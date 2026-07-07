@@ -47,22 +47,29 @@ GoRouter createAppRouter() {
                   GoRoute(
                     path: 'match/:matchId',
                     builder: (context, state) {
-                      final query = state.uri.queryParameters;
                       final matchId = state.pathParameters['matchId'] ?? '';
+                      final extra = state.extra as Map<String, dynamic>? ?? {};
+                      final query = state.uri.queryParameters;
+
+                      final nickname = extra['nickname'] as String? ?? query['nickname'] ?? '';
+                      final platform = extra['platform'] as String? ?? query['platform'] ?? 'steam';
+                      
+                      final summary = extra['summary'] as MatchSummary? ?? MatchSummary(
+                        matchId: matchId,
+                        mapName: query['mapName'] ?? '맵 정보 없음',
+                        mapId: query['mapId'],
+                        gameMode: query['gameMode'] ?? '모드 정보 없음',
+                        kills: int.tryParse(query['kills'] ?? '') ?? 0,
+                        damage: double.tryParse(query['damage'] ?? '') ?? 0,
+                        rank: int.tryParse(query['rank'] ?? ''),
+                        isFallback: query['fallback'] == 'true',
+                      );
+
                       return MatchDetailScreen(
                         matchId: matchId,
-                        nickname: query['nickname'] ?? '',
-                        platform: query['platform'] ?? 'steam',
-                        summary: MatchSummary(
-                          matchId: matchId,
-                          mapName: query['mapName'] ?? '맵 정보 없음',
-                          mapId: query['mapId'],
-                          gameMode: query['gameMode'] ?? '모드 정보 없음',
-                          kills: int.tryParse(query['kills'] ?? '') ?? 0,
-                          damage: double.tryParse(query['damage'] ?? '') ?? 0,
-                          rank: int.tryParse(query['rank'] ?? ''),
-                          isFallback: query['fallback'] == 'true',
-                        ),
+                        nickname: nickname,
+                        platform: platform,
+                        summary: summary,
                       );
                     },
                   ),

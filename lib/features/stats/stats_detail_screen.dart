@@ -231,7 +231,14 @@ class _StatsContentState extends State<_StatsContent> {
           const SizedBox(height: 12),
 
           // 6개 주요 메트릭 그리드
-          _MetricsGrid(stats: currentStats),
+          _MetricsGrid(
+            stats: currentStats,
+            recentMatches: widget.bundle.matches
+                .where((m) => m.gameMode.toLowerCase().contains(_selectedMode.toLowerCase()))
+                .take(20)
+                .toList(),
+            isRanked: _selectedQueue == 'ranked',
+          ),
         ] else ...[
           _EmptyStatsPanel(
             queueLabel: _selectedQueue == 'ranked' ? '경쟁전' : '일반전',
@@ -458,25 +465,60 @@ class _TierInfoPanel extends StatelessWidget {
 }
 
 class _MetricsGrid extends StatelessWidget {
-  const _MetricsGrid({required this.stats});
+  const _MetricsGrid({
+    required this.stats,
+    required this.recentMatches,
+    required this.isRanked,
+  });
 
   final GameModeStats stats;
+  final List<MatchSummary> recentMatches;
+  final bool isRanked;
 
   @override
   Widget build(BuildContext context) {
-    final avgSurvivalTime = stats.roundsPlayed > 0 ? stats.timeSurvived / stats.roundsPlayed : 0.0;
+    // 1. 최근 매치 중 분석완료(fallback 아님) 매치 필터링
+    final validMatches = recentMatches.where((m) => !m.isFallback).toList();
+
+    double avgSurvivalTime = 0.0;
+    double top10Rate = 0.0;
+    double headshotRate = 0.0;
+
+    if (isRanked) {
+      if (validMatches.isNotEmpty) {
+        // top10 진입 횟수 계산 (rank가 1~10 사이)
+        final top10Count = validMatches.where((m) => m.rank != null && m.rank! <= 10).length;
+        top10Rate = (top10Count / validMatches.length) * 100.0;
+
+        // 헤드샷 비율 계산
+        final totalKills = validMatches.fold<int>(0, (sum, m) => sum + m.kills);
+        final totalHeadshots = validMatches.fold<int>(0, (sum, m) => sum + m.headshotKills);
+        headshotRate = totalKills > 0 ? (totalHeadshots / totalKills * 100.0) : 0.0;
+        
+        // 생존 시간 계산
+        final totalSurvival = validMatches.fold<double>(0, (sum, m) => sum + m.timeSurvived);
+        avgSurvivalTime = totalSurvival / validMatches.length;
+      }
+    } else {
+      // 일반전일 때는 기존 PUBG API 제공값 기반
+      avgSurvivalTime = stats.roundsPlayed > 0 ? stats.timeSurvived / stats.roundsPlayed : 0.0;
+      top10Rate = stats.top10Rate;
+      headshotRate = stats.kills > 0 ? (stats.headshotKills / stats.kills * 100.0) : 0.0;
+    }
+
     final survivalMinutes = (avgSurvivalTime / 60).floor();
     final survivalSeconds = (avgSurvivalTime % 60).round();
-    final survivalStr = stats.roundsPlayed > 0 ? '$survivalMinutes분 $survivalSeconds초' : '-';
-
-    final headshotRate = stats.kills > 0 ? (stats.headshotKills / stats.kills * 100) : 0.0;
+    
+    // 생존 시간 표시 조건 (라운드 기록이 있거나 validMatches가 있을 때만 노출)
+    final hasSurvivalData = isRanked ? validMatches.isNotEmpty : stats.roundsPlayed > 0;
+    final survivalStr = hasSurvivalData ? '$survivalMinutes분 $survivalSeconds초' : '-';
 
     final metrics = [
       _Metric('KDA', stats.kda.toStringAsFixed(2), Icons.adjust),
       _Metric('ADR', stats.adr.toStringAsFixed(1), Icons.bolt),
       _Metric('승률', '${stats.winRate.toStringAsFixed(1)}%', Icons.emoji_events),
       _Metric('평균 생존 시간', survivalStr, Icons.hourglass_empty),
-      _Metric('Top 10', '${stats.top10Rate.toStringAsFixed(1)}%', Icons.leaderboard),
+      _Metric('Top 10', '${top10Rate.toStringAsFixed(1)}%', Icons.leaderboard),
       _Metric('헤드샷 비율', '${headshotRate.toStringAsFixed(1)}%', Icons.gps_fixed),
     ];
 

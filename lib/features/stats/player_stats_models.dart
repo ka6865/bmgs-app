@@ -192,6 +192,8 @@ class MatchSummary {
     required this.isFallback,
     this.tier,
     required this.createdAt,
+    this.headshotKills = 0,
+    this.timeSurvived = 0.0,
   });
 
   final String matchId;
@@ -204,6 +206,8 @@ class MatchSummary {
   final bool isFallback;
   final Map<String, dynamic>? tier;
   final DateTime createdAt;
+  final int headshotKills;
+  final double timeSurvived;
 
   String get tierName {
     if (tier == null) return '';
@@ -227,6 +231,8 @@ class MatchSummary {
       isFallback: true,
       tier: null,
       createdAt: DateTime.now(),
+      headshotKills: 0,
+      timeSurvived: 0.0,
     );
   }
 
@@ -283,6 +289,17 @@ class MatchSummary {
               ? Map<String, dynamic>.from(json['currentTier']) 
               : null),
       createdAt: DateTime.tryParse(dateStr) ?? DateTime.now(),
+      headshotKills: _firstNum([
+        json['headshotKills'],
+        player?['headshotKills'],
+        stats?['headshotKills'],
+      ]).round(),
+      timeSurvived: _firstNum([
+        json['timeSurvived'],
+        json['timeSurvived'],
+        player?['timeSurvived'],
+        stats?['timeSurvived'],
+      ]),
     );
   }
 

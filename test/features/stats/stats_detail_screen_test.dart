@@ -264,4 +264,145 @@ void main() {
     // match-2의 경과 시간(3시간 전) 표시 검증
     expect(find.text('3시간 전'), findsOneWidget);
   });
+
+  testWidgets('경쟁전 탭 진입 시 최근 매치 데이터 기반 생존시간, 탑텐율, 헤드샷이 합산 평균으로 보완 렌더링된다', (WidgetTester tester) async {
+    final mockRepo = MockRankedStatsSupplementRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'SupplementUser',
+            platform: 'steam',
+            repository: mockRepo,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. 경쟁전 탭(기본선택)일 때: 최근 매치 기반 실시간 보완 통계 검증
+    // 예상 평균 생존 시간: (1200 + 600) / 2 = 900초 -> 15분 0초
+    // 예상 Top 10 진입률: 1 / 2 = 50.0%
+    // 예상 헤드샷 비율: (1 + 0) / (3 + 1) = 25.0%
+    expect(find.text('15분 0초'), findsOneWidget);
+    expect(find.text('50.0%'), findsOneWidget);
+    expect(find.text('25.0%'), findsOneWidget);
+
+    // 2. 일반전 탭으로 전환
+    await tester.tap(find.text('일반전'));
+    await tester.pumpAndSettle();
+
+    // 일반전일 때는 PUBG API 제공 값을 그대로 사용
+    // normal squad stats: roundsPlayed: 5, top10s: 2 (40.0%), kills: 8, headshotKills: 2 (25.0%), timeSurvived: 4500.0 (평균 900초 -> 15분 0초)
+    // top10Rate: stats.top10Rate -> 2 / 5 = 40.0%
+    expect(find.text('40.0%'), findsOneWidget);
+  });
+}
+
+class MockRankedStatsSupplementRepository extends Fake implements PlayerStatsRepository {
+  @override
+  Future<PlayerStatsBundle> fetchPlayerStats({
+    required String nickname,
+    required String platform,
+    String? season,
+  }) {
+    final modeStats = {
+      'ranked': {
+        'squad': const GameModeStats(
+          roundsPlayed: 10,
+          wins: 2,
+          top10s: 5,
+          losses: 8,
+          kills: 15,
+          assists: 5,
+          damageDealt: 2500.0,
+          timeSurvived: 9000.0,
+          currentTier: {'tier': 'Gold', 'subTier': 'III'},
+          currentRankPoint: 2200,
+          bestTier: {'tier': 'Gold', 'subTier': 'I'},
+          bestRankPoint: 2400,
+          headshotKills: 3,
+          longestKill: 350.0,
+        ),
+      },
+      'normal': {
+        'squad': const GameModeStats(
+          roundsPlayed: 5,
+          wins: 1,
+          top10s: 2, // 2 / 5 -> 40.0%
+          losses: 4,
+          kills: 8,
+          assists: 2,
+          damageDealt: 1200.0,
+          timeSurvived: 4500.0,
+          currentTier: null,
+          currentRankPoint: 0,
+          bestTier: null,
+          bestRankPoint: 0,
+          headshotKills: 2,
+          longestKill: 200.0,
+        ),
+      }
+    };
+
+    final profile = PlayerStatsProfile(
+      nickname: nickname,
+      platform: platform,
+      seasonId: 'division.bro.official.pc-2024-01',
+      kd: 1.5,
+      adr: 250.0,
+      winRate: 20.0,
+      averageRank: 5.0,
+      roundsPlayed: 15,
+      recentMatches: const ['match-1', 'match-2', 'match-3'],
+      matchModes: const {'match-1': 'squad', 'match-2': 'squad', 'match-3': 'squad'},
+      seasonsList: const ['division.bro.official.pc-2024-01'],
+      updatedAt: DateTime(2026, 7, 7, 12, 0, 0),
+      modeStats: modeStats,
+    );
+
+    return SynchronousFuture(PlayerStatsBundle(
+      profile: profile,
+      matches: [
+        MatchSummary(
+          matchId: 'match-1',
+          mapName: 'Erangel',
+          gameMode: 'squad',
+          kills: 3,
+          damage: 450.0,
+          rank: 5, // Top 10
+          isFallback: false,
+          createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
+          headshotKills: 1,
+          timeSurvived: 1200.0, // 20 min
+        ),
+        MatchSummary(
+          matchId: 'match-2',
+          mapName: 'Miramar',
+          gameMode: 'squad',
+          kills: 1,
+          damage: 150.0,
+          rank: 15, // Not Top 10
+          isFallback: false,
+          createdAt: DateTime.now().subtract(const Duration(hours: 3)),
+          headshotKills: 0,
+          timeSurvived: 600.0, // 10 min
+        ),
+        MatchSummary(
+          matchId: 'match-3',
+          mapName: 'Sanhok',
+          gameMode: 'squad',
+          kills: 5,
+          damage: 500.0,
+          rank: 2,
+          isFallback: true, // fallback -> 제외됨
+          createdAt: DateTime.now().subtract(const Duration(hours: 4)),
+          headshotKills: 2,
+          timeSurvived: 900.0,
+        ),
+      ],
+      summaryFallback: false,
+    ));
+  }
 }

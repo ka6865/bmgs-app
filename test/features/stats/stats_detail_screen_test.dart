@@ -7,12 +7,16 @@ import 'package:bgms_mobile_app/features/stats/player_stats_repository.dart';
 import 'package:bgms_mobile_app/features/stats/widgets/radar_chart_widget.dart';
 
 class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
+  bool lastRefresh = false;
+
   @override
   Future<PlayerStatsBundle> fetchPlayerStats({
     required String nickname,
     required String platform,
     String? season,
+    bool refresh = false,
   }) {
+    lastRefresh = refresh;
     final modeStats = {
       'ranked': {
         'squad': const GameModeStats(
@@ -298,6 +302,157 @@ void main() {
     // top10Rate: stats.top10Rate -> 2 / 5 = 40.0%
     expect(find.text('40.0%'), findsOneWidget);
   });
+
+  testWidgets('StatsDetailScreen 새로고침 탭 시 refresh: true 인자로 레포지토리 호출 검증', (WidgetTester tester) async {
+    final mockRepo = MockPlayerStatsRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'TestUser',
+            platform: 'steam',
+            repository: mockRepo,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // 1. 처음엔 refresh = false 로 호출됨
+    expect(mockRepo.lastRefresh, isFalse);
+
+    // 2. 새로고침 아이콘 탭
+    final refreshButton = find.byTooltip('새로고침');
+    expect(refreshButton, findsOneWidget);
+    await tester.tap(refreshButton);
+    await tester.pumpAndSettle();
+
+    // 3. refresh = true 로 다시 호출됨
+    expect(mockRepo.lastRefresh, isTrue);
+  });
+
+  testWidgets('StatsDetailScreen - Miramar 맵코드 대소문자 믹스 매칭 및 그라데이션 검증', (WidgetTester tester) async {
+    final mockRepo = MockMiramarMapNameStatsRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'TestUser',
+            platform: 'steam',
+            repository: mockRepo,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final matchCards = find.byWidgetPredicate((w) => w.runtimeType.toString() == '_MatchCard');
+    expect(matchCards, findsNWidgets(3));
+
+    for (int i = 0; i < 3; i++) {
+      final inkWellFinder = find.descendant(
+        of: matchCards.at(i),
+        matching: find.byType(InkWell),
+      );
+      final containerFinder = find.descendant(
+        of: inkWellFinder,
+        matching: find.byType(Container),
+      ).first;
+      final container = tester.widget<Container>(containerFinder);
+      final decoration = container.decoration as BoxDecoration?;
+      final gradient = decoration?.gradient as LinearGradient?;
+      expect(gradient, isNotNull);
+      expect(gradient!.colors.first, equals(const Color(0xFF5A442E).withValues(alpha: 0.8)));
+    }
+  });
+}
+
+class MockMiramarMapNameStatsRepository extends Fake implements PlayerStatsRepository {
+  @override
+  Future<PlayerStatsBundle> fetchPlayerStats({
+    required String nickname,
+    required String platform,
+    String? season,
+    bool refresh = false,
+  }) {
+    final modeStats = {
+      'ranked': {
+        'squad': const GameModeStats(
+          roundsPlayed: 10,
+          wins: 0,
+          top10s: 5,
+          losses: 8,
+          kills: 15,
+          assists: 5,
+          damageDealt: 2500.0,
+          timeSurvived: 9000.0,
+          currentTier: {'tier': 'Gold', 'subTier': 'III'},
+          currentRankPoint: 2200,
+          bestTier: {'tier': 'Gold', 'subTier': 'I'},
+          bestRankPoint: 2400,
+          headshotKills: 3,
+          longestKill: 350.0,
+        ),
+      },
+    };
+
+    final profile = PlayerStatsProfile(
+      nickname: nickname,
+      platform: platform,
+      seasonId: 'division.bro.official.pc-2024-01',
+      kd: 1.5,
+      adr: 250.0,
+      winRate: 20.0,
+      averageRank: 5.0,
+      roundsPlayed: 15,
+      recentMatches: const ['match-1', 'match-2', 'match-3'],
+      matchModes: const {'match-1': 'squad', 'match-2': 'squad', 'match-3': 'squad'},
+      seasonsList: const ['division.bro.official.pc-2024-01'],
+      updatedAt: DateTime(2026, 7, 7, 12, 0, 0),
+      modeStats: modeStats,
+    );
+
+    return SynchronousFuture(PlayerStatsBundle(
+      profile: profile,
+      matches: [
+        MatchSummary(
+          matchId: 'match-1',
+          mapName: 'Desert_Main',
+          gameMode: 'squad',
+          kills: 3,
+          damage: 450.0,
+          rank: 5,
+          isFallback: false,
+          createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
+        ),
+        MatchSummary(
+          matchId: 'match-2',
+          mapName: 'desert_main',
+          gameMode: 'squad',
+          kills: 1,
+          damage: 150.0,
+          rank: 15,
+          isFallback: false,
+          createdAt: DateTime.now().subtract(const Duration(hours: 3)),
+        ),
+        MatchSummary(
+          matchId: 'match-3',
+          mapName: 'Miramar',
+          gameMode: 'squad',
+          kills: 5,
+          damage: 500.0,
+          rank: 2,
+          isFallback: false,
+          createdAt: DateTime.now().subtract(const Duration(hours: 4)),
+        ),
+      ],
+      summaryFallback: false,
+    ));
+  }
 }
 
 class MockRankedStatsSupplementRepository extends Fake implements PlayerStatsRepository {
@@ -306,6 +461,7 @@ class MockRankedStatsSupplementRepository extends Fake implements PlayerStatsRep
     required String nickname,
     required String platform,
     String? season,
+    bool refresh = false,
   }) {
     final modeStats = {
       'ranked': {

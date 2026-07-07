@@ -46,7 +46,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     }
   }
 
-  void _startFetch() {
+  void _startFetch({bool refresh = false}) {
     final nickname = widget.nickname?.trim() ?? '';
     if (nickname.isEmpty) {
       _statsFuture = null;
@@ -56,11 +56,12 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
       nickname: nickname,
       platform: widget.platform,
       season: _selectedSeason,
+      refresh: refresh,
     );
   }
 
   void _retry() {
-    setState(_startFetch);
+    setState(() => _startFetch(refresh: true));
   }
 
   void _onSeasonChanged(String? newSeason) {
@@ -917,7 +918,7 @@ class _MatchCard extends StatelessWidget {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
-    } else if (name.contains('miramar')) {
+    } else if (name.contains('miramar') || name.contains('desert')) {
       return LinearGradient(
         colors: [
           const Color(0xFF5A442E).withValues(alpha: 0.8),

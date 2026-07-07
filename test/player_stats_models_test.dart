@@ -53,6 +53,7 @@ void main() {
         'date': '2026-07-06T15:30:00.000Z',
       },
       'player': {'kills': 3, 'damageDealt': 450.5, 'winPlace': 4},
+      'timeSurvived': 1234.5,
     });
 
     expect(summary.mapName, '에란겔');
@@ -62,6 +63,7 @@ void main() {
     expect(summary.rank, 4);
     expect(summary.isFallback, isFalse);
     expect(summary.createdAt, DateTime.parse('2026-07-06T15:30:00.000Z'));
+    expect(summary.timeSurvived, 1234.5);
   });
 
   test('AiCoachingSummary parses normal NDJSON final response', () {

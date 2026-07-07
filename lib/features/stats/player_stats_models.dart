@@ -296,7 +296,6 @@ class MatchSummary {
       ]).round(),
       timeSurvived: _firstNum([
         json['timeSurvived'],
-        json['timeSurvived'],
         player?['timeSurvived'],
         stats?['timeSurvived'],
       ]),

@@ -1,95 +1,135 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../core/config/app_config.dart';
+import '../../core/theme/bgms_theme.dart';
+import '../../core/widgets/bgms_brand_header.dart';
+import 'map_models.dart';
+import 'map_view_helpers.dart';
+import 'maps_repository.dart';
+
 class MapsScreen extends StatefulWidget {
-  const MapsScreen({super.key});
+  const MapsScreen({super.key, this.initialMapId, this.repository});
+
+  final String? initialMapId;
+  final MapsRepository? repository;
 
   @override
   State<MapsScreen> createState() => _MapsScreenState();
 }
 
 class _MapsScreenState extends State<MapsScreen> {
-  String _mapId = 'Erangel';
-  final Set<String> _layers = {'Garage', 'SecretRoom'};
+  late final MapsRepository _repository;
+  late BgmsMap _selectedMap;
+  final Set<String> _layers = {'Garage', 'SecretRoom', 'HotDrop'};
+  late Future<MapMarkerLayer> _markerFuture;
+  Timer? _reloadTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = widget.repository ?? MapsRepository();
+    _selectedMap = _repository.resolveMap(widget.initialMapId);
+    _markerFuture = _loadMarkers();
+  }
+
+  Future<MapMarkerLayer> _loadMarkers() {
+    return _repository.fetchMarkers(
+      mapId: _selectedMap.id,
+      layers: _layers.toList()..sort(),
+    );
+  }
+
+  void _reloadMarkers() {
+    setState(() {
+      _markerFuture = _loadMarkers();
+    });
+  }
+
+  void _scheduleReloadMarkers() {
+    _reloadTimer?.cancel();
+    _reloadTimer = Timer(const Duration(milliseconds: 250), _reloadMarkers);
+  }
+
+  @override
+  void dispose() {
+    _reloadTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        Text(
-          '지도',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+        const BgmsBrandHeader(
+          title: '지도',
+          subtitle: '맵별 주요 마커와 레이어를 읽기 전용으로 확인합니다.',
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
-          initialValue: _mapId,
+          initialValue: _selectedMap.id,
           decoration: const InputDecoration(labelText: '맵 선택'),
-          items: const [
-            DropdownMenuItem(value: 'Erangel', child: Text('Erangel')),
-            DropdownMenuItem(value: 'Miramar', child: Text('Miramar')),
-            DropdownMenuItem(value: 'Taego', child: Text('Taego')),
-            DropdownMenuItem(value: 'Rondo', child: Text('Rondo')),
-            DropdownMenuItem(value: 'Vikendi', child: Text('Vikendi')),
-            DropdownMenuItem(value: 'Deston', child: Text('Deston')),
-          ],
+          items: _repository.availableMaps
+              .map(
+                (map) => DropdownMenuItem(value: map.id, child: Text(map.name)),
+              )
+              .toList(),
           onChanged: (value) {
-            if (value != null) setState(() => _mapId = value);
+            if (value == null) return;
+            setState(() => _selectedMap = _repository.resolveMap(value));
+            _scheduleReloadMarkers();
           },
         ),
         const SizedBox(height: 16),
         Wrap(
           spacing: 8,
+          runSpacing: 8,
           children: [
-            FilterChip(
-              label: const Text('차량'),
+            _LayerChip(
+              label: '차량',
+              layer: 'Garage',
               selected: _layers.contains('Garage'),
-              onSelected: (_) => _toggleLayer('Garage'),
+              onSelected: _toggleLayer,
             ),
-            FilterChip(
-              label: const Text('비밀방'),
+            _LayerChip(
+              label: '비밀방',
+              layer: 'SecretRoom',
               selected: _layers.contains('SecretRoom'),
-              onSelected: (_) => _toggleLayer('SecretRoom'),
+              onSelected: _toggleLayer,
             ),
-            FilterChip(
-              label: const Text('이스포츠'),
+            _LayerChip(
+              label: '이스포츠',
+              layer: 'Esports',
               selected: _layers.contains('Esports'),
-              onSelected: (_) => _toggleLayer('Esports'),
+              onSelected: _toggleLayer,
+            ),
+            _LayerChip(
+              label: '핫드랍',
+              layer: 'HotDrop',
+              selected: _layers.contains('HotDrop'),
+              onSelected: _toggleLayer,
             ),
           ],
         ),
         const SizedBox(height: 16),
-        Card(
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: InteractiveViewer(
-              minScale: 0.7,
-              maxScale: 3,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                      ),
-                      child: Center(child: Text('$_mapId 읽기 전용 지도')),
-                    ),
-                  ),
-                  const Positioned(
-                    left: 80,
-                    top: 110,
-                    child: _MapMarker(label: '차량'),
-                  ),
-                  const Positioned(
-                    right: 76,
-                    bottom: 96,
-                    child: _MapMarker(label: '비밀방'),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        FutureBuilder<MapMarkerLayer>(
+          future: _markerFuture,
+          builder: (context, snapshot) {
+            final layer =
+                snapshot.data ??
+                MapMarkerLayer.unavailable(
+                  mapId: _selectedMap.id,
+                  message: '지도 마커를 준비하는 중입니다.',
+                );
+            return _MapPanel(
+              map: _selectedMap,
+              layer: layer,
+              activeLayers: _layers,
+              loading: snapshot.connectionState == ConnectionState.waiting,
+            );
+          },
         ),
       ],
     );
@@ -103,19 +143,271 @@ class _MapsScreenState extends State<MapsScreen> {
         _layers.add(layer);
       }
     });
+    _scheduleReloadMarkers();
+  }
+}
+
+class _LayerChip extends StatelessWidget {
+  const _LayerChip({
+    required this.label,
+    required this.layer,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final String layer;
+  final bool selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(layer),
+    );
+  }
+}
+
+class _MapPanel extends StatelessWidget {
+  const _MapPanel({
+    required this.map,
+    required this.layer,
+    required this.activeLayers,
+    required this.loading,
+  });
+
+  final BgmsMap map;
+  final MapMarkerLayer layer;
+  final Set<String> activeLayers;
+  final bool loading;
+
+  void _showMarkerDetails(BuildContext context, MapMarker marker) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF161b26),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        final label = getCategoryLabel(marker.layer);
+        final color = getMarkerColor(marker.layer);
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: color, width: 0.5),
+                      ),
+                      child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  marker.label,
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '위치 좌표: (X: ${(marker.x * 100).toStringAsFixed(1)}%, Y: ${(marker.y * 100).toStringAsFixed(1)}%)',
+                  style: const TextStyle(color: Colors.white54, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '${marker.label}은(는) ${getCategoryLabel(marker.layer)} 분류 지점입니다. 게임 플레이 전술 수립 시 참고하십시오.',
+                  style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleMarkers = layer.markers
+        .where((marker) => activeLayers.contains(marker.layer))
+        .toList();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${map.name} 읽기 전용 지도',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: BgmsColors.accent,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Chip(label: Text(layer.source.name)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text('${layer.message} 지도 배경은 웹 BGMS 타일(/tiles) 기준입니다.'),
+            const SizedBox(height: 12),
+            if (loading) const LinearProgressIndicator(),
+            AspectRatio(
+              aspectRatio: 1,
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 3,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      children: [
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: BgmsColors.elevated,
+                              border: Border.all(color: BgmsColors.border),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: _MapTileMosaic(map: map),
+                            ),
+                          ),
+                        ),
+                        ...visibleMarkers.map(
+                          (marker) => Align(
+                            alignment: FractionalOffset(marker.x, marker.y),
+                            child: _MapMarker(
+                              marker: marker,
+                              onTap: () => _showMarkerDetails(context, marker),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+            if (!loading && visibleMarkers.isEmpty) ...[
+              const SizedBox(height: 12),
+              const Text('표시할 마커가 없습니다. 위 API 메시지를 확인해 주세요.'),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapTileMosaic extends StatelessWidget {
+  const _MapTileMosaic({required this.map});
+
+  static const int _zoom = 2;
+  static const int _tileCount = 4;
+
+  final BgmsMap map;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseUrl = AppConfig.local.apiBaseUrl.replaceFirst(RegExp(r'/$'), '');
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        GridView.builder(
+          padding: EdgeInsets.zero,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _tileCount,
+          ),
+          itemCount: _tileCount * _tileCount,
+          itemBuilder: (context, index) {
+            final x = index % _tileCount;
+            final row = index ~/ _tileCount;
+            final y = -(_tileCount - row);
+            final url = '$baseUrl/tiles/${map.tilePath}/$_zoom/$x/$y.jpg';
+
+            return Image.network(
+              url,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (context, error, stackTrace) {
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: BgmsColors.bgBase,
+                    border: Border.all(color: BgmsColors.border),
+                  ),
+                  child: const SizedBox.expand(),
+                );
+              },
+            );
+          },
+        ),
+        Align(
+          alignment: Alignment.bottomRight,
+          child: Container(
+            margin: const EdgeInsets.all(8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.62),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: BgmsColors.border),
+            ),
+            child: const Text(
+              'tile z2',
+              style: TextStyle(fontSize: 11, color: Colors.white70),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
 class _MapMarker extends StatelessWidget {
-  const _MapMarker({required this.label});
+  const _MapMarker({required this.marker, required this.onTap});
 
-  final String label;
+  final MapMarker marker;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      avatar: const Icon(Icons.location_on, size: 16),
-      label: Text(label),
+    final icon = getMarkerIcon(marker.layer);
+    final color = getMarkerColor(marker.layer);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.2),
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 1.5),
+        ),
+        child: Icon(icon, size: 14, color: color),
+      ),
     );
   }
 }

@@ -15,6 +15,12 @@ class BgmsApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
       routerConfig: _router,
+      builder: (context, child) {
+        return GestureDetector(
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: child,
+        );
+      },
     );
   }
 }

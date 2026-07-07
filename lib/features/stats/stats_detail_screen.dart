@@ -685,7 +685,7 @@ class _MatchCard extends StatelessWidget {
 
   String _formatElapsedTime(DateTime dateTime) {
     final now = DateTime.now();
-    final difference = now.difference(dateTime);
+    final difference = now.difference(dateTime.toLocal());
 
     if (difference.inMinutes < 1) {
       return '방금 전';

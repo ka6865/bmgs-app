@@ -4,7 +4,7 @@ import 'package:bgms_mobile_app/features/stats/match_detail_screen.dart';
 import 'package:bgms_mobile_app/features/stats/player_stats_models.dart';
 
 void main() {
-  testWidgets('MatchDetailScreen - "리플레이 지도에서 동선 확인" 버튼이 표시되지 않는지 검증 (TDD 실패 테스트)', (WidgetTester tester) async {
+  testWidgets('MatchDetailScreen - "리플레이 지도에서 동선 확인" 버튼이 표시되지 않는지 검증', (WidgetTester tester) async {
     final summary = MatchSummary(
       matchId: 'test-match-id-123',
       mapName: 'Erangel',

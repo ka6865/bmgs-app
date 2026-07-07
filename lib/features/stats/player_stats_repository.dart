@@ -24,7 +24,7 @@ class PlayerStatsRepository {
         refresh: refresh,
       );
       final profile = PlayerStatsProfile.fromJson(playerJson);
-      final matchIds = profile.recentMatches.take(10).toList();
+      final matchIds = profile.recentMatches.take(20).toList();
 
       if (matchIds.isEmpty) {
         return PlayerStatsBundle(

@@ -49,7 +49,7 @@ class GameModeStats {
       roundsPlayed: _asInt(json['roundsPlayed']),
       wins: _asInt(json['wins']),
       top10s: _asInt(json['top10s']),
-      losses: _asInt(json['losses']),
+      losses: _asInt(json['losses'] ?? json['deaths']),
       kills: _asInt(json['kills']),
       assists: _asInt(json['assists']),
       damageDealt: _asDouble(json['damageDealt']),

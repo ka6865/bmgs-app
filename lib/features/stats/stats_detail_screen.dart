@@ -152,6 +152,11 @@ class _StatsContent extends StatefulWidget {
 }
 
 class _StatsContentState extends State<_StatsContent> {
+  static const double _targetCombatKD = 2.0;
+  static const double _targetTacticalADR = 300.0;
+  static const double _targetSurvivalSeconds = 1200.0;
+  static const double _targetAvgAssists = 1.5;
+
   String _selectedQueue = 'ranked'; // 'ranked' | 'normal'
   String _selectedMode = 'squad'; // 'squad' | 'duo' | 'solo'
 
@@ -338,28 +343,48 @@ class _StatsContentState extends State<_StatsContent> {
   }
 
   double _calculateCombatScore(GameModeStats stats) {
-    // KD 가 2.0 이면 100점
-    return (stats.kd / 2.0 * 100).clamp(0.0, 100.0);
+    return (stats.kd / _targetCombatKD * 100).clamp(0.0, 100.0);
   }
 
   double _calculateTacticalScore(GameModeStats stats) {
-    // ADR 이 300 이면 100점
-    return (stats.adr / 300.0 * 100).clamp(0.0, 100.0);
+    return (stats.adr / _targetTacticalADR * 100).clamp(0.0, 100.0);
   }
 
   double _calculateSurvivalScore(GameModeStats stats) {
     if (stats.roundsPlayed == 0) return 0.0;
-    // 평균 생존 시간 20분(1200초)이면 100점
     final avgSurvival = stats.timeSurvived / stats.roundsPlayed;
-    return (avgSurvival / 1200.0 * 100).clamp(0.0, 100.0);
+    return (avgSurvival / _targetSurvivalSeconds * 100).clamp(0.0, 100.0);
   }
 
   double _calculateTeamworkScore(GameModeStats stats) {
     if (stats.roundsPlayed == 0) return 0.0;
-    // 평균 어시스트 1.5개면 100점
+    if (_selectedMode == 'solo') {
+      // 솔로 모드에서는 어시스트가 불가능하므로, 탑10 비율(최소 20점 보장)로 보정하여 0점 수렴 방지
+      return stats.top10Rate.clamp(20.0, 100.0);
+    }
     final avgAssists = stats.assists / stats.roundsPlayed;
-    return (avgAssists / 1.5 * 100).clamp(0.0, 100.0);
+    return (avgAssists / _targetAvgAssists * 100).clamp(0.0, 100.0);
   }
+}
+
+Color _getTierColor(String tierName) {
+  if (tierName.contains('Bronze')) return const Color(0xFFCD7F32);
+  if (tierName.contains('Silver')) return const Color(0xFFC0C0C0);
+  if (tierName.contains('Gold')) return const Color(0xFFFFD700);
+  if (tierName.contains('Platinum')) return const Color(0xFFE5E4E2);
+  if (tierName.contains('Diamond')) return const Color(0xFFB9F2FF);
+  if (tierName.contains('Master')) return const Color(0xFFFF007F);
+  if (tierName.contains('Grandmaster')) return const Color(0xFFFF3F3F);
+  return BgmsColors.accent;
+}
+
+IconData _getTierIcon(String tierName) {
+  if (tierName.contains('Bronze') || tierName.contains('Silver')) return Icons.shield;
+  if (tierName.contains('Gold')) return Icons.emoji_events;
+  if (tierName.contains('Platinum') || tierName.contains('Diamond')) return Icons.diamond;
+  if (tierName.contains('Master')) return Icons.military_tech;
+  if (tierName.contains('Grandmaster')) return Icons.local_fire_department;
+  return Icons.stars;
 }
 
 class _TierInfoPanel extends StatelessWidget {
@@ -376,32 +401,9 @@ class _TierInfoPanel extends StatelessWidget {
     // RP를 다음 백 단위 기준 진척도로 환산
     final double progress = (rp % 100) / 100.0;
 
-    // 티어별 어울리는 아이콘 색상 설정
-    Color tierColor = BgmsColors.accent;
-    IconData tierIcon = Icons.stars;
-
-    if (tierName.contains('Bronze')) {
-      tierColor = const Color(0xFFCD7F32);
-      tierIcon = Icons.shield;
-    } else if (tierName.contains('Silver')) {
-      tierColor = const Color(0xFFC0C0C0);
-      tierIcon = Icons.shield;
-    } else if (tierName.contains('Gold')) {
-      tierColor = const Color(0xFFFFD700);
-      tierIcon = Icons.emoji_events;
-    } else if (tierName.contains('Platinum')) {
-      tierColor = const Color(0xFFE5E4E2);
-      tierIcon = Icons.diamond;
-    } else if (tierName.contains('Diamond')) {
-      tierColor = const Color(0xFFB9F2FF);
-      tierIcon = Icons.diamond;
-    } else if (tierName.contains('Master')) {
-      tierColor = const Color(0xFFFF007F);
-      tierIcon = Icons.military_tech;
-    } else if (tierName.contains('Grandmaster')) {
-      tierColor = const Color(0xFFFF3F3F);
-      tierIcon = Icons.local_fire_department;
-    }
+    // 티어별 어울리는 아이콘 및 색상 설정
+    final Color tierColor = _getTierColor(tierName);
+    final IconData tierIcon = _getTierIcon(tierName);
 
     return Card(
       color: const Color(0xFF161b26),
@@ -819,22 +821,7 @@ class _MatchCard extends StatelessWidget {
   }
 
   Widget _buildTierBadge(String tierName) {
-    Color tierColor = Colors.white54;
-    if (tierName.contains('Bronze')) {
-      tierColor = const Color(0xFFCD7F32);
-    } else if (tierName.contains('Silver')) {
-      tierColor = const Color(0xFFC0C0C0);
-    } else if (tierName.contains('Gold')) {
-      tierColor = const Color(0xFFFFD700);
-    } else if (tierName.contains('Platinum')) {
-      tierColor = const Color(0xFFE5E4E2);
-    } else if (tierName.contains('Diamond')) {
-      tierColor = const Color(0xFFB9F2FF);
-    } else if (tierName.contains('Master')) {
-      tierColor = const Color(0xFFFF007F);
-    } else if (tierName.contains('Grandmaster')) {
-      tierColor = const Color(0xFFFF3F3F);
-    }
+    final Color tierColor = _getTierColor(tierName);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

@@ -1,4 +1,4 @@
-import 'dart:async';
+
 
 import 'package:flutter/material.dart';
 
@@ -24,7 +24,6 @@ class _MapsScreenState extends State<MapsScreen> {
   late BgmsMap _selectedMap;
   final Set<String> _layers = {'Garage', 'SecretRoom', 'HotDrop'};
   late Future<MapMarkerLayer> _markerFuture;
-  Timer? _reloadTimer;
 
   @override
   void initState() {
@@ -35,104 +34,27 @@ class _MapsScreenState extends State<MapsScreen> {
   }
 
   Future<MapMarkerLayer> _loadMarkers() {
-    return _repository.fetchMarkers(
+    final future = _repository.fetchMarkers(
       mapId: _selectedMap.id,
-      layers: _layers.toList()..sort(),
+      layers: const [], // 전체 마커 데이터 로드
     );
-  }
 
-  void _reloadMarkers() {
-    setState(() {
-      _markerFuture = _loadMarkers();
+    future.then((layer) {
+      if (mounted) {
+        setState(() {
+          if (layer.markers.isNotEmpty) {
+            final available = layer.markers.map((m) => m.layer).toSet();
+            _layers.clear();
+            _layers.addAll(available);
+          } else {
+            _layers.clear();
+            _layers.addAll(const ['Garage', 'SecretRoom', 'Esports', 'HotDrop']);
+          }
+        });
+      }
     });
-  }
 
-  void _scheduleReloadMarkers() {
-    _reloadTimer?.cancel();
-    _reloadTimer = Timer(const Duration(milliseconds: 250), _reloadMarkers);
-  }
-
-  @override
-  void dispose() {
-    _reloadTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const BgmsBrandHeader(
-          title: '지도',
-          subtitle: '맵별 주요 마커와 레이어를 읽기 전용으로 확인합니다.',
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedMap.id,
-          decoration: const InputDecoration(labelText: '맵 선택'),
-          items: _repository.availableMaps
-              .map(
-                (map) => DropdownMenuItem(value: map.id, child: Text(map.name)),
-              )
-              .toList(),
-          onChanged: (value) {
-            if (value == null) return;
-            setState(() => _selectedMap = _repository.resolveMap(value));
-            _scheduleReloadMarkers();
-          },
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _LayerChip(
-              label: '차량',
-              layer: 'Garage',
-              selected: _layers.contains('Garage'),
-              onSelected: _toggleLayer,
-            ),
-            _LayerChip(
-              label: '비밀방',
-              layer: 'SecretRoom',
-              selected: _layers.contains('SecretRoom'),
-              onSelected: _toggleLayer,
-            ),
-            _LayerChip(
-              label: '이스포츠',
-              layer: 'Esports',
-              selected: _layers.contains('Esports'),
-              onSelected: _toggleLayer,
-            ),
-            _LayerChip(
-              label: '핫드랍',
-              layer: 'HotDrop',
-              selected: _layers.contains('HotDrop'),
-              onSelected: _toggleLayer,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        FutureBuilder<MapMarkerLayer>(
-          future: _markerFuture,
-          builder: (context, snapshot) {
-            final layer =
-                snapshot.data ??
-                MapMarkerLayer.unavailable(
-                  mapId: _selectedMap.id,
-                  message: '지도 마커를 준비하는 중입니다.',
-                );
-            return _MapPanel(
-              map: _selectedMap,
-              layer: layer,
-              activeLayers: _layers,
-              loading: snapshot.connectionState == ConnectionState.waiting,
-            );
-          },
-        ),
-      ],
-    );
+    return future;
   }
 
   void _toggleLayer(String layer) {
@@ -143,7 +65,76 @@ class _MapsScreenState extends State<MapsScreen> {
         _layers.add(layer);
       }
     });
-    _scheduleReloadMarkers();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<MapMarkerLayer>(
+      future: _markerFuture,
+      builder: (context, snapshot) {
+        final layer = snapshot.data ??
+            MapMarkerLayer.unavailable(
+              mapId: _selectedMap.id,
+              message: '지도 마커를 준비하는 중입니다.',
+            );
+        final loading = snapshot.connectionState == ConnectionState.waiting;
+
+        // 마커 목록에서 레이어 목록을 동적으로 구성 (중복제거 및 정렬)
+        final availableLayers =
+            layer.markers.map((m) => m.layer).toSet().toList()..sort();
+
+        final layersToShow = availableLayers.isNotEmpty
+            ? availableLayers
+            : const ['Garage', 'SecretRoom', 'Esports', 'HotDrop'];
+
+        return ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            const BgmsBrandHeader(
+              title: '지도',
+              subtitle: '맵별 주요 마커와 레이어를 읽기 전용으로 확인합니다.',
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedMap.id,
+              decoration: const InputDecoration(labelText: '맵 선택'),
+              items: _repository.availableMaps
+                  .map(
+                    (map) => DropdownMenuItem(value: map.id, child: Text(map.name)),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _selectedMap = _repository.resolveMap(value);
+                  _markerFuture = _loadMarkers();
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: layersToShow.map((layerName) {
+                return _LayerChip(
+                  label: getCategoryLabel(layerName),
+                  layer: layerName,
+                  selected: _layers.contains(layerName),
+                  onSelected: _toggleLayer,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            _MapPanel(
+              map: _selectedMap,
+              layer: layer,
+              activeLayers: _layers,
+              loading: loading,
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 

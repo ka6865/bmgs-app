@@ -6,16 +6,19 @@ import '../../core/widgets/bgms_brand_header.dart';
 import 'ai_coaching_card.dart';
 import 'player_stats_models.dart';
 import 'player_stats_repository.dart';
+import 'widgets/radar_chart_widget.dart';
 
 class StatsDetailScreen extends StatefulWidget {
   const StatsDetailScreen({
     super.key,
     required this.nickname,
     required this.platform,
+    this.repository,
   });
 
   final String? nickname;
   final String platform;
+  final PlayerStatsRepository? repository;
 
   @override
   State<StatsDetailScreen> createState() => _StatsDetailScreenState();
@@ -29,7 +32,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _repository = PlayerStatsRepository();
+    _repository = widget.repository ?? PlayerStatsRepository();
     _startFetch();
   }
 
@@ -129,7 +132,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   }
 }
 
-class _StatsContent extends StatelessWidget {
+class _StatsContent extends StatefulWidget {
   const _StatsContent({
     required this.bundle,
     required this.selectedSeason,
@@ -141,8 +144,21 @@ class _StatsContent extends StatelessWidget {
   final ValueChanged<String?> onSeasonChanged;
 
   @override
+  State<_StatsContent> createState() => _StatsContentState();
+}
+
+class _StatsContentState extends State<_StatsContent> {
+  String _selectedQueue = 'ranked'; // 'ranked' | 'normal'
+  String _selectedMode = 'squad'; // 'squad' | 'duo' | 'solo'
+
+  @override
   Widget build(BuildContext context) {
-    final profile = bundle.profile;
+    final profile = widget.bundle.profile;
+
+    // 현재 선택된 큐/모드의 스탯 추출
+    final queueStats = profile.modeStats[_selectedQueue];
+    final currentStats = queueStats?[_selectedMode];
+    final bool hasStats = currentStats != null && currentStats.roundsPlayed > 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -150,52 +166,238 @@ class _StatsContent extends StatelessWidget {
         // 1. 프로필 헤더 & 시즌 필터 드롭다운
         _ProfileHeader(
           profile: profile,
-          selectedSeason: selectedSeason,
-          onSeasonChanged: onSeasonChanged,
+          selectedSeason: widget.selectedSeason,
+          onSeasonChanged: widget.onSeasonChanged,
         ),
         const SizedBox(height: 12),
 
-        // 2. 주요 스펙 지표들
-        _MetricsGrid(profile: profile),
-        if (!profile.hasSeasonStats) ...[
+        // 큐 선택 세그먼트 탭
+        _buildQueueSegmentedControl(),
+        const SizedBox(height: 8),
+
+        // 모드 선택 슬라이딩 칩
+        _buildModeChips(),
+        const SizedBox(height: 16),
+
+        // 2. 스탯 렌더링 또는 Empty State
+        if (hasStats) ...[
+          if (_selectedQueue == 'ranked') ...[
+            _TierInfoPanel(stats: currentStats),
+            const SizedBox(height: 12),
+          ],
+          // 레이더 차트 카드
+          Card(
+            color: const Color(0xFF161b26),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFF232b3c)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  const Text(
+                    '성향 분석',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 220,
+                    child: RadarChartWidget(
+                      combat: _calculateCombatScore(currentStats),
+                      tactical: _calculateTacticalScore(currentStats),
+                      survival: _calculateSurvivalScore(currentStats),
+                      teamwork: _calculateTeamworkScore(currentStats),
+                      grit: currentStats.top10Rate,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 12),
-          const _StatePanel(
-            icon: Icons.info_outline,
-            title: '선택 시즌 기록이 비어 있습니다',
-            body: '서버 응답은 정상이나 현재 시즌의 플레이 기록이 아직 없을 수 있습니다.',
+
+          // 6개 주요 메트릭 그리드
+          _MetricsGrid(stats: currentStats),
+        ] else ...[
+          _EmptyStatsPanel(
+            queueLabel: _selectedQueue == 'ranked' ? '경쟁전' : '일반전',
+            modeLabel: _selectedMode == 'squad'
+                ? '스쿼드'
+                : _selectedMode == 'duo'
+                    ? '듀오'
+                    : '솔로',
           ),
         ],
         const SizedBox(height: 12),
 
         // 3. 매치 요약 및 리스트
-        _MatchSummaryPanel(bundle: bundle),
+        _MatchSummaryPanel(bundle: widget.bundle),
         const SizedBox(height: 12),
 
         // 4. AI 코칭 리포트 카드
-        AiCoachingCard(bundle: bundle),
+        AiCoachingCard(bundle: widget.bundle),
       ],
     );
   }
+
+  Widget _buildQueueSegmentedControl() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF161b26),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF232b3c)),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          Expanded(child: _buildQueueTabItem('ranked', '경쟁전')),
+          Expanded(child: _buildQueueTabItem('normal', '일반전')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQueueTabItem(String queueKey, String label) {
+    final isSelected = _selectedQueue == queueKey;
+    return GestureDetector(
+      onTap: () {
+        if (!isSelected) {
+          setState(() {
+            _selectedQueue = queueKey;
+          });
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? BgmsColors.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.black : Colors.white70,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModeChips() {
+    final modes = [
+      {'key': 'solo', 'label': '솔로'},
+      {'key': 'duo', 'label': '듀오'},
+      {'key': 'squad', 'label': '스쿼드'},
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: modes.map((mode) {
+          final isSelected = _selectedMode == mode['key'];
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(mode['label']!),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() {
+                    _selectedMode = mode['key']!;
+                  });
+                }
+              },
+              selectedColor: BgmsColors.accent,
+              backgroundColor: const Color(0xFF161b26),
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.black : Colors.white70,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected ? BgmsColors.accent : const Color(0xFF232b3c),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  double _calculateCombatScore(GameModeStats stats) {
+    // KD 가 2.0 이면 100점
+    return (stats.kd / 2.0 * 100).clamp(0.0, 100.0);
+  }
+
+  double _calculateTacticalScore(GameModeStats stats) {
+    // ADR 이 300 이면 100점
+    return (stats.adr / 300.0 * 100).clamp(0.0, 100.0);
+  }
+
+  double _calculateSurvivalScore(GameModeStats stats) {
+    if (stats.roundsPlayed == 0) return 0.0;
+    // 평균 생존 시간 20분(1200초)이면 100점
+    final avgSurvival = stats.timeSurvived / stats.roundsPlayed;
+    return (avgSurvival / 1200.0 * 100).clamp(0.0, 100.0);
+  }
+
+  double _calculateTeamworkScore(GameModeStats stats) {
+    if (stats.roundsPlayed == 0) return 0.0;
+    // 평균 어시스트 1.5개면 100점
+    final avgAssists = stats.assists / stats.roundsPlayed;
+    return (avgAssists / 1.5 * 100).clamp(0.0, 100.0);
+  }
 }
 
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({
-    required this.profile,
-    required this.selectedSeason,
-    required this.onSeasonChanged,
-  });
+class _TierInfoPanel extends StatelessWidget {
+  const _TierInfoPanel({required this.stats});
 
-  final PlayerStatsProfile profile;
-  final String? selectedSeason;
-  final ValueChanged<String?> onSeasonChanged;
+  final GameModeStats stats;
 
   @override
   Widget build(BuildContext context) {
-    final updatedAt = profile.updatedAt;
-    final seasons = profile.seasonsList;
+    final tierName = stats.currentTierName;
+    final rp = stats.currentRankPoint;
+    final bestRp = stats.bestRankPoint;
 
-    // 만약 API에서 주는 현재 활성 시즌이 있고 selectedSeason이 설정 안 되었을 때 대응
-    final String currentSeasonId = selectedSeason ?? profile.seasonId ?? '';
+    // RP를 다음 백 단위 기준 진척도로 환산
+    final double progress = (rp % 100) / 100.0;
+
+    // 티어별 어울리는 아이콘 색상 설정
+    Color tierColor = BgmsColors.accent;
+    IconData tierIcon = Icons.stars;
+
+    if (tierName.contains('Bronze')) {
+      tierColor = const Color(0xFFCD7F32);
+      tierIcon = Icons.shield;
+    } else if (tierName.contains('Silver')) {
+      tierColor = const Color(0xFFC0C0C0);
+      tierIcon = Icons.shield;
+    } else if (tierName.contains('Gold')) {
+      tierColor = const Color(0xFFFFD700);
+      tierIcon = Icons.emoji_events;
+    } else if (tierName.contains('Platinum')) {
+      tierColor = const Color(0xFFE5E4E2);
+      tierIcon = Icons.diamond;
+    } else if (tierName.contains('Diamond')) {
+      tierColor = const Color(0xFFB9F2FF);
+      tierIcon = Icons.diamond;
+    } else if (tierName.contains('Master')) {
+      tierColor = const Color(0xFFFF007F);
+      tierIcon = Icons.military_tech;
+    } else if (tierName.contains('Grandmaster')) {
+      tierColor = const Color(0xFFFF3F3F);
+      tierIcon = Icons.local_fire_department;
+    }
 
     return Card(
       color: const Color(0xFF161b26),
@@ -210,86 +412,38 @@ class _ProfileHeader extends StatelessWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.black,
-                  child: const Icon(Icons.person),
-                ),
+                Icon(tierIcon, color: tierColor, size: 36),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        profile.nickname,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: BgmsColors.accent,
-                          fontWeight: FontWeight.w800,
+                        tierName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        profile.platform.toUpperCase(),
-                        style: const TextStyle(color: Colors.white54, fontSize: 13),
+                        '현재 RP: $rp  (최고 RP: $bestRp)',
+                        style: const TextStyle(color: Colors.white54, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            const Divider(color: Color(0xFF232b3c), height: 1),
             const SizedBox(height: 12),
-
-            // 시즌 필터 드롭다운 UI
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.calendar_month_outlined, size: 18, color: Colors.white70),
-                    SizedBox(width: 6),
-                    Text(
-                      '조회 시즌',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
-                    ),
-                  ],
-                ),
-                if (seasons.isEmpty)
-                  Text(
-                    currentSeasonId.isEmpty ? '기본 시즌' : currentSeasonId,
-                    style: const TextStyle(color: BgmsColors.accent, fontWeight: FontWeight.bold),
-                  )
-                else
-                  DropdownButton<String>(
-                    value: seasons.contains(currentSeasonId) ? currentSeasonId : seasons.first,
-                    dropdownColor: const Color(0xFF161b26),
-                    underline: const SizedBox(),
-                    icon: const Icon(Icons.arrow_drop_down, color: BgmsColors.accent),
-                    style: const TextStyle(
-                      color: BgmsColors.accent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                    items: seasons.map((season) {
-                      return DropdownMenuItem<String>(
-                        value: season,
-                        child: Text(season),
-                      );
-                    }).toList(),
-                    onChanged: onSeasonChanged,
-                  ),
-              ],
+            LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white10,
+              color: tierColor,
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(3),
             ),
-            if (updatedAt != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                '동기화 시간: ${updatedAt.toLocal()}'.split('.').first,
-                style: const TextStyle(color: BgmsColors.textMuted, fontSize: 11),
-              ),
-            ],
           ],
         ),
       ),
@@ -298,37 +452,38 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _MetricsGrid extends StatelessWidget {
-  const _MetricsGrid({required this.profile});
+  const _MetricsGrid({required this.stats});
 
-  final PlayerStatsProfile profile;
+  final GameModeStats stats;
 
   @override
   Widget build(BuildContext context) {
+    final avgSurvivalTime = stats.roundsPlayed > 0 ? stats.timeSurvived / stats.roundsPlayed : 0.0;
+    final survivalMinutes = (avgSurvivalTime / 60).floor();
+    final survivalSeconds = (avgSurvivalTime % 60).round();
+    final survivalStr = stats.roundsPlayed > 0 ? '$survivalMinutes분 $survivalSeconds초' : '-';
+
+    final headshotRate = stats.kills > 0 ? (stats.headshotKills / stats.kills * 100) : 0.0;
+
     final metrics = [
-      _Metric('K/D', profile.kd.toStringAsFixed(2), Icons.adjust),
-      _Metric('ADR', profile.adr.toStringAsFixed(1), Icons.bolt),
-      _Metric(
-        '승률',
-        '${profile.winRate.toStringAsFixed(1)}%',
-        Icons.emoji_events,
-      ),
-      _Metric(
-        '평균 순위',
-        profile.averageRank > 0 ? profile.averageRank.toStringAsFixed(1) : '-',
-        Icons.leaderboard,
-      ),
+      _Metric('KDA', stats.kda.toStringAsFixed(2), Icons.adjust),
+      _Metric('ADR', stats.adr.toStringAsFixed(1), Icons.bolt),
+      _Metric('승률', '${stats.winRate.toStringAsFixed(1)}%', Icons.emoji_events),
+      _Metric('평균 생존 시간', survivalStr, Icons.hourglass_empty),
+      _Metric('Top 10', '${stats.top10Rate.toStringAsFixed(1)}%', Icons.leaderboard),
+      _Metric('헤드샷 비율', '${headshotRate.toStringAsFixed(1)}%', Icons.gps_fixed),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final narrow = constraints.maxWidth < 420;
+        final crossCount = constraints.maxWidth < 360 ? 2 : 3;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: metrics.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: narrow ? 2 : 4,
-            childAspectRatio: narrow ? 1.55 : 1.25,
+            crossAxisCount: crossCount,
+            childAspectRatio: 1.25,
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
           ),
@@ -341,25 +496,28 @@ class _MetricsGrid extends StatelessWidget {
                 side: const BorderSide(color: Color(0xFF232b3c)),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(metric.icon, size: 20, color: index == 0 ? BgmsColors.accent : Colors.white70),
-                    const SizedBox(height: 8),
+                    Icon(metric.icon, size: 18, color: index == 0 ? BgmsColors.accent : Colors.white70),
+                    const SizedBox(height: 4),
                     FittedBox(
                       child: Text(
                         metric.value,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: index == 0
-                              ? BgmsColors.accent
-                              : BgmsColors.textPrimary,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: index == 0 ? BgmsColors.accent : BgmsColors.textPrimary,
+                              fontWeight: FontWeight.w800,
+                            ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(metric.label, maxLines: 1, style: const TextStyle(fontSize: 11, color: Colors.white60)),
+                    const SizedBox(height: 2),
+                    Text(
+                      metric.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 10, color: Colors.white60),
+                    ),
                   ],
                 ),
               ),
@@ -367,6 +525,55 @@ class _MetricsGrid extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _EmptyStatsPanel extends StatelessWidget {
+  const _EmptyStatsPanel({
+    required this.queueLabel,
+    required this.modeLabel,
+  });
+
+  final String queueLabel;
+  final String modeLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: const Color(0xFF161b26),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFF232b3c)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              size: 48,
+              color: Colors.white30,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '해당 모드 플레이 기록 없음',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '현재 시즌의 $queueLabel ($modeLabel) 플레이 기록이 아직 없습니다.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white54, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -408,58 +615,64 @@ class _MatchSummaryPanel extends StatelessWidget {
               ...matches.map(
                 (match) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
+                  child: Material(
                     color: Colors.white.withValues(alpha: 0.02),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.04), width: 0.5),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    title: Text(
-                      '${match.mapName} · ${match.gameMode}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    subtitle: Text(
-                      '킬: ${match.kills} | 데미지: ${match.damage.toStringAsFixed(0)}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (match.rank != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: match.rank == 1 ? BgmsColors.accent.withValues(alpha: 0.15) : Colors.white10,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                color: match.rank == 1 ? BgmsColors.accent : Colors.white24,
-                                width: 0.5,
+                    clipBehavior: Clip.antiAlias,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.04), width: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        title: Text(
+                          '${match.mapName} · ${match.gameMode}',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          '킬: ${match.kills} | 데미지: ${match.damage.toStringAsFixed(0)}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (match.rank != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: match.rank == 1 ? BgmsColors.accent.withValues(alpha: 0.15) : Colors.white10,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: match.rank == 1 ? BgmsColors.accent : Colors.white24,
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Text(
+                                  '#${match.rank}',
+                                  style: TextStyle(
+                                    color: match.rank == 1 ? BgmsColors.accent : Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
                               ),
-                            ),
-                            child: Text(
-                              '#${match.rank}',
-                              style: TextStyle(
-                                color: match.rank == 1 ? BgmsColors.accent : Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.chevron_right, color: Colors.white30),
-                      ],
-                    ),
-                    onTap: () {
-                      context.push(
-                        '/stats/match/${match.matchId}',
-                        extra: {
-                          'nickname': bundle.profile.nickname,
-                          'platform': bundle.profile.platform,
-                          'summary': match,
+                            const SizedBox(width: 8),
+                            const Icon(Icons.chevron_right, color: Colors.white30),
+                          ],
+                        ),
+                        onTap: () {
+                          context.push(
+                            '/stats/match/${match.matchId}',
+                            extra: {
+                              'nickname': bundle.profile.nickname,
+                              'platform': bundle.profile.platform,
+                              'summary': match,
+                            },
+                          );
                         },
-                      );
-                    },
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -604,4 +817,123 @@ class _Metric {
   final String label;
   final String value;
   final IconData icon;
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.profile,
+    required this.selectedSeason,
+    required this.onSeasonChanged,
+  });
+
+  final PlayerStatsProfile profile;
+  final String? selectedSeason;
+  final ValueChanged<String?> onSeasonChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final updatedAt = profile.updatedAt;
+    final seasons = profile.seasonsList;
+
+    // 만약 API에서 주는 현재 활성 시즌이 있고 selectedSeason이 설정 안 되었을 때 대응
+    final String currentSeasonId = selectedSeason ?? profile.seasonId ?? '';
+
+    return Card(
+      color: const Color(0xFF161b26),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFF232b3c)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.black,
+                  child: const Icon(Icons.person),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        profile.nickname,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: BgmsColors.accent,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        profile.platform.toUpperCase(),
+                        style: const TextStyle(color: Colors.white54, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(color: Color(0xFF232b3c), height: 1),
+            const SizedBox(height: 12),
+
+            // 시즌 필터 드롭다운 UI
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.calendar_month_outlined, size: 18, color: Colors.white70),
+                    SizedBox(width: 6),
+                    Text(
+                      '조회 시즌',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
+                    ),
+                  ],
+                ),
+                if (seasons.isEmpty)
+                  Text(
+                    currentSeasonId.isEmpty ? '기본 시즌' : currentSeasonId,
+                    style: const TextStyle(color: BgmsColors.accent, fontWeight: FontWeight.bold),
+                  )
+                else
+                  DropdownButton<String>(
+                    value: seasons.contains(currentSeasonId) ? currentSeasonId : seasons.first,
+                    dropdownColor: const Color(0xFF161b26),
+                    underline: const SizedBox(),
+                    icon: const Icon(Icons.arrow_drop_down, color: BgmsColors.accent),
+                    style: const TextStyle(
+                      color: BgmsColors.accent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    items: seasons.map((season) {
+                      return DropdownMenuItem<String>(
+                        value: season,
+                        child: Text(season),
+                      );
+                    }).toList(),
+                    onChanged: onSeasonChanged,
+                  ),
+              ],
+            ),
+            if (updatedAt != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                '동기화 시간: ${updatedAt.toLocal()}'.split('.').first,
+                style: const TextStyle(color: BgmsColors.textMuted, fontSize: 11),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

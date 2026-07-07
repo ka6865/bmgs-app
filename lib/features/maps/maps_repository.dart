@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/network/bgms_api_client.dart';
@@ -101,18 +102,46 @@ class MapsRepository {
     }
   }
 
+  Future<Map<String, List<String>>> fetchMapSettingsFromSupabase() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('map_settings')
+          .select('map_id, categories');
+      final result = <String, List<String>>{};
+      for (final row in response) {
+        final mapId = row['map_id'] as String?;
+        final cats = row['categories'] as List<dynamic>?;
+        if (mapId != null && cats != null) {
+          result[mapId] = cats.map((c) => c.toString()).toList();
+        }
+      }
+      return result;
+    } catch (_) {
+      return {};
+    }
+  }
+
   List<String> filterActiveLayers(
     String mapId,
     List<String> availableLayers,
-    Map<String, dynamic> settings,
+    Map<String, List<String>> settings,
   ) {
-    final configKey = 'map_active_layers_$mapId';
-    final activeString = settings[configKey]?.toString();
-    if (activeString == null || activeString.trim().isEmpty) {
-      return availableLayers; // 설정이 없으면 기본적으로 다 보여줌
+    if (settings.isEmpty) {
+      return availableLayers;
     }
-    final allowed = activeString.split(',').map((s) => s.trim()).toSet();
-    return availableLayers.where((l) => allowed.contains(l)).toList();
+    final matchedKey = settings.keys.firstWhere(
+      (k) => k.toLowerCase() == mapId.toLowerCase(),
+      orElse: () => '',
+    );
+    if (matchedKey.isEmpty) {
+      return availableLayers;
+    }
+    final allowed = settings[matchedKey];
+    if (allowed == null) {
+      return availableLayers;
+    }
+    final allowedSet = allowed.map((s) => s.trim().toLowerCase()).toSet();
+    return availableLayers.where((l) => allowedSet.contains(l.toLowerCase())).toList();
   }
 
   String _dioMessage(DioException error) {

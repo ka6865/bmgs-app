@@ -25,7 +25,7 @@ class _MapsScreenState extends State<MapsScreen> {
   late BgmsMap _selectedMap;
   final Set<String> _layers = {'Garage', 'SecretRoom', 'HotDrop'};
   late Future<MapMarkerLayer> _markerFuture;
-  Map<String, dynamic> _adminSettings = {};
+  Map<String, List<String>> _adminSettings = {};
 
   @override
   void initState() {
@@ -36,7 +36,7 @@ class _MapsScreenState extends State<MapsScreen> {
   }
 
   Future<MapMarkerLayer> _loadMarkers() {
-    _repository.fetchAdminSettings().then((settings) {
+    _repository.fetchMapSettingsFromSupabase().then((settings) {
       if (mounted) {
         setState(() {
           _adminSettings = settings;

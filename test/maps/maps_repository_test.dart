@@ -5,8 +5,8 @@ void main() {
   test('filterActiveLayers restricts available layers based on admin settings', () {
     final repository = MapsRepository();
     final mockSettings = {
-      'map_active_layers_Erangel': 'Garage,SecretRoom',
-      'map_active_layers_Miramar': 'Garage,HotDrop',
+      'Erangel': ['Garage', 'SecretRoom'],
+      'Miramar': ['Garage', 'HotDrop'],
     };
     
     final erangelLayers = ['Garage', 'SecretRoom', 'Glider', 'Boat'];

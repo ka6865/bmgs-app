@@ -247,10 +247,15 @@ class FakeMapsRepository extends Fake implements MapsRepository {
   }
 
   @override
+  Future<Map<String, List<String>>> fetchMapSettingsFromSupabase() async {
+    return {};
+  }
+
+  @override
   List<String> filterActiveLayers(
     String mapId,
     List<String> availableLayers,
-    Map<String, dynamic> settings,
+    Map<String, List<String>> settings,
   ) {
     return availableLayers;
   }

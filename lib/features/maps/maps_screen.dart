@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/app_config.dart';
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import 'map_fullscreen_view.dart';
 import 'map_models.dart';
 import 'map_view_helpers.dart';
 import 'maps_repository.dart';
@@ -265,39 +266,68 @@ class _MapPanel extends StatelessWidget {
             if (loading) const LinearProgressIndicator(),
             AspectRatio(
               aspectRatio: 1,
-              child: InteractiveViewer(
-                minScale: 0.8,
-                maxScale: 3,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Stack(
-                      children: [
-                        Positioned.fill(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              color: BgmsColors.elevated,
-                              border: Border.all(color: BgmsColors.border),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: _MapTileMosaic(map: map),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 3,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Stack(
+                            children: [
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: BgmsColors.elevated,
+                                    border: Border.all(color: BgmsColors.border),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: MapTileMosaic(map: map),
+                                  ),
+                                ),
+                              ),
+                              ...visibleMarkers.map(
+                                (marker) => Align(
+                                  alignment: FractionalOffset(marker.x, marker.y),
+                                  child: MapMarkerWidget(
+                                    marker: marker,
+                                    onTap: () => _showMarkerDetails(context, marker),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: FloatingActionButton.small(
+                      heroTag: 'map_fullscreen',
+                      backgroundColor: Colors.black.withValues(alpha: 0.62),
+                      foregroundColor: BgmsColors.accent,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MapFullscreenView(
+                              map: map,
+                              markers: layer.markers,
+                              activeLayers: activeLayers,
+                              onMarkerTap: (m) => _showMarkerDetails(context, m),
                             ),
                           ),
-                        ),
-                        ...visibleMarkers.map(
-                          (marker) => Align(
-                            alignment: FractionalOffset(marker.x, marker.y),
-                            child: _MapMarker(
-                              marker: marker,
-                              onTap: () => _showMarkerDetails(context, marker),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                        );
+                      },
+                      child: const Icon(Icons.fullscreen),
+                    ),
+                  ),
+                ],
               ),
             ),
             if (!loading && visibleMarkers.isEmpty) ...[
@@ -311,8 +341,8 @@ class _MapPanel extends StatelessWidget {
   }
 }
 
-class _MapTileMosaic extends StatelessWidget {
-  const _MapTileMosaic({required this.map});
+class MapTileMosaic extends StatelessWidget {
+  const MapTileMosaic({super.key, required this.map});
 
   static const int _zoom = 2;
   static const int _tileCount = 4;
@@ -377,8 +407,8 @@ class _MapTileMosaic extends StatelessWidget {
   }
 }
 
-class _MapMarker extends StatelessWidget {
-  const _MapMarker({required this.marker, required this.onTap});
+class MapMarkerWidget extends StatelessWidget {
+  const MapMarkerWidget({super.key, required this.marker, required this.onTap});
 
   final MapMarker marker;
   final VoidCallback onTap;

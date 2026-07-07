@@ -108,6 +108,55 @@ void main() {
 
     expect(find.textContaining('위치 좌표: (X: 50.0%, Y: 50.0%)'), findsNothing);
   });
+
+  testWidgets('maps screen opens fullscreen map and handles marker tap and back', (tester) async {
+    final fakeRepo = FakeMapsRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MapsScreen(repository: fakeRepo),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // 1. 전체화면 버튼 확인 및 탭
+    final fullscreenBtnFinder = find.byIcon(Icons.fullscreen);
+    expect(fullscreenBtnFinder, findsOneWidget);
+    await tester.ensureVisible(fullscreenBtnFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(fullscreenBtnFinder);
+    await tester.pumpAndSettle();
+
+    // 2. 전체화면 모달 진입 확인 (정밀 지도 타이틀 확인)
+    expect(find.text('Erangel 정밀 지도'), findsOneWidget);
+
+    // 3. 전체화면 뷰 내의 마커 탭 실행
+    final markerFinder = find.byIcon(Icons.local_taxi);
+    expect(markerFinder, findsOneWidget);
+    await tester.tap(markerFinder);
+    await tester.pumpAndSettle();
+
+    // 4. 바텀시트 콘텐츠 확인 (전체화면 내에서 onTap -> showMarkerDetails 실행됨)
+    expect(find.text('강남 차고지'), findsWidgets);
+    expect(find.textContaining('위치 좌표: (X: 50.0%, Y: 50.0%)'), findsOneWidget);
+
+    // 5. 바텀시트 닫기 버튼 탭 (가장 나중에 렌더링된 close 아이콘)
+    await tester.tap(find.byIcon(Icons.close).last);
+    await tester.pumpAndSettle();
+
+    // 바텀시트가 닫혀서 전체화면 정밀 지도가 다시 단독 노출되는지 확인
+    expect(find.textContaining('위치 좌표: (X: 50.0%, Y: 50.0%)'), findsNothing);
+
+    // 6. 전체화면 AppBar의 닫기 버튼 탭
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+
+    // 원래 화면으로 돌아왔는지 확인
+    expect(find.text('Erangel 정밀 지도'), findsNothing);
+  });
 }
 
 class FakeMapsRepository extends Fake implements MapsRepository {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import '../../core/theme/bgms_theme.dart';
 
 IconData getMarkerIcon(String layer) {
@@ -38,4 +39,13 @@ String getCategoryLabel(String layer) {
     'EsportsBoat' => '대회 보트',
     _ => '기타',
   };
+}
+
+extension Matrix4ScaleExtension on Matrix4 {
+  double getMaxScaleOnViewport() {
+    final double x = storage[0];
+    final double y = storage[1];
+    final double z = storage[2];
+    return math.sqrt(x * x + y * y + z * z);
+  }
 }

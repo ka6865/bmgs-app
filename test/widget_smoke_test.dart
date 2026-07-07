@@ -2,6 +2,7 @@ import 'package:bgms_mobile_app/app.dart';
 import 'package:bgms_mobile_app/features/maps/map_models.dart';
 import 'package:bgms_mobile_app/features/maps/maps_repository.dart';
 import 'package:bgms_mobile_app/features/maps/maps_screen.dart';
+import 'package:bgms_mobile_app/features/maps/map_view_helpers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -156,6 +157,51 @@ void main() {
 
     // 원래 화면으로 돌아왔는지 확인
     expect(find.text('Erangel 정밀 지도'), findsNothing);
+  });
+
+  testWidgets('maps screen zoom in compensates marker scale', (tester) async {
+    final fakeRepo = FakeMapsRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MapsScreen(repository: fakeRepo),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // 1. InteractiveViewer 찾기
+    final interactiveViewerFinder = find.byType(InteractiveViewer);
+    expect(interactiveViewerFinder, findsOneWidget);
+
+    final interactiveViewer = tester.widget<InteractiveViewer>(interactiveViewerFinder);
+    final controller = interactiveViewer.transformationController;
+    expect(controller, isNotNull, reason: 'InteractiveViewer should have a transformationController assigned');
+
+    // 2. 초기 줌 배율 (1.0) 확인 - Transform.scale의 scale이 1.0인지 확인
+    final transformFinder = find.ancestor(
+      of: find.byType(MapMarkerWidget),
+      matching: find.byType(Transform),
+    ).first;
+    expect(transformFinder, findsOneWidget);
+    
+    Transform transformWidget = tester.widget<Transform>(transformFinder);
+    expect(transformWidget.transform.getMaxScaleOnViewport(), closeTo(1.0, 0.001));
+
+    // 3. 줌 배율을 3.0으로 변경
+    controller!.value = Matrix4.diagonal3Values(3.0, 3.0, 1.0);
+    // 리스너 호출 및 리빌드
+    await tester.pump();
+
+    // 4. 역보정된 스케일(1/3.0 = 0.3333) 확인
+    final transformFinderAfter = find.ancestor(
+      of: find.byType(MapMarkerWidget),
+      matching: find.byType(Transform),
+    ).first;
+    transformWidget = tester.widget<Transform>(transformFinderAfter);
+    expect(transformWidget.transform.getMaxScaleOnViewport(), closeTo(1.0 / 3.0, 0.001));
   });
 }
 

@@ -156,7 +156,7 @@ class _MapsScreenState extends State<MapsScreen> {
 }
 
 
-class _MapPanel extends StatelessWidget {
+class _MapPanel extends StatefulWidget {
   const _MapPanel({
     required this.map,
     required this.layer,
@@ -168,6 +168,36 @@ class _MapPanel extends StatelessWidget {
   final MapMarkerLayer layer;
   final Set<String> activeLayers;
   final bool loading;
+
+  @override
+  State<_MapPanel> createState() => _MapPanelState();
+}
+
+class _MapPanelState extends State<_MapPanel> {
+  final TransformationController _transformationController = TransformationController();
+  final ValueNotifier<double> _zoomScaleNotifier = ValueNotifier<double>(1.0);
+
+  @override
+  void initState() {
+    super.initState();
+    _transformationController.addListener(_handleZoomChange);
+  }
+
+  void _handleZoomChange() {
+    final zoomMatrix = _transformationController.value;
+    final currentScale = zoomMatrix.getMaxScaleOnViewport();
+    if (_zoomScaleNotifier.value != currentScale) {
+      _zoomScaleNotifier.value = currentScale;
+    }
+  }
+
+  @override
+  void dispose() {
+    _transformationController.removeListener(_handleZoomChange);
+    _transformationController.dispose();
+    _zoomScaleNotifier.dispose();
+    super.dispose();
+  }
 
   void _showMarkerDetails(BuildContext context, MapMarker marker) {
     showModalBottomSheet(
@@ -230,8 +260,8 @@ class _MapPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleMarkers = layer.markers
-        .where((marker) => activeLayers.contains(marker.layer))
+    final visibleMarkers = widget.layer.markers
+        .where((marker) => widget.activeLayers.contains(marker.layer))
         .toList();
 
     return Card(
@@ -244,7 +274,7 @@ class _MapPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '${map.name} 전술 지도',
+                    '${widget.map.name} 전술 지도',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: BgmsColors.accent,
                       fontWeight: FontWeight.w800,
@@ -256,13 +286,14 @@ class _MapPanel extends StatelessWidget {
             const SizedBox(height: 8),
             const Text('지도 배경 및 마커 정보는 인게임 전술 맵 규격 기준입니다.'),
             const SizedBox(height: 12),
-            if (loading) const LinearProgressIndicator(),
+            if (widget.loading) const LinearProgressIndicator(),
             AspectRatio(
               aspectRatio: 1,
               child: Stack(
                 children: [
                   Positioned.fill(
                     child: InteractiveViewer(
+                      transformationController: _transformationController,
                       minScale: 0.8,
                       maxScale: 3,
                       child: LayoutBuilder(
@@ -278,17 +309,25 @@ class _MapPanel extends StatelessWidget {
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
-                                    child: MapTileMosaic(map: map),
+                                    child: MapTileMosaic(map: widget.map),
                                   ),
                                 ),
                               ),
                               ...visibleMarkers.map(
-                                (marker) => Align(
-                                  alignment: FractionalOffset(marker.x, marker.y),
-                                  child: MapMarkerWidget(
-                                    marker: marker,
-                                    onTap: () => _showMarkerDetails(context, marker),
-                                  ),
+                                (marker) => ValueListenableBuilder<double>(
+                                  valueListenable: _zoomScaleNotifier,
+                                  builder: (context, scale, child) {
+                                    return Align(
+                                      alignment: FractionalOffset(marker.x, marker.y),
+                                      child: Transform.scale(
+                                        scale: 1.0 / scale,
+                                        child: MapMarkerWidget(
+                                          marker: marker,
+                                          onTap: () => _showMarkerDetails(context, marker),
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                             ],
@@ -309,9 +348,9 @@ class _MapPanel extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (context) => MapFullscreenView(
-                              map: map,
-                              markers: layer.markers,
-                              activeLayers: activeLayers,
+                              map: widget.map,
+                              markers: widget.layer.markers,
+                              activeLayers: widget.activeLayers,
                               onMarkerTap: (m) => _showMarkerDetails(context, m),
                             ),
                           ),
@@ -323,7 +362,7 @@ class _MapPanel extends StatelessWidget {
                 ],
               ),
             ),
-            if (!loading && visibleMarkers.isEmpty) ...[
+            if (!widget.loading && visibleMarkers.isEmpty) ...[
               const SizedBox(height: 12),
               const Text('표시할 마커가 없습니다. 위 API 메시지를 확인해 주세요.'),
             ],

@@ -613,72 +613,307 @@ class _MatchSummaryPanel extends StatelessWidget {
               const Text('최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.', style: TextStyle(color: Colors.white60))
             else
               ...matches.map(
-                (match) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: Material(
-                    color: Colors.white.withValues(alpha: 0.02),
-                    borderRadius: BorderRadius.circular(8),
-                    clipBehavior: Clip.antiAlias,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.04), width: 0.5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        title: Text(
-                          '${match.mapName} · ${match.gameMode}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                        subtitle: Text(
-                          '킬: ${match.kills} | 데미지: ${match.damage.toStringAsFixed(0)}',
-                          style: const TextStyle(color: Colors.white70, fontSize: 12),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (match.rank != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: match.rank == 1 ? BgmsColors.accent.withValues(alpha: 0.15) : Colors.white10,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: match.rank == 1 ? BgmsColors.accent : Colors.white24,
-                                    width: 0.5,
-                                  ),
-                                ),
-                                child: Text(
-                                  '#${match.rank}',
-                                  style: TextStyle(
-                                    color: match.rank == 1 ? BgmsColors.accent : Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.chevron_right, color: Colors.white30),
-                          ],
-                        ),
-                        onTap: () {
-                          context.push(
-                            '/stats/match/${match.matchId}',
-                            extra: {
-                              'nickname': bundle.profile.nickname,
-                              'platform': bundle.profile.platform,
-                              'summary': match,
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ),
+                (match) => _MatchCard(
+                  match: match,
+                  profile: bundle.profile,
                 ),
               ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MatchCard extends StatelessWidget {
+  const _MatchCard({
+    required this.match,
+    required this.profile,
+  });
+
+  final MatchSummary match;
+  final PlayerStatsProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final isChicken = match.rank == 1;
+
+    // 맵 그라데이션 획득
+    final mapGradient = _getMapGradient(match.mapName);
+
+    // 치킨 하이라이트 보완 그라데이션
+    final finalGradient = isChicken
+        ? LinearGradient(
+            colors: [
+              Colors.amber.withValues(alpha: 0.08),
+              const Color(0xFF161b26).withValues(alpha: 0.95),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+        : mapGradient;
+
+    final border = Border.all(
+      color: isChicken ? Colors.amber : const Color(0xFF232b3c),
+      width: isChicken ? 1.5 : 0.8,
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            context.push(
+              '/stats/match/${match.matchId}',
+              extra: {
+                'nickname': profile.nickname,
+                'platform': profile.platform,
+                'summary': match,
+              },
+            );
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: finalGradient,
+              borderRadius: BorderRadius.circular(12),
+              border: border,
+              boxShadow: isChicken
+                  ? [
+                      BoxShadow(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      )
+                    ]
+                  : null,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              children: [
+                // 맵 전경의 기하학적 백그라운드 연출 (우측에 은은하게 위치)
+                Positioned(
+                  right: -20,
+                  bottom: -20,
+                  top: -20,
+                  child: Opacity(
+                    opacity: 0.08,
+                    child: Icon(
+                      Icons.map_outlined,
+                      size: 130,
+                      color: isChicken ? Colors.amber : Colors.white,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 상단 윙 & 태그 라인
+                      Row(
+                        children: [
+                          // 맵 종류 & 모드
+                          Expanded(
+                            child: Text(
+                              '${match.mapName} · ${match.gameMode.toUpperCase()}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // 티어 뱃지 노출
+                          if (match.tier != null) ...[
+                            _buildTierBadge(match.tierName),
+                            const SizedBox(width: 8),
+                          ],
+                          // 순위 정보
+                          if (match.rank != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isChicken ? Colors.amber : const Color(0xFF232b3c),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '#${match.rank}',
+                                style: TextStyle(
+                                  color: isChicken ? Colors.black : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // 중단 지표 라인
+                      Row(
+                        children: [
+                          _buildMetricColumn('KILLS', '${match.kills}', Colors.redAccent),
+                          const SizedBox(width: 24),
+                          _buildMetricColumn('DAMAGE', match.damage.toStringAsFixed(0), Colors.amber),
+                          const Spacer(),
+                          const Icon(Icons.chevron_right, color: Colors.white30),
+                        ],
+                      ),
+                      // 하단 우승(치킨) 리본 라벨 추가
+                      if (isChicken) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Colors.amber, Colors.orangeAccent],
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            'WINNER WINNER CHICKEN DINNER',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricColumn(String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTierBadge(String tierName) {
+    Color tierColor = Colors.white54;
+    if (tierName.contains('Bronze')) {
+      tierColor = const Color(0xFFCD7F32);
+    } else if (tierName.contains('Silver')) {
+      tierColor = const Color(0xFFC0C0C0);
+    } else if (tierName.contains('Gold')) {
+      tierColor = const Color(0xFFFFD700);
+    } else if (tierName.contains('Platinum')) {
+      tierColor = const Color(0xFFE5E4E2);
+    } else if (tierName.contains('Diamond')) {
+      tierColor = const Color(0xFFB9F2FF);
+    } else if (tierName.contains('Master')) {
+      tierColor = const Color(0xFFFF007F);
+    } else if (tierName.contains('Grandmaster')) {
+      tierColor = const Color(0xFFFF3F3F);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: tierColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: tierColor.withValues(alpha: 0.3), width: 0.8),
+      ),
+      child: Text(
+        tierName,
+        style: TextStyle(
+          color: tierColor,
+          fontWeight: FontWeight.bold,
+          fontSize: 10,
+        ),
+      ),
+    );
+  }
+
+  Gradient _getMapGradient(String mapName) {
+    final name = mapName.toLowerCase();
+    if (name.contains('erangel')) {
+      return LinearGradient(
+        colors: [
+          const Color(0xFF1b3c33).withValues(alpha: 0.8),
+          const Color(0xFF0F2027).withValues(alpha: 0.9),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+    } else if (name.contains('miramar')) {
+      return LinearGradient(
+        colors: [
+          const Color(0xFF5A442E).withValues(alpha: 0.8),
+          const Color(0xFF14110F).withValues(alpha: 0.9),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+    } else if (name.contains('sanhok')) {
+      return LinearGradient(
+        colors: [
+          const Color(0xFF132e18).withValues(alpha: 0.8),
+          const Color(0xFF08120a).withValues(alpha: 0.9),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+    } else if (name.contains('vikendi')) {
+      return LinearGradient(
+        colors: [
+          const Color(0xFF243B55).withValues(alpha: 0.8),
+          const Color(0xFF141E30).withValues(alpha: 0.9),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+    } else if (name.contains('deston')) {
+      return LinearGradient(
+        colors: [
+          const Color(0xFF373B44).withValues(alpha: 0.8),
+          const Color(0xFF1D2026).withValues(alpha: 0.9),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+    } else if (name.contains('taego')) {
+      return LinearGradient(
+        colors: [
+          const Color(0xFF4B2329).withValues(alpha: 0.8),
+          const Color(0xFF180A0C).withValues(alpha: 0.9),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+    }
+    return LinearGradient(
+      colors: [
+        const Color(0xFF1e293b).withValues(alpha: 0.8),
+        const Color(0xFF0f172a).withValues(alpha: 0.9),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
     );
   }
 }

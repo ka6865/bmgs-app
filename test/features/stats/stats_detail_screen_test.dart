@@ -94,6 +94,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
           damage: 450.0,
           rank: 1,
           isFallback: false,
+          tier: {'tier': 'Diamond', 'subTier': 'I'},
         ),
         MatchSummary(
           matchId: 'match-2',
@@ -154,5 +155,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('해당 모드 플레이 기록 없음'), findsOneWidget);
+  });
+
+  testWidgets('StatsDetailScreen - 매치 리스트 아이템 UI 고도화 검증 (우승 하이라이트 및 티어 뱃지)', (WidgetTester tester) async {
+    final mockRepo = MockPlayerStatsRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'TestUser',
+            platform: 'steam',
+            repository: mockRepo,
+          ),
+        ),
+      ),
+    );
+
+    // 로딩 대기
+    await tester.pumpAndSettle();
+
+    // 1. 우승(치킨) 카드 하이라이트 검증
+    // rank == 1 일 때 'WINNER WINNER CHICKEN DINNER' 리본/텍스트가 표시되어야 함
+    expect(find.text('WINNER WINNER CHICKEN DINNER'), findsOneWidget);
+
+    // 2. 매치 티어 뱃지 검증
+    // match-1 에는 Diamond I 이 부여되었으므로, Diamond I 텍스트가 화면에 존재해야 함
+    expect(find.text('Diamond I'), findsOneWidget);
+
+    // 3. 맵 배경 및 맵 종류 정보 노출 검증
+    expect(find.textContaining('Erangel'), findsWidgets);
+    expect(find.textContaining('Miramar'), findsWidgets);
   });
 }

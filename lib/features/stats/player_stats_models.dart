@@ -190,6 +190,7 @@ class MatchSummary {
     required this.damage,
     required this.rank,
     required this.isFallback,
+    this.tier,
   });
 
   final String matchId;
@@ -200,6 +201,14 @@ class MatchSummary {
   final double damage;
   final int? rank;
   final bool isFallback;
+  final Map<String, dynamic>? tier;
+
+  String get tierName {
+    if (tier == null) return '';
+    final t = tier!['tier']?.toString() ?? '';
+    final sub = tier!['subTier']?.toString() ?? '';
+    return sub.isEmpty ? t : '$t $sub';
+  }
 
   static MatchSummary fallback({
     required String matchId,
@@ -214,6 +223,7 @@ class MatchSummary {
       damage: 0,
       rank: null,
       isFallback: true,
+      tier: null,
     );
   }
 
@@ -259,6 +269,11 @@ class MatchSummary {
         stats?['rank'],
       ]),
       isFallback: false,
+      tier: json['tier'] is Map 
+          ? Map<String, dynamic>.from(json['tier']) 
+          : (json['currentTier'] is Map 
+              ? Map<String, dynamic>.from(json['currentTier']) 
+              : null),
     );
   }
 

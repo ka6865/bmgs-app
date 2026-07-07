@@ -120,7 +120,10 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
                   body: '검색 결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
                 );
               }
+              final profile = bundle.profile;
+              final currentSeasonId = _selectedSeason ?? profile.seasonId ?? '';
               return _StatsContent(
+                key: ValueKey('${profile.nickname}_$currentSeasonId'),
                 bundle: bundle,
                 selectedSeason: _selectedSeason,
                 onSeasonChanged: _onSeasonChanged,
@@ -134,6 +137,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
 
 class _StatsContent extends StatefulWidget {
   const _StatsContent({
+    super.key,
     required this.bundle,
     required this.selectedSeason,
     required this.onSeasonChanged,

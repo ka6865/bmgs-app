@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bgms_mobile_app/features/stats/stats_detail_screen.dart';
@@ -11,7 +12,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
     required String nickname,
     required String platform,
     String? season,
-  }) async {
+  }) {
     final modeStats = {
       'ranked': {
         'squad': const GameModeStats(
@@ -83,7 +84,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
       modeStats: modeStats,
     );
 
-    return PlayerStatsBundle(
+    return SynchronousFuture(PlayerStatsBundle(
       profile: profile,
       matches: const [
         MatchSummary(
@@ -107,7 +108,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
         ),
       ],
       summaryFallback: false,
-    );
+    ));
   }
 }
 
@@ -186,5 +187,54 @@ void main() {
     // 3. 맵 배경 및 맵 종류 정보 노출 검증
     expect(find.textContaining('Erangel'), findsWidgets);
     expect(find.textContaining('Miramar'), findsWidgets);
+  });
+
+  testWidgets('StatsDetailScreen - 플레이어 변경 시 내부 필터 탭 초기화 검증 (ValueKey 테스트)', (WidgetTester tester) async {
+    final mockRepo = MockPlayerStatsRepository();
+
+    // 1. 처음 TestUser로 빌드
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'TestUser',
+            platform: 'steam',
+            repository: mockRepo,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 기본적으로 '스쿼드'가 선택되어 있으므로 Gold III 티어 노출됨
+    expect(find.text('Gold III'), findsOneWidget);
+
+    // 2. 모드를 '듀오'로 변경
+    await tester.tap(find.text('듀오'));
+    await tester.pumpAndSettle();
+
+    // 듀오는 기록이 없으므로 '해당 모드 플레이 기록 없음'이 노출됨
+    expect(find.text('해당 모드 플레이 기록 없음'), findsOneWidget);
+    expect(find.text('Gold III'), findsNothing);
+
+    // 3. 닉네임을 'TestUser2'로 변경하여 다시 pumpWidget 실행
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'TestUser2',
+            platform: 'steam',
+            repository: mockRepo,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 닉네임이 변경되었을 때 key가 바르게 작동한다면,
+    // _StatsContent의 State가 새로 생성되어 다시 기본 모드인 '스쿼드'가 선택되어야 함.
+    // 따라서 다시 'Gold III' 티어가 노출되어야 하고, '해당 모드 플레이 기록 없음'은 사라져야 함.
+    expect(find.text('Gold III'), findsOneWidget);
+    expect(find.text('해당 모드 플레이 기록 없음'), findsNothing);
   });
 }

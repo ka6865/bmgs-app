@@ -58,12 +58,17 @@ class _MapsScreenState extends State<MapsScreen> {
     return future;
   }
 
-  void _toggleLayer(String layer) {
+  void _toggleCategoryLabel(String labelName, List<String> availableLayers) {
+    final relatedLayers = availableLayers
+        .where((l) => getCategoryLabel(l) == labelName)
+        .toList();
+    final isAnyActive = relatedLayers.any((l) => _layers.contains(l));
+
     setState(() {
-      if (_layers.contains(layer)) {
-        _layers.remove(layer);
+      if (isAnyActive) {
+        _layers.removeAll(relatedLayers);
       } else {
-        _layers.add(layer);
+        _layers.addAll(relatedLayers);
       }
     });
   }
@@ -88,12 +93,17 @@ class _MapsScreenState extends State<MapsScreen> {
             ? availableLayers
             : const ['Garage', 'SecretRoom', 'Esports', 'HotDrop'];
 
+        // 한글 라벨명 기준 중복 제거 및 정렬
+        final uniqueKoreanLabels =
+            layersToShow.map((l) => getCategoryLabel(l)).toSet().toList()
+              ..sort();
+
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
             const BgmsBrandHeader(
               title: '지도',
-              subtitle: '맵별 주요 마커와 레이어를 읽기 전용으로 확인합니다.',
+              subtitle: '맵별 차량, 비밀방, 글라이더, 보트 등 전술 마커 분포를 확인합니다.',
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
@@ -116,12 +126,18 @@ class _MapsScreenState extends State<MapsScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: layersToShow.map((layerName) {
-                return _LayerChip(
-                  label: getCategoryLabel(layerName),
-                  layer: layerName,
-                  selected: _layers.contains(layerName),
-                  onSelected: _toggleLayer,
+              children: uniqueKoreanLabels.map((koreanLabel) {
+                final relatedLayers = layersToShow
+                    .where((l) => getCategoryLabel(l) == koreanLabel)
+                    .toList();
+                final isSelected =
+                    relatedLayers.any((l) => _layers.contains(l));
+
+                return FilterChip(
+                  label: Text(koreanLabel),
+                  selected: isSelected,
+                  onSelected: (_) =>
+                      _toggleCategoryLabel(koreanLabel, layersToShow),
                 );
               }).toList(),
             ),
@@ -139,28 +155,6 @@ class _MapsScreenState extends State<MapsScreen> {
   }
 }
 
-class _LayerChip extends StatelessWidget {
-  const _LayerChip({
-    required this.label,
-    required this.layer,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final String label;
-  final String layer;
-  final bool selected;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onSelected(layer),
-    );
-  }
-}
 
 class _MapPanel extends StatelessWidget {
   const _MapPanel({
@@ -250,18 +244,17 @@ class _MapPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '${map.name} 읽기 전용 지도',
+                    '${map.name} 전술 지도',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: BgmsColors.accent,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
-                Chip(label: Text(layer.source.name)),
               ],
             ),
             const SizedBox(height: 8),
-            Text('${layer.message} 지도 배경은 웹 BGMS 타일(/tiles) 기준입니다.'),
+            const Text('지도 배경 및 마커 정보는 인게임 전술 맵 규격 기준입니다.'),
             const SizedBox(height: 12),
             if (loading) const LinearProgressIndicator(),
             AspectRatio(

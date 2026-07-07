@@ -640,6 +640,21 @@ class _MatchCard extends StatelessWidget {
   final MatchSummary match;
   final PlayerStatsProfile profile;
 
+  String _formatElapsedTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return '방금 전';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}분 전';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}시간 전';
+    } else {
+      return '${difference.inDays}일 전';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isChicken = match.rank == 1;
@@ -730,6 +745,14 @@ class _MatchCard extends StatelessWidget {
                                 fontSize: 14,
                                 letterSpacing: 0.5,
                               ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatElapsedTime(match.createdAt),
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
                             ),
                           ),
                           const SizedBox(width: 8),

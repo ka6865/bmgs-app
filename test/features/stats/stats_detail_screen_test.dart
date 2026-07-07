@@ -96,7 +96,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
           rank: 1,
           isFallback: false,
           tier: const {'tier': 'Diamond', 'subTier': 'I'},
-          createdAt: DateTime(2026, 7, 7, 12, 0, 0),
+          createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
         ),
         MatchSummary(
           matchId: 'match-2',
@@ -106,7 +106,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
           damage: 150.0,
           rank: 4,
           isFallback: false,
-          createdAt: DateTime(2026, 7, 7, 12, 0, 0),
+          createdAt: DateTime.now().subtract(const Duration(hours: 3)),
         ),
       ],
       summaryFallback: false,
@@ -238,5 +238,30 @@ void main() {
     // 따라서 다시 'Gold III' 티어가 노출되어야 하고, '해당 모드 플레이 기록 없음'은 사라져야 함.
     expect(find.text('Gold III'), findsOneWidget);
     expect(find.text('해당 모드 플레이 기록 없음'), findsNothing);
+  });
+
+  testWidgets('StatsDetailScreen - 매치 리스트 아이템 UI 경과 시간 표시 검증', (WidgetTester tester) async {
+    final mockRepo = MockPlayerStatsRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'TestUser',
+            platform: 'steam',
+            repository: mockRepo,
+          ),
+        ),
+      ),
+    );
+
+    // 로딩 대기
+    await tester.pumpAndSettle();
+
+    // match-1의 경과 시간(5분 전) 표시 검증
+    expect(find.text('5분 전'), findsOneWidget);
+
+    // match-2의 경과 시간(3시간 전) 표시 검증
+    expect(find.text('3시간 전'), findsOneWidget);
   });
 }

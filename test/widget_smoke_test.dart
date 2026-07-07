@@ -240,4 +240,18 @@ class FakeMapsRepository extends Fake implements MapsRepository {
       ],
     );
   }
+
+  @override
+  Future<Map<String, dynamic>> fetchAdminSettings() async {
+    return {};
+  }
+
+  @override
+  List<String> filterActiveLayers(
+    String mapId,
+    List<String> availableLayers,
+    Map<String, dynamic> settings,
+  ) {
+    return availableLayers;
+  }
 }

@@ -79,6 +79,10 @@ class BgmsApiClient {
     );
   }
 
+  Uri buildAdminSettingsUri() {
+    return Uri.parse('$_baseUrl/api/admin/settings');
+  }
+
   Uri buildBoardPostsUri({
     int limit = 20,
     String? cursor,
@@ -188,6 +192,17 @@ class BgmsApiClient {
       buildMapMarkersUri(mapId: mapId, layers: layers),
     );
     return response.data ?? <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> fetchAdminSettings() async {
+    final response = await _dio.getUri<Map<String, dynamic>>(
+      buildAdminSettingsUri(),
+    );
+    final data = response.data;
+    if (data != null && data['success'] == true) {
+      return Map<String, dynamic>.from(data['settings'] ?? {});
+    }
+    return {};
   }
 
   Future<Map<String, dynamic>> fetchBoardPosts({

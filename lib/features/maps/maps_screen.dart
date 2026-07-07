@@ -25,6 +25,7 @@ class _MapsScreenState extends State<MapsScreen> {
   late BgmsMap _selectedMap;
   final Set<String> _layers = {'Garage', 'SecretRoom', 'HotDrop'};
   late Future<MapMarkerLayer> _markerFuture;
+  Map<String, dynamic> _adminSettings = {};
 
   @override
   void initState() {
@@ -35,6 +36,14 @@ class _MapsScreenState extends State<MapsScreen> {
   }
 
   Future<MapMarkerLayer> _loadMarkers() {
+    _repository.fetchAdminSettings().then((settings) {
+      if (mounted) {
+        setState(() {
+          _adminSettings = settings;
+        });
+      }
+    });
+
     final future = _repository.fetchMarkers(
       mapId: _selectedMap.id,
       layers: const [], // 전체 마커 데이터 로드
@@ -93,9 +102,15 @@ class _MapsScreenState extends State<MapsScreen> {
             ? availableLayers
             : const ['Garage', 'SecretRoom', 'Esports', 'HotDrop'];
 
+        final allowedLayers = _repository.filterActiveLayers(
+          _selectedMap.id,
+          layersToShow,
+          _adminSettings,
+        );
+
         // 한글 라벨명 기준 중복 제거 및 정렬
         final uniqueKoreanLabels =
-            layersToShow.map((l) => getCategoryLabel(l)).toSet().toList()
+            allowedLayers.map((l) => getCategoryLabel(l)).toSet().toList()
               ..sort();
 
         return ListView(
@@ -127,7 +142,7 @@ class _MapsScreenState extends State<MapsScreen> {
               spacing: 8,
               runSpacing: 8,
               children: uniqueKoreanLabels.map((koreanLabel) {
-                final relatedLayers = layersToShow
+                final relatedLayers = allowedLayers
                     .where((l) => getCategoryLabel(l) == koreanLabel)
                     .toList();
                 final isSelected =
@@ -137,7 +152,7 @@ class _MapsScreenState extends State<MapsScreen> {
                   label: Text(koreanLabel),
                   selected: isSelected,
                   onSelected: (_) =>
-                      _toggleCategoryLabel(koreanLabel, layersToShow),
+                      _toggleCategoryLabel(koreanLabel, allowedLayers),
                 );
               }).toList(),
             ),

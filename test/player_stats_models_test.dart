@@ -47,7 +47,11 @@ void main() {
 
   test('MatchSummary parses common summary fields with fallback values', () {
     final summary = MatchSummary.fromJson('match-1', {
-      'matchInfo': {'mapName': '에란겔', 'mode': 'squad-fpp'},
+      'matchInfo': {
+        'mapName': '에란겔',
+        'mode': 'squad-fpp',
+        'date': '2026-07-06T15:30:00.000Z',
+      },
       'player': {'kills': 3, 'damageDealt': 450.5, 'winPlace': 4},
     });
 
@@ -57,6 +61,7 @@ void main() {
     expect(summary.damage, 450.5);
     expect(summary.rank, 4);
     expect(summary.isFallback, isFalse);
+    expect(summary.createdAt, DateTime.parse('2026-07-06T15:30:00.000Z'));
   });
 
   test('AiCoachingSummary parses normal NDJSON final response', () {

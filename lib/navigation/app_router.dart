@@ -63,6 +63,7 @@ GoRouter createAppRouter() {
                         damage: double.tryParse(query['damage'] ?? '') ?? 0,
                         rank: int.tryParse(query['rank'] ?? ''),
                         isFallback: query['fallback'] == 'true',
+                        createdAt: DateTime.tryParse(query['date'] ?? '') ?? DateTime.now(),
                       );
 
                       return MatchDetailScreen(

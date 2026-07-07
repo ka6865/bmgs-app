@@ -191,6 +191,7 @@ class MatchSummary {
     required this.rank,
     required this.isFallback,
     this.tier,
+    required this.createdAt,
   });
 
   final String matchId;
@@ -202,6 +203,7 @@ class MatchSummary {
   final int? rank;
   final bool isFallback;
   final Map<String, dynamic>? tier;
+  final DateTime createdAt;
 
   String get tierName {
     if (tier == null) return '';
@@ -224,6 +226,7 @@ class MatchSummary {
       rank: null,
       isFallback: true,
       tier: null,
+      createdAt: DateTime.now(),
     );
   }
 
@@ -233,6 +236,11 @@ class MatchSummary {
         : null;
     final player = json['player'] is Map ? json['player'] as Map : null;
     final stats = json['stats'] is Map ? json['stats'] as Map : null;
+
+    final dateStr = _firstText([
+      json['createdAt'],
+      matchInfo?['date'],
+    ], fallback: DateTime.now().toIso8601String());
 
     return MatchSummary(
       matchId: matchId,
@@ -274,6 +282,7 @@ class MatchSummary {
           : (json['currentTier'] is Map 
               ? Map<String, dynamic>.from(json['currentTier']) 
               : null),
+      createdAt: DateTime.tryParse(dateStr) ?? DateTime.now(),
     );
   }
 

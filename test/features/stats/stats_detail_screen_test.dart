@@ -86,7 +86,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
 
     return SynchronousFuture(PlayerStatsBundle(
       profile: profile,
-      matches: const [
+      matches: [
         MatchSummary(
           matchId: 'match-1',
           mapName: 'Erangel',
@@ -95,7 +95,8 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
           damage: 450.0,
           rank: 1,
           isFallback: false,
-          tier: {'tier': 'Diamond', 'subTier': 'I'},
+          tier: const {'tier': 'Diamond', 'subTier': 'I'},
+          createdAt: DateTime(2026, 7, 7, 12, 0, 0),
         ),
         MatchSummary(
           matchId: 'match-2',
@@ -105,6 +106,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
           damage: 150.0,
           rank: 4,
           isFallback: false,
+          createdAt: DateTime(2026, 7, 7, 12, 0, 0),
         ),
       ],
       summaryFallback: false,

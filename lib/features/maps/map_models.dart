@@ -64,6 +64,21 @@ class MapMarkerLayer {
   final MapMarkerSource source;
   final String message;
 
+  String get displaySourceLabel => switch (source) {
+    MapMarkerSource.api => '마커 연동',
+    MapMarkerSource.fallback => '마커 준비 중',
+  };
+
+  String get displayMessage {
+    if (source == MapMarkerSource.api) {
+      return '선택한 맵의 전술 마커를 표시하고 있습니다.';
+    }
+    if (message.contains('비어')) {
+      return '이 맵에는 현재 표시할 마커가 없습니다. 다른 맵이나 레이어를 확인해 주세요.';
+    }
+    return '마커 데이터를 일시적으로 불러오지 못했습니다. 지도 이미지는 계속 확인할 수 있습니다.';
+  }
+
   static MapMarkerLayer fromJson(
     Map<String, dynamic> json, {
     required String mapId,
@@ -86,13 +101,13 @@ class MapMarkerLayer {
       mapId: mapId,
       markers: markers,
       source: MapMarkerSource.api,
-      message: '실제 지도 마커 API 응답입니다.',
+      message: '지도 마커를 불러왔습니다.',
     );
   }
 
   static MapMarkerLayer unavailable({
     required String mapId,
-    String message = '/api/maps/{mapId}/markers 모바일 계약 준비 중입니다.',
+    String message = '지도 마커를 준비하고 있습니다.',
   }) {
     return MapMarkerLayer(
       mapId: mapId,

@@ -79,6 +79,21 @@ class RankingBoard {
 
   bool get isFallback => source == RankingSource.fallback;
 
+  String get displaySourceLabel => switch (source) {
+    RankingSource.api => '최신 랭킹',
+    RankingSource.fallback || RankingSource.unavailable => '준비 중',
+  };
+
+  String get displayMessage {
+    if (source == RankingSource.api) {
+      return '최근 경기 데이터를 기준으로 집계한 랭킹입니다.';
+    }
+    if (message.contains('비어')) {
+      return '아직 이 조건에 맞는 랭킹 데이터가 없습니다. 필터를 바꾸거나 잠시 후 다시 확인해 주세요.';
+    }
+    return '랭킹 데이터를 일시적으로 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  }
+
   static RankingBoard fromJson(
     Map<String, dynamic> json, {
     required RankingQuery query,
@@ -106,13 +121,13 @@ class RankingBoard {
       source: RankingSource.api,
       query: query,
       entries: entries,
-      message: '실제 랭킹 API 응답입니다.',
+      message: '랭킹 데이터를 불러왔습니다.',
     );
   }
 
   static RankingBoard fallback({
     required RankingQuery query,
-    String message = '/api/rankings 모바일 계약 준비 중입니다.',
+    String message = '랭킹 데이터를 준비하고 있습니다.',
   }) => unavailable(query: query, message: message);
 
   static RankingBoard unavailable({

@@ -21,7 +21,9 @@ void main() {
     expect(find.text('검색한 닉네임이 여기에 저장됩니다.'), findsOneWidget);
   });
 
-  testWidgets('home search shows validation message for empty nickname', (tester) async {
+  testWidgets('home search shows validation message for empty nickname', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const BgmsApp());
     await tester.pumpAndSettle();
@@ -55,6 +57,7 @@ void main() {
 
     expect(find.text('랭킹'), findsWidgets);
     expect(find.text('딜량'), findsOneWidget);
+    expect(find.textContaining('주간 딜량'), findsWidgets);
   });
 
   testWidgets('maps tab renders map selectors and layers', (tester) async {
@@ -84,14 +87,14 @@ void main() {
     expect(find.text('즐겨찾기가 없습니다.'), findsOneWidget);
   });
 
-  testWidgets('maps screen renders markers and opens bottom sheet on tap', (tester) async {
+  testWidgets('maps screen renders markers and opens bottom sheet on tap', (
+    tester,
+  ) async {
     final fakeRepo = FakeMapsRepository();
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          body: MapsScreen(repository: fakeRepo),
-        ),
+        home: Scaffold(body: MapsScreen(repository: fakeRepo)),
       ),
     );
 
@@ -122,63 +125,65 @@ void main() {
     expect(find.textContaining('위치 좌표: (X: 50.0%, Y: 50.0%)'), findsNothing);
   });
 
-  testWidgets('maps screen opens fullscreen map and handles marker tap and back', (tester) async {
-    final fakeRepo = FakeMapsRepository();
+  testWidgets(
+    'maps screen opens fullscreen map and handles marker tap and back',
+    (tester) async {
+      final fakeRepo = FakeMapsRepository();
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: MapsScreen(repository: fakeRepo),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: MapsScreen(repository: fakeRepo)),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    // 1. 전체화면 버튼 확인 및 탭
-    final fullscreenBtnFinder = find.byIcon(Icons.fullscreen);
-    expect(fullscreenBtnFinder, findsOneWidget);
-    await tester.ensureVisible(fullscreenBtnFinder);
-    await tester.pumpAndSettle();
-    await tester.tap(fullscreenBtnFinder);
-    await tester.pumpAndSettle();
+      // 1. 전체화면 버튼 확인 및 탭
+      final fullscreenBtnFinder = find.byIcon(Icons.fullscreen);
+      expect(fullscreenBtnFinder, findsOneWidget);
+      await tester.ensureVisible(fullscreenBtnFinder);
+      await tester.pumpAndSettle();
+      await tester.tap(fullscreenBtnFinder);
+      await tester.pumpAndSettle();
 
-    // 2. 전체화면 모달 진입 확인 (정밀 지도 타이틀 확인)
-    expect(find.text('Erangel 정밀 지도'), findsOneWidget);
+      // 2. 전체화면 모달 진입 확인 (정밀 지도 타이틀 확인)
+      expect(find.text('Erangel 정밀 지도'), findsOneWidget);
 
-    // 3. 전체화면 뷰 내의 마커 탭 실행
-    final markerFinder = find.byIcon(Icons.local_taxi);
-    expect(markerFinder, findsOneWidget);
-    await tester.tap(markerFinder);
-    await tester.pumpAndSettle();
+      // 3. 전체화면 뷰 내의 마커 탭 실행
+      final markerFinder = find.byIcon(Icons.local_taxi);
+      expect(markerFinder, findsOneWidget);
+      await tester.tap(markerFinder);
+      await tester.pumpAndSettle();
 
-    // 4. 바텀시트 콘텐츠 확인 (전체화면 내에서 onTap -> showMarkerDetails 실행됨)
-    expect(find.text('강남 차고지'), findsWidgets);
-    expect(find.textContaining('위치 좌표: (X: 50.0%, Y: 50.0%)'), findsOneWidget);
+      // 4. 바텀시트 콘텐츠 확인 (전체화면 내에서 onTap -> showMarkerDetails 실행됨)
+      expect(find.text('강남 차고지'), findsWidgets);
+      expect(
+        find.textContaining('위치 좌표: (X: 50.0%, Y: 50.0%)'),
+        findsOneWidget,
+      );
 
-    // 5. 바텀시트 닫기 버튼 탭 (가장 나중에 렌더링된 close 아이콘)
-    await tester.tap(find.byIcon(Icons.close).last);
-    await tester.pumpAndSettle();
+      // 5. 바텀시트 닫기 버튼 탭 (가장 나중에 렌더링된 close 아이콘)
+      await tester.tap(find.byIcon(Icons.close).last);
+      await tester.pumpAndSettle();
 
-    // 바텀시트가 닫혀서 전체화면 정밀 지도가 다시 단독 노출되는지 확인
-    expect(find.textContaining('위치 좌표: (X: 50.0%, Y: 50.0%)'), findsNothing);
+      // 바텀시트가 닫혀서 전체화면 정밀 지도가 다시 단독 노출되는지 확인
+      expect(find.textContaining('위치 좌표: (X: 50.0%, Y: 50.0%)'), findsNothing);
 
-    // 6. 전체화면 AppBar의 닫기 버튼 탭
-    await tester.tap(find.byIcon(Icons.close));
-    await tester.pumpAndSettle();
+      // 6. 전체화면 AppBar의 닫기 버튼 탭
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
 
-    // 원래 화면으로 돌아왔는지 확인
-    expect(find.text('Erangel 정밀 지도'), findsNothing);
-  });
+      // 원래 화면으로 돌아왔는지 확인
+      expect(find.text('Erangel 정밀 지도'), findsNothing);
+    },
+  );
 
   testWidgets('maps screen zoom in compensates marker scale', (tester) async {
     final fakeRepo = FakeMapsRepository();
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          body: MapsScreen(repository: fakeRepo),
-        ),
+        home: Scaffold(body: MapsScreen(repository: fakeRepo)),
       ),
     );
 
@@ -188,19 +193,31 @@ void main() {
     final interactiveViewerFinder = find.byType(InteractiveViewer);
     expect(interactiveViewerFinder, findsOneWidget);
 
-    final interactiveViewer = tester.widget<InteractiveViewer>(interactiveViewerFinder);
+    final interactiveViewer = tester.widget<InteractiveViewer>(
+      interactiveViewerFinder,
+    );
     final controller = interactiveViewer.transformationController;
-    expect(controller, isNotNull, reason: 'InteractiveViewer should have a transformationController assigned');
+    expect(
+      controller,
+      isNotNull,
+      reason:
+          'InteractiveViewer should have a transformationController assigned',
+    );
 
     // 2. 초기 줌 배율 (1.0) 확인 - Transform.scale의 scale이 1.0인지 확인
-    final transformFinder = find.ancestor(
-      of: find.byType(MapMarkerWidget),
-      matching: find.byType(Transform),
-    ).first;
+    final transformFinder = find
+        .ancestor(
+          of: find.byType(MapMarkerWidget),
+          matching: find.byType(Transform),
+        )
+        .first;
     expect(transformFinder, findsOneWidget);
-    
+
     Transform transformWidget = tester.widget<Transform>(transformFinder);
-    expect(transformWidget.transform.getMaxScaleOnViewport(), closeTo(1.0, 0.001));
+    expect(
+      transformWidget.transform.getMaxScaleOnViewport(),
+      closeTo(1.0, 0.001),
+    );
 
     // 3. 줌 배율을 3.0으로 변경
     controller!.value = Matrix4.diagonal3Values(3.0, 3.0, 1.0);
@@ -208,25 +225,30 @@ void main() {
     await tester.pump();
 
     // 4. 역보정된 스케일(1/3.0 = 0.3333) 확인
-    final transformFinderAfter = find.ancestor(
-      of: find.byType(MapMarkerWidget),
-      matching: find.byType(Transform),
-    ).first;
+    final transformFinderAfter = find
+        .ancestor(
+          of: find.byType(MapMarkerWidget),
+          matching: find.byType(Transform),
+        )
+        .first;
     transformWidget = tester.widget<Transform>(transformFinderAfter);
-    expect(transformWidget.transform.getMaxScaleOnViewport(), closeTo(1.0 / 3.0, 0.001));
+    expect(
+      transformWidget.transform.getMaxScaleOnViewport(),
+      closeTo(1.0 / 3.0, 0.001),
+    );
   });
 }
 
 class FakeMapsRepository extends Fake implements MapsRepository {
   @override
   List<BgmsMap> get availableMaps => const [
-        BgmsMap(
-          id: 'Erangel',
-          name: 'Erangel',
-          assetPath: 'assets/maps/Erangel_HeightMap.jpg',
-          tilePath: 'Erangel',
-        ),
-      ];
+    BgmsMap(
+      id: 'Erangel',
+      name: 'Erangel',
+      assetPath: 'assets/maps/Erangel_HeightMap.jpg',
+      tilePath: 'Erangel',
+    ),
+  ];
 
   @override
   BgmsMap resolveMap(String? mapId) => availableMaps.first;

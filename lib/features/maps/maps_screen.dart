@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 
 import '../../core/config/app_config.dart';
@@ -58,7 +56,12 @@ class _MapsScreenState extends State<MapsScreen> {
             _layers.addAll(available);
           } else {
             _layers.clear();
-            _layers.addAll(const ['Garage', 'SecretRoom', 'Esports', 'HotDrop']);
+            _layers.addAll(const [
+              'Garage',
+              'SecretRoom',
+              'Esports',
+              'HotDrop',
+            ]);
           }
         });
       }
@@ -87,7 +90,8 @@ class _MapsScreenState extends State<MapsScreen> {
     return FutureBuilder<MapMarkerLayer>(
       future: _markerFuture,
       builder: (context, snapshot) {
-        final layer = snapshot.data ??
+        final layer =
+            snapshot.data ??
             MapMarkerLayer.unavailable(
               mapId: _selectedMap.id,
               message: '지도 마커를 준비하는 중입니다.',
@@ -126,7 +130,8 @@ class _MapsScreenState extends State<MapsScreen> {
               decoration: const InputDecoration(labelText: '맵 선택'),
               items: _repository.availableMaps
                   .map(
-                    (map) => DropdownMenuItem(value: map.id, child: Text(map.name)),
+                    (map) =>
+                        DropdownMenuItem(value: map.id, child: Text(map.name)),
                   )
                   .toList(),
               onChanged: (value) {
@@ -145,8 +150,9 @@ class _MapsScreenState extends State<MapsScreen> {
                 final relatedLayers = allowedLayers
                     .where((l) => getCategoryLabel(l) == koreanLabel)
                     .toList();
-                final isSelected =
-                    relatedLayers.any((l) => _layers.contains(l));
+                final isSelected = relatedLayers.any(
+                  (l) => _layers.contains(l),
+                );
 
                 return FilterChip(
                   label: Text(koreanLabel),
@@ -170,7 +176,6 @@ class _MapsScreenState extends State<MapsScreen> {
   }
 }
 
-
 class _MapPanel extends StatefulWidget {
   const _MapPanel({
     required this.map,
@@ -189,7 +194,8 @@ class _MapPanel extends StatefulWidget {
 }
 
 class _MapPanelState extends State<_MapPanel> {
-  final TransformationController _transformationController = TransformationController();
+  final TransformationController _transformationController =
+      TransformationController();
   final ValueNotifier<double> _zoomScaleNotifier = ValueNotifier<double>(1.0);
 
   @override
@@ -236,16 +242,30 @@ class _MapPanelState extends State<_MapPanel> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(color: color, width: 0.5),
                       ),
-                      child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white70,
+                        size: 20,
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -253,7 +273,11 @@ class _MapPanelState extends State<_MapPanel> {
                 const SizedBox(height: 12),
                 Text(
                   marker.label,
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -263,7 +287,11 @@ class _MapPanelState extends State<_MapPanel> {
                 const SizedBox(height: 12),
                 Text(
                   '${marker.label}은(는) ${getCategoryLabel(marker.layer)} 분류 지점입니다. 게임 플레이 전술 수립 시 참고하십시오.',
-                  style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
@@ -299,7 +327,13 @@ class _MapPanelState extends State<_MapPanel> {
               ],
             ),
             const SizedBox(height: 8),
-            const Text('지도 배경 및 마커 정보는 인게임 전술 맵 규격 기준입니다.'),
+            Row(
+              children: [
+                Chip(label: Text(widget.layer.displaySourceLabel)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(widget.layer.displayMessage)),
+              ],
+            ),
             const SizedBox(height: 12),
             if (widget.loading) const LinearProgressIndicator(),
             AspectRatio(
@@ -320,7 +354,9 @@ class _MapPanelState extends State<_MapPanel> {
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     color: BgmsColors.elevated,
-                                    border: Border.all(color: BgmsColors.border),
+                                    border: Border.all(
+                                      color: BgmsColors.border,
+                                    ),
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
@@ -333,12 +369,18 @@ class _MapPanelState extends State<_MapPanel> {
                                   valueListenable: _zoomScaleNotifier,
                                   builder: (context, scale, child) {
                                     return Align(
-                                      alignment: FractionalOffset(marker.x, marker.y),
+                                      alignment: FractionalOffset(
+                                        marker.x,
+                                        marker.y,
+                                      ),
                                       child: Transform.scale(
                                         scale: 1.0 / scale,
                                         child: MapMarkerWidget(
                                           marker: marker,
-                                          onTap: () => _showMarkerDetails(context, marker),
+                                          onTap: () => _showMarkerDetails(
+                                            context,
+                                            marker,
+                                          ),
                                         ),
                                       ),
                                     );
@@ -366,7 +408,8 @@ class _MapPanelState extends State<_MapPanel> {
                               map: widget.map,
                               markers: widget.layer.markers,
                               activeLayers: widget.activeLayers,
-                              onMarkerTap: (m) => _showMarkerDetails(context, m),
+                              onMarkerTap: (m) =>
+                                  _showMarkerDetails(context, m),
                             ),
                           ),
                         );
@@ -379,7 +422,20 @@ class _MapPanelState extends State<_MapPanel> {
             ),
             if (!widget.loading && visibleMarkers.isEmpty) ...[
               const SizedBox(height: 12),
-              const Text('표시할 마커가 없습니다. 위 API 메시지를 확인해 주세요.'),
+              const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 18,
+                    color: BgmsColors.textSecondary,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text('선택한 레이어에 표시할 마커가 없습니다. 다른 레이어를 켜 보세요.'),
+                  ),
+                ],
+              ),
             ],
           ],
         ),

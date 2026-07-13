@@ -24,13 +24,13 @@ class RankingsRepository {
       return RankingBoard.unavailable(
         query: query,
         message: status == 404
-            ? '/api/rankings API가 없습니다. 현재 웹 프로젝트에는 server action만 있고 모바일용 route가 필요합니다.'
-            : '랭킹 API 실패: ${_dioMessage(error)}',
+            ? '랭킹 데이터를 준비하고 있습니다.'
+            : '랭킹 데이터를 일시적으로 불러오지 못했습니다. ${_dioMessage(error)}',
       );
     } catch (error) {
       return RankingBoard.unavailable(
         query: query,
-        message: '랭킹 응답 파싱 실패: $error',
+        message: '랭킹 데이터를 표시하지 못했습니다. $error',
       );
     }
   }

@@ -44,7 +44,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
       children: [
         const BgmsBrandHeader(
           title: '랭킹',
-          subtitle: 'damage, kills, tier 기준의 모바일 랭킹 보드입니다.',
+          subtitle: '주간 딜량, 킬, 티어 기준으로 상위 플레이어를 확인합니다.',
         ),
         const SizedBox(height: 16),
         SegmentedButton<String>(
@@ -170,14 +170,14 @@ class _RankingBoardCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Chip(label: Text(board.source.name)),
+                Chip(label: Text(board.displaySourceLabel)),
               ],
             ),
             const SizedBox(height: 8),
-            Text(board.message),
+            Text(board.displayMessage),
             const SizedBox(height: 12),
             if (board.entries.isEmpty)
-              const Text('표시할 랭킹 데이터가 없습니다.')
+              const _EmptyRankingMessage()
             else
               ...board.entries.map((entry) => _RankingTile(entry: entry)),
           ],
@@ -192,6 +192,22 @@ class _RankingBoardCard extends StatelessWidget {
       'tier' => '티어 랭킹',
       _ => '주간 딜량 랭킹',
     };
+  }
+}
+
+class _EmptyRankingMessage extends StatelessWidget {
+  const _EmptyRankingMessage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.info_outline, size: 18, color: BgmsColors.textSecondary),
+        SizedBox(width: 8),
+        Expanded(child: Text('조건에 맞는 플레이어가 아직 없습니다. 다른 필터를 선택해 보세요.')),
+      ],
+    );
   }
 }
 

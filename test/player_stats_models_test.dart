@@ -131,8 +131,12 @@ void main() {
       expect(board.source, RankingSource.api);
       expect(board.entries.single.nickname, 'Player');
       expect(board.entries.single.value, 312.4);
+      expect(board.displaySourceLabel, '최신 랭킹');
+      expect(board.displayMessage, contains('최근 경기'));
       expect(unavailable.source, RankingSource.unavailable);
       expect(unavailable.entries, isEmpty);
+      expect(unavailable.displaySourceLabel, '준비 중');
+      expect(unavailable.displayMessage, contains('필터'));
     },
   );
 
@@ -153,47 +157,57 @@ void main() {
     }, mapId: 'Erangel');
 
     expect(layer.source, MapMarkerSource.api);
+    expect(layer.displaySourceLabel, '마커 연동');
+    expect(layer.displayMessage, contains('전술 마커'));
     expect(layer.markers.single.layer, 'Garage');
     expect(layer.markers.single.source, MapMarkerSource.api);
     expect(layer.markers.single.x, 0.25);
     expect(layer.markers.single.y, 0.75);
     expect(unavailable.source, MapMarkerSource.fallback);
     expect(unavailable.markers, isEmpty);
+    expect(unavailable.displaySourceLabel, '마커 준비 중');
+    expect(unavailable.displayMessage, contains('다른 맵'));
   });
 
-  test('PlayerStatsProfile parses separate ranked and normal stats for each mode', () {
-    final mockJson = {
-      'nickname': 'TestPlayer',
-      'platform': 'steam',
-      'seasonId': 'pc-2026-01',
-      'seasonsList': ['pc-2026-01'],
-      'stats': {
-        'ranked': {
-          'squad': {
-            'roundsPlayed': 10,
-            'kills': 20,
-            'deaths': 5,
-            'damageDealt': 2500.0,
-            'currentTier': {'tier': 'Gold', 'subTier': 'III'},
-            'currentRankPoint': 2350,
-          }
+  test(
+    'PlayerStatsProfile parses separate ranked and normal stats for each mode',
+    () {
+      final mockJson = {
+        'nickname': 'TestPlayer',
+        'platform': 'steam',
+        'seasonId': 'pc-2026-01',
+        'seasonsList': ['pc-2026-01'],
+        'stats': {
+          'ranked': {
+            'squad': {
+              'roundsPlayed': 10,
+              'kills': 20,
+              'deaths': 5,
+              'damageDealt': 2500.0,
+              'currentTier': {'tier': 'Gold', 'subTier': 'III'},
+              'currentRankPoint': 2350,
+            },
+          },
+          'normal': {
+            'squad': {
+              'roundsPlayed': 5,
+              'wins': 1,
+              'top10s': 3,
+              'kills': 15,
+              'losses': 4,
+              'damageDealt': 1200.0,
+            },
+          },
         },
-        'normal': {
-          'squad': {
-            'roundsPlayed': 5,
-            'wins': 1,
-            'top10s': 3,
-            'kills': 15,
-            'losses': 4,
-            'damageDealt': 1200.0,
-          }
-        }
-      }
-    };
-    final profile = PlayerStatsProfile.fromJson(mockJson);
-    expect(profile.modeStats['ranked']?['squad']?.roundsPlayed, 10);
-    expect(profile.modeStats['ranked']?['squad']?.kills, 20);
-    expect(profile.modeStats['ranked']?['squad']?.currentTierName, 'Gold III');
-    expect(profile.modeStats['normal']?['squad']?.roundsPlayed, 5);
-  });
+      };
+      final profile = PlayerStatsProfile.fromJson(mockJson);
+      expect(profile.modeStats['ranked']?['squad']?.roundsPlayed, 10);
+      expect(profile.modeStats['ranked']?['squad']?.kills, 20);
+      expect(
+        profile.modeStats['ranked']?['squad']?.currentTierName,
+        'Gold III',
+      );
+      expect(profile.modeStats['normal']?['squad']?.roundsPlayed, 5);
+    },
+  );
 }

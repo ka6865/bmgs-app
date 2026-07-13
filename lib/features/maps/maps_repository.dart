@@ -83,13 +83,13 @@ class MapsRepository {
       return MapMarkerLayer.unavailable(
         mapId: mapId,
         message: status == 404
-            ? '/api/maps/$mapId/markers API가 없습니다. 웹/백엔드에 해당 라우트가 필요합니다.'
-            : '지도 마커 API 실패: ${_dioMessage(error)}',
+            ? '이 맵의 마커 데이터를 준비하고 있습니다.'
+            : '지도 마커를 일시적으로 불러오지 못했습니다. ${_dioMessage(error)}',
       );
     } catch (error) {
       return MapMarkerLayer.unavailable(
         mapId: mapId,
-        message: '지도 마커 파싱 실패: $error',
+        message: '지도 마커를 표시하지 못했습니다. $error',
       );
     }
   }
@@ -141,7 +141,9 @@ class MapsRepository {
       return availableLayers;
     }
     final allowedSet = allowed.map((s) => s.trim().toLowerCase()).toSet();
-    return availableLayers.where((l) => allowedSet.contains(l.toLowerCase())).toList();
+    return availableLayers
+        .where((l) => allowedSet.contains(l.toLowerCase()))
+        .toList();
   }
 
   String _dioMessage(DioException error) {

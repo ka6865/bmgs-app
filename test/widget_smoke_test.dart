@@ -21,6 +21,18 @@ void main() {
     expect(find.text('검색한 닉네임이 여기에 저장됩니다.'), findsOneWidget);
   });
 
+  testWidgets('home search shows validation message for empty nickname', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('전적 검색'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('닉네임을 입력해 주세요.'), findsOneWidget);
+    expect(find.text('닉네임 검색'), findsOneWidget);
+  });
+
   testWidgets('stats tab shows empty state without nickname', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const BgmsApp());

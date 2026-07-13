@@ -19,6 +19,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<StoredPlayer> _recentPlayers = const [];
   List<StoredPlayer> _favoritePlayers = const [];
   bool _loadingStore = true;
+  bool _searching = false;
+  String? _nicknameError;
 
   @override
   void initState() {
@@ -52,13 +54,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _search({String? nickname, String? platform}) async {
+    if (_searching) return;
+
     final resolvedNickname = (nickname ?? _nicknameController.text).trim();
     final resolvedPlatform = platform ?? _platform;
-    if (resolvedNickname.isEmpty) return;
+    if (resolvedNickname.isEmpty) {
+      setState(() {
+        _nicknameError = '닉네임을 입력해 주세요.';
+      });
+      return;
+    }
+
+    setState(() {
+      _searching = true;
+      _nicknameError = null;
+    });
 
     await _store?.addRecentSearch(resolvedNickname, platform: resolvedPlatform);
     await _refreshPlayers();
     if (!mounted) return;
+
+    setState(() {
+      _searching = false;
+    });
 
     context.go(
       Uri(
@@ -99,14 +117,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 TextField(
                   controller: _nicknameController,
                   textInputAction: TextInputAction.search,
+                  enabled: !_searching,
+                  onChanged: (_) {
+                    if (_nicknameError == null) return;
+                    setState(() => _nicknameError = null);
+                  },
                   onSubmitted: (_) => _search(),
                   decoration: InputDecoration(
                     labelText: '닉네임 검색',
                     hintText: 'KangHeeSung_',
+                    errorText: _nicknameError,
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: IconButton(
-                      onPressed: _search,
-                      icon: const Icon(Icons.arrow_forward),
+                      onPressed: _searching ? null : _search,
+                      icon: _searching
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.arrow_forward),
                       tooltip: '검색',
                     ),
                   ),
@@ -129,9 +159,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: _search,
-                    icon: const Icon(Icons.search),
-                    label: const Text('전적 검색'),
+                    onPressed: _searching ? null : _search,
+                    icon: _searching
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.search),
+                    label: Text(_searching ? '검색 중...' : '전적 검색'),
                   ),
                 ),
               ],

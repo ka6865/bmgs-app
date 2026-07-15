@@ -6,6 +6,7 @@ import '../../core/observability/app_logger.dart';
 import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../../navigation/shell_scaffold.dart';
 import 'widgets/home_dashboard_sections.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loadingStore = true;
   bool _searching = false;
   String? _nicknameError;
+  bool? _wasActive;
 
   @override
   void initState() {
@@ -38,6 +40,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _nicknameController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isActive = ShellTabScope.maybeOf(context)?.currentIndex == 0;
+    if (isActive && _wasActive == false) {
+      _refreshPlayers();
+    }
+    _wasActive = isActive;
   }
 
   Future<void> _loadStore() async {
@@ -137,6 +149,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _toggleFavorite(StoredPlayer player) async {
+    try {
+      await _storeReady;
+      final store = _store;
+      if (store == null) return;
+
+      await store.toggleFavorite(player.nickname, platform: player.platform);
+      await _refreshPlayers();
+    } catch (error, stackTrace) {
+      AppObservability.logger.warning(
+        '홈 즐겨찾기를 변경하지 못했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'home', 'operation': 'toggle_favorite'},
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final latestPlayer = _recentPlayers.isEmpty ? null : _recentPlayers.first;
@@ -222,10 +252,14 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 12),
             ContinuePlayerCard(
               player: latestPlayer,
+              isFavorite: _favoritePlayers.any(
+                (player) => player.id == latestPlayer.id,
+              ),
               onTap: () => _search(
                 nickname: latestPlayer.nickname,
                 platform: latestPlayer.platform,
               ),
+              onFavoriteTap: () => _toggleFavorite(latestPlayer),
             ),
           ],
           const SizedBox(height: 12),

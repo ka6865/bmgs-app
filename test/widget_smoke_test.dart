@@ -152,6 +152,83 @@ void main() {
     );
   });
 
+  testWidgets(
+    'home continue player favorite toggle updates storage and dashboard',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'bgms_recent_searches': ['kakao\tfavoriteCandidate'],
+      });
+      final store = LocalPlayerStore(await SharedPreferences.getInstance());
+      await tester.pumpWidget(const BgmsApp());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('즐겨찾기에 추가'));
+      await tester.pumpAndSettle();
+
+      expect(
+        await store.isFavorite('favoriteCandidate', platform: 'kakao'),
+        isTrue,
+      );
+      expect(find.text('favoriteCandidate · kakao'), findsNWidgets(2));
+      expect(find.byTooltip('즐겨찾기 해제'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('즐겨찾기 해제'));
+      await tester.pumpAndSettle();
+
+      expect(
+        await store.isFavorite('favoriteCandidate', platform: 'kakao'),
+        isFalse,
+      );
+      expect(find.text('favoriteCandidate · kakao'), findsOneWidget);
+      expect(find.text('즐겨찾기를 추가하면 빠르게 전적을 확인할 수 있습니다.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'home refreshes recent players after a stats search and tab return',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final router = createAppRouter();
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.query_stats));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'searchedFromStats');
+      await tester.tap(find.text('분석 시작'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.search).last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('searchedFromStats · steam'), findsOneWidget);
+    },
+  );
+
+  testWidgets('home refreshes after my clears recent players and favorites', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'bgms_recent_searches': ['steam\tmanagedPlayer'],
+      'bgms_favorite_players': ['steam\tmanagedPlayer'],
+    });
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.person));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('전체 삭제'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('즐겨찾기 해제'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.search).last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('managedPlayer · steam'), findsNothing);
+    expect(find.text('즐겨찾기를 추가하면 빠르게 전적을 확인할 수 있습니다.'), findsOneWidget);
+  });
+
   testWidgets('home search shows validation message for empty nickname', (
     tester,
   ) async {

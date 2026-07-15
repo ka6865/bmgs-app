@@ -9,8 +9,11 @@ import '../features/maps/maps_screen.dart';
 import '../features/my/my_screen.dart';
 import '../features/rankings/rankings_screen.dart';
 import '../features/stats/match_detail_screen.dart';
+import '../features/stats/match_detail_repository.dart';
 import '../features/stats/player_stats_models.dart';
+import '../features/stats/player_stats_repository.dart';
 import '../features/stats/stats_detail_screen.dart';
+import '../core/player/player_search_flow.dart';
 import 'shell_scaffold.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -20,6 +23,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 GoRouter createAppRouter({
   Future<SharedPreferences> Function()? homePreferencesLoader,
   Future<SharedPreferences> Function()? statsPreferencesLoader,
+  PlayerStatsRepository? statsRepository,
+  MatchDetailRepository? matchDetailRepository,
 }) {
   return GoRouter(
     initialLocation: '/',
@@ -46,7 +51,10 @@ GoRouter createAppRouter({
                 path: '/stats',
                 builder: (context, state) => StatsDetailScreen(
                   nickname: state.uri.queryParameters['nickname'],
-                  platform: state.uri.queryParameters['platform'] ?? 'steam',
+                  platform: normalizePlayerPlatform(
+                    state.uri.queryParameters['platform'] ?? 'steam',
+                  ),
+                  repository: statsRepository,
                   preferencesLoader: statsPreferencesLoader,
                 ),
                 routes: [
@@ -61,10 +69,11 @@ GoRouter createAppRouter({
                           extra['nickname'] as String? ??
                           query['nickname'] ??
                           '';
-                      final platform =
-                          extra['platform'] as String? ??
-                          query['platform'] ??
-                          'steam';
+                      final platform = normalizePlayerPlatform(
+                        extra['platform'] as String? ??
+                            query['platform'] ??
+                            'steam',
+                      );
 
                       final summary =
                           extra['summary'] as MatchSummary? ??
@@ -87,6 +96,7 @@ GoRouter createAppRouter({
                         nickname: nickname,
                         platform: platform,
                         summary: summary,
+                        repository: matchDetailRepository,
                       );
                     },
                   ),

@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/app_config.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../../navigation/shell_scaffold.dart';
 
 class MyScreen extends StatefulWidget {
   const MyScreen({super.key});
@@ -19,11 +20,22 @@ class MyScreen extends StatefulWidget {
 
 class _MyScreenState extends State<MyScreen> {
   late Future<_MyScreenStateData> _stateFuture;
+  bool? _wasActive;
 
   @override
   void initState() {
     super.initState();
     _stateFuture = _loadState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isActive = ShellTabScope.maybeOf(context)?.currentIndex == 5;
+    if (isActive && _wasActive == false) {
+      _refresh();
+    }
+    _wasActive = isActive;
   }
 
   Future<_MyScreenStateData> _loadState() async {

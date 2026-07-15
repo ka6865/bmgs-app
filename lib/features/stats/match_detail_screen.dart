@@ -13,12 +13,14 @@ class MatchDetailScreen extends StatefulWidget {
     required this.nickname,
     required this.platform,
     required this.summary,
+    this.repository,
   });
 
   final String matchId;
   final String nickname;
   final String platform;
   final MatchSummary summary;
+  final MatchDetailRepository? repository;
 
   @override
   State<MatchDetailScreen> createState() => _MatchDetailScreenState();
@@ -31,7 +33,7 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _repository = MatchDetailRepository();
+    _repository = widget.repository ?? MatchDetailRepository();
     _detailFuture = _loadDetail();
   }
 

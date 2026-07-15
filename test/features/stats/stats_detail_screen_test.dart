@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bgms_mobile_app/features/stats/stats_detail_screen.dart';
+import 'package:bgms_mobile_app/features/stats/match_detail_screen.dart';
+import 'package:bgms_mobile_app/features/stats/match_detail_models.dart';
+import 'package:bgms_mobile_app/features/stats/match_detail_repository.dart';
 import 'package:bgms_mobile_app/features/stats/player_stats_models.dart';
 import 'package:bgms_mobile_app/features/stats/player_stats_repository.dart';
 import 'package:bgms_mobile_app/features/stats/widgets/radar_chart_widget.dart';
@@ -164,6 +167,29 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.platforms, ['steam']);
+    },
+  );
+
+  testWidgets(
+    'match deep link normalizes an invalid platform at the router boundary',
+    (WidgetTester tester) async {
+      final router = createAppRouter(
+        statsRepository: MockPlayerStatsRepository(),
+        matchDetailRepository: _NoopMatchDetailRepository(),
+      );
+      router.go(
+        '/stats/match/match-1?nickname=DeepLinkPlayer&platform=invalid',
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pump();
+
+      expect(
+        tester
+            .widget<MatchDetailScreen>(find.byType(MatchDetailScreen))
+            .platform,
+        'steam',
+      );
     },
   );
 
@@ -464,6 +490,19 @@ void main() {
       );
     }
   });
+}
+
+class _NoopMatchDetailRepository extends Fake implements MatchDetailRepository {
+  @override
+  Future<MatchDetail> fetchMatchDetail({
+    required MatchSummary summary,
+    required String nickname,
+    required String platform,
+  }) {
+    return SynchronousFuture(
+      MatchDetail.fromSummary(summary, nickname: nickname),
+    );
+  }
 }
 
 class MockMiramarMapNameStatsRepository extends Fake

@@ -7,6 +7,7 @@ import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../../navigation/shell_scaffold.dart';
 import 'ai_coaching_card.dart';
 import 'player_stats_models.dart';
 import 'player_stats_repository.dart';
@@ -42,6 +43,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   bool _loadingStore = true;
   bool _searching = false;
   String? _searchError;
+  bool? _wasActive;
 
   String get _normalizedPlatform => normalizePlayerPlatform(widget.platform);
 
@@ -58,6 +60,16 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isActive = ShellTabScope.maybeOf(context)?.currentIndex == 1;
+    if (isActive && _wasActive == false) {
+      _refreshPlayers();
+    }
+    _wasActive = isActive;
   }
 
   @override

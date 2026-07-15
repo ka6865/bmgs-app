@@ -7,11 +7,15 @@ class ContinuePlayerCard extends StatelessWidget {
   const ContinuePlayerCard({
     super.key,
     required this.player,
+    required this.isFavorite,
     required this.onTap,
+    required this.onFavoriteTap,
   });
 
   final StoredPlayer player;
+  final bool isFavorite;
   final VoidCallback onTap;
+  final VoidCallback onFavoriteTap;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +25,11 @@ class ContinuePlayerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(
           height: 76,
-          child: _ContinuePlayerContent(player: player),
+          child: _ContinuePlayerContent(
+            player: player,
+            isFavorite: isFavorite,
+            onFavoriteTap: onFavoriteTap,
+          ),
         ),
       ),
     );
@@ -29,9 +37,15 @@ class ContinuePlayerCard extends StatelessWidget {
 }
 
 class _ContinuePlayerContent extends StatelessWidget {
-  const _ContinuePlayerContent({required this.player});
+  const _ContinuePlayerContent({
+    required this.player,
+    required this.isFavorite,
+    required this.onFavoriteTap,
+  });
 
   final StoredPlayer player;
+  final bool isFavorite;
+  final VoidCallback onFavoriteTap;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +77,12 @@ class _ContinuePlayerContent extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          IconButton(
+            onPressed: onFavoriteTap,
+            icon: Icon(isFavorite ? Icons.star : Icons.star_border),
+            color: isFavorite ? BgmsColors.accent : null,
+            tooltip: isFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가',
           ),
           const Icon(Icons.chevron_right),
         ],

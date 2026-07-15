@@ -96,7 +96,9 @@ void main() {
     expect(find.text('BGMS 커뮤니티 글을 확인하고 로그인 후 글과 댓글을 작성합니다.'), findsOneWidget);
   });
 
-  testWidgets('stats tab shows search hub without nickname', (tester) async {
+  testWidgets('stats tab shows analysis workspace without home duplicates', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({
       'bgms_recent_searches': ['steam\tkangheesung_'],
       'bgms_favorite_players': ['kakao\tbgmsTester'],
@@ -107,13 +109,14 @@ void main() {
     await tester.tap(find.text('전적'));
     await tester.pumpAndSettle();
 
-    expect(find.text('전적 검색'), findsOneWidget);
-    expect(find.text('최근 본 플레이어'), findsOneWidget);
-    expect(find.text('즐겨찾기'), findsOneWidget);
+    expect(find.text('전적 분석'), findsOneWidget);
+    expect(find.text('분석 시작'), findsOneWidget);
+    expect(find.text('최근 분석'), findsOneWidget);
     expect(find.text('kangheesung_ · steam'), findsOneWidget);
-    expect(find.text('bgmsTester · kakao'), findsOneWidget);
-    expect(find.text('다음 업데이트'), findsOneWidget);
-    expect(find.textContaining('비교 모드'), findsOneWidget);
+    expect(find.text('즐겨찾기'), findsNothing);
+    expect(find.text('다음 업데이트'), findsNothing);
+    expect(find.textContaining('비교 모드'), findsNothing);
+    expect(find.textContaining('bgmsTester'), findsNothing);
   });
 
   testWidgets('rankings tab renders ranking controls', (tester) async {

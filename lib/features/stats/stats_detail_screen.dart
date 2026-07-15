@@ -33,7 +33,6 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   Future<PlayerStatsBundle>? _statsFuture;
   LocalPlayerStore? _store;
   List<StoredPlayer> _recentPlayers = const [];
-  List<StoredPlayer> _favoritePlayers = const [];
   String? _selectedSeason;
   String _searchPlatform = 'steam';
   bool _loadingStore = true;
@@ -76,11 +75,9 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     final store = _store;
     if (store == null) return;
     final recent = await store.getRecentPlayers();
-    final favorites = await store.getFavoritePlayers();
     if (!mounted) return;
     setState(() {
       _recentPlayers = recent;
-      _favoritePlayers = favorites;
       _loadingStore = false;
     });
   }
@@ -149,11 +146,6 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     }
   }
 
-  Future<void> _toggleFavorite(StoredPlayer player) async {
-    await _store?.toggleFavorite(player.nickname, platform: player.platform);
-    await _refreshPlayers();
-  }
-
   @override
   Widget build(BuildContext context) {
     final nickname = widget.nickname?.trim() ?? '';
@@ -162,8 +154,8 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
       padding: const EdgeInsets.all(20),
       children: [
         BgmsBrandHeader(
-          title: '전적',
-          subtitle: nickname.isEmpty ? '닉네임 검색 후 최근 기록을 확인합니다.' : nickname,
+          title: nickname.isEmpty ? '전적 분석' : '전적',
+          subtitle: nickname.isEmpty ? '분석할 플레이어를 선택하세요.' : nickname,
           trailing: nickname.isEmpty
               ? null
               : IconButton(
@@ -178,7 +170,6 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
             controller: _searchController,
             platform: _searchPlatform,
             recentPlayers: _recentPlayers,
-            favoritePlayers: _favoritePlayers,
             loadingStore: _loadingStore,
             searching: _searching,
             errorText: _searchError,
@@ -186,7 +177,6 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
               setState(() => _searchPlatform = platform);
             },
             onSearch: _searchPlayer,
-            onFavoriteTap: _toggleFavorite,
             onTextChanged: () {
               if (_searchError == null) return;
               setState(() => _searchError = null);
@@ -236,12 +226,10 @@ class _StatsSearchHub extends StatelessWidget {
     required this.controller,
     required this.platform,
     required this.recentPlayers,
-    required this.favoritePlayers,
     required this.loadingStore,
     required this.searching,
     required this.onPlatformChanged,
     required this.onSearch,
-    required this.onFavoriteTap,
     required this.onTextChanged,
     this.errorText,
   });
@@ -249,13 +237,11 @@ class _StatsSearchHub extends StatelessWidget {
   final TextEditingController controller;
   final String platform;
   final List<StoredPlayer> recentPlayers;
-  final List<StoredPlayer> favoritePlayers;
   final bool loadingStore;
   final bool searching;
   final String? errorText;
   final ValueChanged<String> onPlatformChanged;
   final Future<void> Function({String? nickname, String? platform}) onSearch;
-  final ValueChanged<StoredPlayer> onFavoriteTap;
   final VoidCallback onTextChanged;
 
   @override
@@ -332,30 +318,14 @@ class _StatsSearchHub extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _PlayerShortcutPanel(
-          title: '최근 본 플레이어',
+          title: '최근 분석',
           icon: Icons.history,
           players: recentPlayers,
-          favorites: favoritePlayers,
           loading: loadingStore,
-          emptyText: '홈 또는 전적 탭에서 검색한 플레이어가 여기에 표시됩니다.',
+          emptyText: '최근에 분석한 플레이어가 없습니다.',
           onTap: (player) =>
               onSearch(nickname: player.nickname, platform: player.platform),
-          onFavoriteTap: onFavoriteTap,
         ),
-        const SizedBox(height: 12),
-        _PlayerShortcutPanel(
-          title: '즐겨찾기',
-          icon: Icons.star_outline,
-          players: favoritePlayers,
-          favorites: favoritePlayers,
-          loading: loadingStore,
-          emptyText: '자주 보는 플레이어를 별표로 고정하세요.',
-          onTap: (player) =>
-              onSearch(nickname: player.nickname, platform: player.platform),
-          onFavoriteTap: onFavoriteTap,
-        ),
-        const SizedBox(height: 12),
-        const _UpcomingStatsPanel(),
       ],
     );
   }
@@ -366,21 +336,17 @@ class _PlayerShortcutPanel extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.players,
-    required this.favorites,
     required this.loading,
     required this.emptyText,
     required this.onTap,
-    required this.onFavoriteTap,
   });
 
   final String title;
   final IconData icon;
   final List<StoredPlayer> players;
-  final List<StoredPlayer> favorites;
   final bool loading;
   final String emptyText;
   final ValueChanged<StoredPlayer> onTap;
-  final ValueChanged<StoredPlayer> onFavoriteTap;
 
   @override
   Widget build(BuildContext context) {
@@ -413,103 +379,16 @@ class _PlayerShortcutPanel extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: players.map((player) {
-                  final favorite = favorites.any(
-                    (item) => item.id == player.id,
-                  );
-                  return InputChip(
-                    avatar: Icon(
-                      favorite ? Icons.star : Icons.star_border,
-                      size: 18,
-                    ),
-                    label: Text('${player.nickname} · ${player.platform}'),
-                    onPressed: () => onTap(player),
-                    onDeleted: () => onFavoriteTap(player),
-                    deleteIcon: Icon(
-                      favorite ? Icons.star : Icons.star_border,
-                      size: 18,
-                    ),
-                    deleteButtonTooltipMessage: favorite
-                        ? '즐겨찾기 해제'
-                        : '즐겨찾기 추가',
-                  );
-                }).toList(),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _UpcomingStatsPanel extends StatelessWidget {
-  const _UpcomingStatsPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    const items = [
-      (Icons.compare_arrows, '비교 모드', '플레이어 2명을 나란히 비교'),
-      (Icons.notifications_active_outlined, '전적 알림', '즐겨찾기 갱신과 시즌 변동 알림'),
-      (Icons.route_outlined, '매치 디테일', '동선, 교전, 생존 구간 고도화'),
-    ];
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.rocket_launch_outlined,
-                  size: 18,
-                  color: BgmsColors.accent,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '다음 업데이트',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...items.map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(item.$1, size: 18, color: Colors.white70),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.$2,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            item.$3,
-                            style: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+                children: players
+                    .map(
+                      (player) => InputChip(
+                        avatar: const Icon(Icons.history, size: 18),
+                        label: Text('${player.nickname} · ${player.platform}'),
+                        onPressed: () => onTap(player),
                       ),
-                    ),
-                  ],
-                ),
+                    )
+                    .toList(),
               ),
-            ),
           ],
         ),
       ),

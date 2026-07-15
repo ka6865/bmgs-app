@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 
@@ -56,9 +57,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _search({String? nickname, String? platform}) async {
     if (_searching) return;
 
-    final resolvedNickname = (nickname ?? _nicknameController.text).trim();
-    final resolvedPlatform = platform ?? _platform;
-    if (resolvedNickname.isEmpty) {
+    final destination = await preparePlayerSearch(
+      store: _store,
+      nickname: nickname ?? _nicknameController.text,
+      platform: platform ?? _platform,
+    );
+    if (destination == null) {
       setState(() {
         _nicknameError = '닉네임을 입력해 주세요.';
       });
@@ -70,7 +74,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _nicknameError = null;
     });
 
-    await _store?.addRecentSearch(resolvedNickname, platform: resolvedPlatform);
     await _refreshPlayers();
     if (!mounted) return;
 
@@ -78,15 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _searching = false;
     });
 
-    context.go(
-      Uri(
-        path: '/stats',
-        queryParameters: {
-          'nickname': resolvedNickname,
-          'platform': resolvedPlatform,
-        },
-      ).toString(),
-    );
+    context.go(destination.location);
   }
 
   Future<void> _toggleFavorite(StoredPlayer player) async {

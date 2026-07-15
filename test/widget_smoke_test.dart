@@ -8,17 +8,40 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('BGMS app renders home tab with search controls', (tester) async {
+  testWidgets('home renders compact dashboard in empty state', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const BgmsApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('BGMS'), findsWidgets);
-    expect(find.text('닉네임 검색'), findsOneWidget);
-    expect(find.byIcon(Icons.search), findsWidgets);
-    expect(find.text('Steam'), findsOneWidget);
-    expect(find.text('Kakao'), findsOneWidget);
-    expect(find.text('검색한 닉네임이 여기에 저장됩니다.'), findsOneWidget);
+    expect(find.text('PUBG 플레이어 검색'), findsOneWidget);
+    expect(find.text('빠른 메뉴'), findsOneWidget);
+    expect(find.text('랭킹'), findsWidgets);
+    expect(find.text('지도'), findsWidgets);
+    expect(find.text('게시판'), findsWidgets);
+    expect(find.text('이어서 보기'), findsNothing);
+  });
+
+  testWidgets('home separates latest, favorites, and activity', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'bgms_recent_searches': ['steam\tlatestPlayer', 'kakao\tolderPlayer'],
+      'bgms_favorite_players': [
+        'steam\tfavorite0',
+        'steam\tfavorite1',
+        'steam\tfavorite2',
+        'steam\tfavorite3',
+        'steam\tfavorite4',
+        'steam\tfavorite5',
+      ],
+    });
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('이어서 보기'), findsOneWidget);
+    expect(find.textContaining('latestPlayer'), findsOneWidget);
+    expect(find.text('즐겨찾는 플레이어'), findsOneWidget);
+    expect(find.textContaining('favorite5'), findsNothing);
+    expect(find.text('최근 활동'), findsOneWidget);
+    expect(find.textContaining('olderPlayer'), findsOneWidget);
   });
 
   testWidgets('home search shows validation message for empty nickname', (
@@ -32,7 +55,40 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('닉네임을 입력해 주세요.'), findsOneWidget);
-    expect(find.text('닉네임 검색'), findsOneWidget);
+    expect(find.text('PUBG 플레이어 검색'), findsOneWidget);
+  });
+
+  testWidgets('home quick action opens rankings', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('랭킹').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('딜량'), findsOneWidget);
+  });
+
+  testWidgets('home quick action opens maps', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('지도').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('맵 선택'), findsOneWidget);
+  });
+
+  testWidgets('home quick action opens board', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('게시판').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('BGMS 커뮤니티 글을 확인하고 로그인 후 글과 댓글을 작성합니다.'), findsOneWidget);
   });
 
   testWidgets('stats tab shows search hub without nickname', (tester) async {

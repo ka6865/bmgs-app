@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import 'widgets/home_dashboard_sections.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -94,46 +95,70 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _toggleFavorite(StoredPlayer player) async {
-    await _store?.toggleFavorite(player.nickname, platform: player.platform);
-    await _refreshPlayers();
-  }
-
-  Future<void> _clearRecentSearches() async {
-    await _store?.clearRecentSearches();
-    await _refreshPlayers();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    final latestPlayer = _recentPlayers.isEmpty ? null : _recentPlayers.first;
+    final remainingRecent = _recentPlayers.skip(1).toList();
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
-      children: [
-        const BgmsBrandHeader(
-          title: 'BGMS',
-          subtitle: 'PUBG 전적과 최근 매치를 빠르게 확인하세요.',
-        ),
-        const SizedBox(height: 24),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _nicknameController,
-                  textInputAction: TextInputAction.search,
-                  enabled: !_searching,
-                  onChanged: (_) {
-                    if (_nicknameError == null) return;
-                    setState(() => _nicknameError = null);
-                  },
-                  onSubmitted: (_) => _search(),
-                  decoration: InputDecoration(
-                    labelText: '닉네임 검색',
-                    hintText: 'KangHeeSung_',
-                    errorText: _nicknameError,
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: IconButton(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const BgmsBrandHeader(title: 'BGMS'),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _nicknameController,
+                    textInputAction: TextInputAction.search,
+                    enabled: !_searching,
+                    onChanged: (_) {
+                      if (_nicknameError == null) return;
+                      setState(() => _nicknameError = null);
+                    },
+                    onSubmitted: (_) => _search(),
+                    decoration: InputDecoration(
+                      labelText: 'PUBG 플레이어 검색',
+                      hintText: 'KangHeeSung_',
+                      errorText: _nicknameError,
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: IconButton(
+                        onPressed: _searching ? null : _search,
+                        icon: _searching
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.arrow_forward),
+                        tooltip: '검색',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'steam', label: Text('Steam')),
+                        ButtonSegment(value: 'kakao', label: Text('Kakao')),
+                      ],
+                      selected: {_platform},
+                      onSelectionChanged: (selection) {
+                        setState(() => _platform = selection.first);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
                       onPressed: _searching ? null : _search,
                       icon: _searching
                           ? const SizedBox(
@@ -141,159 +166,49 @@ class _HomeScreenState extends State<HomeScreen> {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.arrow_forward),
-                      tooltip: '검색',
+                          : const Icon(Icons.search),
+                      label: Text(_searching ? '검색 중...' : '전적 검색'),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'steam', label: Text('Steam')),
-                      ButtonSegment(value: 'kakao', label: Text('Kakao')),
-                    ],
-                    selected: {_platform},
-                    onSelectionChanged: (selection) {
-                      setState(() => _platform = selection.first);
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _searching ? null : _search,
-                    icon: _searching
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.search),
-                    label: Text(_searching ? '검색 중...' : '전적 검색'),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 24),
-        _PlayerSection(
-          title: '최근 검색',
-          icon: Icons.history,
-          players: _recentPlayers,
-          favorites: _favoritePlayers,
-          loading: _loadingStore,
-          emptyText: '검색한 닉네임이 여기에 저장됩니다.',
-          trailing: _recentPlayers.isEmpty
-              ? null
-              : TextButton.icon(
-                  onPressed: _clearRecentSearches,
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  label: const Text('삭제'),
-                ),
-          onTap: (player) =>
-              _search(nickname: player.nickname, platform: player.platform),
-          onFavoriteTap: _toggleFavorite,
-        ),
-        const SizedBox(height: 12),
-        _PlayerSection(
-          title: '즐겨찾기',
-          icon: Icons.star_outline,
-          players: _favoritePlayers,
-          favorites: _favoritePlayers,
-          loading: _loadingStore,
-          emptyText: '자주 보는 플레이어를 별표로 추가하세요.',
-          onTap: (player) =>
-              _search(nickname: player.nickname, platform: player.platform),
-          onFavoriteTap: _toggleFavorite,
-        ),
-      ],
-    );
-  }
-}
-
-class _PlayerSection extends StatelessWidget {
-  const _PlayerSection({
-    required this.title,
-    required this.icon,
-    required this.players,
-    required this.favorites,
-    required this.loading,
-    required this.emptyText,
-    required this.onTap,
-    required this.onFavoriteTap,
-    this.trailing,
-  });
-
-  final String title;
-  final IconData icon;
-  final List<StoredPlayer> players;
-  final List<StoredPlayer> favorites;
-  final bool loading;
-  final String emptyText;
-  final Widget? trailing;
-  final ValueChanged<StoredPlayer> onTap;
-  final ValueChanged<StoredPlayer> onFavoriteTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                ?trailing,
-              ],
-            ),
+          if (latestPlayer != null) ...[
             const SizedBox(height: 12),
-            if (loading)
-              const LinearProgressIndicator()
-            else if (players.isEmpty)
-              Text(emptyText)
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: players.map((player) {
-                  final favorite = favorites.any(
-                    (item) => item.id == player.id,
-                  );
-                  return InputChip(
-                    avatar: Icon(
-                      favorite ? Icons.star : Icons.star_border,
-                      size: 18,
-                    ),
-                    label: Text('${player.nickname} · ${player.platform}'),
-                    onPressed: () => onTap(player),
-                    onDeleted: () => onFavoriteTap(player),
-                    deleteIcon: Icon(
-                      favorite ? Icons.star : Icons.star_border,
-                      size: 18,
-                    ),
-                    deleteButtonTooltipMessage: favorite
-                        ? '즐겨찾기 해제'
-                        : '즐겨찾기 추가',
-                  );
-                }).toList(),
+            ContinuePlayerCard(
+              player: latestPlayer,
+              onTap: () => _search(
+                nickname: latestPlayer.nickname,
+                platform: latestPlayer.platform,
               ),
+            ),
           ],
-        ),
+          if (_loadingStore || _favoritePlayers.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            FavoritePlayersSection(
+              players: _favoritePlayers,
+              loading: _loadingStore,
+              onTap: (player) =>
+                  _search(nickname: player.nickname, platform: player.platform),
+            ),
+          ],
+          const SizedBox(height: 12),
+          HomeQuickActions(
+            onRankingsTap: () => context.go('/rankings'),
+            onMapsTap: () => context.go('/maps'),
+            onBoardTap: () => context.go('/board'),
+          ),
+          if (_loadingStore || remainingRecent.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            RecentActivitySection(
+              players: remainingRecent,
+              loading: _loadingStore,
+              onTap: (player) =>
+                  _search(nickname: player.nickname, platform: player.platform),
+            ),
+          ],
+        ],
       ),
     );
   }

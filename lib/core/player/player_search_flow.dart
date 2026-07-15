@@ -24,8 +24,5 @@ Future<PlayerSearchDestination?> preparePlayerSearch({
   if (cleanNickname.isEmpty) return null;
 
   await store?.addRecentSearch(cleanNickname, platform: platform);
-  return PlayerSearchDestination(
-    nickname: cleanNickname,
-    platform: platform,
-  );
+  return PlayerSearchDestination(nickname: cleanNickname, platform: platform);
 }

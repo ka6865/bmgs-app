@@ -114,12 +114,9 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   Future<void> _searchPlayer({String? nickname, String? platform}) async {
     if (_searching) return;
 
-    final destination = await preparePlayerSearch(
-      store: _store,
-      nickname: nickname ?? _searchController.text,
-      platform: platform ?? _searchPlatform,
-    );
-    if (destination == null) {
+    final cleanNickname = (nickname ?? _searchController.text).trim();
+    if (cleanNickname.isEmpty) {
+      if (!mounted) return;
       setState(() => _searchError = '닉네임을 입력해 주세요.');
       return;
     }
@@ -129,11 +126,27 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
       _searchError = null;
     });
 
-    await _refreshPlayers();
-    if (!mounted) return;
+    try {
+      final destination = await preparePlayerSearch(
+        store: _store,
+        nickname: cleanNickname,
+        platform: platform ?? _searchPlatform,
+      );
+      if (!mounted) return;
+      if (destination == null) return;
 
-    setState(() => _searching = false);
-    context.go(destination.location);
+      await _refreshPlayers();
+      if (!mounted) return;
+
+      context.go(destination.location);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _searchError = '검색 중 오류가 발생했습니다.');
+    } finally {
+      if (mounted) {
+        setState(() => _searching = false);
+      }
+    }
   }
 
   Future<void> _toggleFavorite(StoredPlayer player) async {

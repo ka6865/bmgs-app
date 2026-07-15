@@ -57,12 +57,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _search({String? nickname, String? platform}) async {
     if (_searching) return;
 
-    final destination = await preparePlayerSearch(
-      store: _store,
-      nickname: nickname ?? _nicknameController.text,
-      platform: platform ?? _platform,
-    );
-    if (destination == null) {
+    final cleanNickname = (nickname ?? _nicknameController.text).trim();
+    if (cleanNickname.isEmpty) {
+      if (!mounted) return;
       setState(() {
         _nicknameError = '닉네임을 입력해 주세요.';
       });
@@ -74,14 +71,27 @@ class _HomeScreenState extends State<HomeScreen> {
       _nicknameError = null;
     });
 
-    await _refreshPlayers();
-    if (!mounted) return;
+    try {
+      final destination = await preparePlayerSearch(
+        store: _store,
+        nickname: cleanNickname,
+        platform: platform ?? _platform,
+      );
+      if (!mounted) return;
+      if (destination == null) return;
 
-    setState(() {
-      _searching = false;
-    });
+      await _refreshPlayers();
+      if (!mounted) return;
 
-    context.go(destination.location);
+      context.go(destination.location);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _nicknameError = '검색 중 오류가 발생했습니다.');
+    } finally {
+      if (mounted) {
+        setState(() => _searching = false);
+      }
+    }
   }
 
   Future<void> _toggleFavorite(StoredPlayer player) async {

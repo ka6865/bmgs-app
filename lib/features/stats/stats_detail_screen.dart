@@ -18,11 +18,13 @@ class StatsDetailScreen extends StatefulWidget {
     required this.nickname,
     required this.platform,
     this.repository,
+    this.preferencesLoader,
   });
 
   final String? nickname;
   final String platform;
   final PlayerStatsRepository? repository;
+  final Future<SharedPreferences> Function()? preferencesLoader;
 
   @override
   State<StatsDetailScreen> createState() => _StatsDetailScreenState();
@@ -41,11 +43,13 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   bool _searching = false;
   String? _searchError;
 
+  String get _normalizedPlatform => normalizePlayerPlatform(widget.platform);
+
   @override
   void initState() {
     super.initState();
     _repository = widget.repository ?? PlayerStatsRepository();
-    _searchPlatform = widget.platform;
+    _searchPlatform = _normalizedPlatform;
     _storeReady = _loadStore();
     _startFetch();
   }
@@ -62,14 +66,16 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     if (oldWidget.nickname != widget.nickname ||
         oldWidget.platform != widget.platform) {
       _selectedSeason = null; // 닉네임이나 플랫폼이 바뀌면 시즌 필터 초기화
-      _searchPlatform = widget.platform;
+      _searchPlatform = _normalizedPlatform;
       _startFetch();
     }
   }
 
   Future<void> _loadStore() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs =
+          await (widget.preferencesLoader?.call() ??
+              SharedPreferences.getInstance());
       _store = LocalPlayerStore(prefs);
       await _refreshPlayers();
     } catch (error, stackTrace) {
@@ -104,7 +110,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     }
     _statsFuture = _repository.fetchPlayerStats(
       nickname: nickname,
-      platform: widget.platform,
+      platform: _normalizedPlatform,
       season: _selectedSeason,
       refresh: refresh,
     );
@@ -126,11 +132,15 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     if (_searching) return;
 
     final cleanNickname = (nickname ?? _searchController.text).trim();
+    final selectedPlatform = normalizePlayerPlatform(
+      platform ?? _searchPlatform,
+    );
     if (cleanNickname.isEmpty) {
       if (!mounted) return;
       setState(() => _searchError = '닉네임을 입력해 주세요.');
       return;
     }
+    final requestUri = GoRouter.of(context).routeInformationProvider.value.uri;
 
     setState(() {
       _searching = true;
@@ -142,7 +152,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
       final destination = await preparePlayerSearch(
         store: _store,
         nickname: cleanNickname,
-        platform: platform ?? _searchPlatform,
+        platform: selectedPlatform,
       );
       if (!mounted) return;
       if (destination == null) return;
@@ -158,6 +168,12 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
         );
       }
       if (!mounted) return;
+      if (!isPlayerSearchNavigationCurrent(
+        requestUri: requestUri,
+        currentUri: GoRouter.of(context).routeInformationProvider.value.uri,
+      )) {
+        return;
+      }
 
       context.go(destination.location);
     } catch (error, stackTrace) {
@@ -219,7 +235,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return _LoadingPanel(
                   nickname: nickname,
-                  platform: widget.platform,
+                  platform: _normalizedPlatform,
                 );
               }
               if (snapshot.hasError) {

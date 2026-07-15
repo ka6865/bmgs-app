@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/board/board_detail_screen.dart';
 import '../features/board/board_screen.dart';
@@ -16,7 +17,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return createAppRouter();
 });
 
-GoRouter createAppRouter() {
+GoRouter createAppRouter({
+  Future<SharedPreferences> Function()? homePreferencesLoader,
+  Future<SharedPreferences> Function()? statsPreferencesLoader,
+}) {
   return GoRouter(
     initialLocation: '/',
     routes: [
@@ -30,7 +34,8 @@ GoRouter createAppRouter() {
             routes: [
               GoRoute(
                 path: '/',
-                builder: (context, state) => const HomeScreen(),
+                builder: (context, state) =>
+                    HomeScreen(preferencesLoader: homePreferencesLoader),
               ),
             ],
           ),
@@ -42,6 +47,7 @@ GoRouter createAppRouter() {
                 builder: (context, state) => StatsDetailScreen(
                   nickname: state.uri.queryParameters['nickname'],
                   platform: state.uri.queryParameters['platform'] ?? 'steam',
+                  preferencesLoader: statsPreferencesLoader,
                 ),
                 routes: [
                   GoRoute(
@@ -51,20 +57,30 @@ GoRouter createAppRouter() {
                       final extra = state.extra as Map<String, dynamic>? ?? {};
                       final query = state.uri.queryParameters;
 
-                      final nickname = extra['nickname'] as String? ?? query['nickname'] ?? '';
-                      final platform = extra['platform'] as String? ?? query['platform'] ?? 'steam';
-                      
-                      final summary = extra['summary'] as MatchSummary? ?? MatchSummary(
-                        matchId: matchId,
-                        mapName: query['mapName'] ?? '맵 정보 없음',
-                        mapId: query['mapId'],
-                        gameMode: query['gameMode'] ?? '모드 정보 없음',
-                        kills: int.tryParse(query['kills'] ?? '') ?? 0,
-                        damage: double.tryParse(query['damage'] ?? '') ?? 0,
-                        rank: int.tryParse(query['rank'] ?? ''),
-                        isFallback: query['fallback'] == 'true',
-                        createdAt: DateTime.tryParse(query['date'] ?? '') ?? DateTime.now(),
-                      );
+                      final nickname =
+                          extra['nickname'] as String? ??
+                          query['nickname'] ??
+                          '';
+                      final platform =
+                          extra['platform'] as String? ??
+                          query['platform'] ??
+                          'steam';
+
+                      final summary =
+                          extra['summary'] as MatchSummary? ??
+                          MatchSummary(
+                            matchId: matchId,
+                            mapName: query['mapName'] ?? '맵 정보 없음',
+                            mapId: query['mapId'],
+                            gameMode: query['gameMode'] ?? '모드 정보 없음',
+                            kills: int.tryParse(query['kills'] ?? '') ?? 0,
+                            damage: double.tryParse(query['damage'] ?? '') ?? 0,
+                            rank: int.tryParse(query['rank'] ?? ''),
+                            isFallback: query['fallback'] == 'true',
+                            createdAt:
+                                DateTime.tryParse(query['date'] ?? '') ??
+                                DateTime.now(),
+                          );
 
                       return MatchDetailScreen(
                         matchId: matchId,
@@ -108,7 +124,9 @@ GoRouter createAppRouter() {
                   GoRoute(
                     path: ':postId',
                     builder: (context, state) => BoardDetailScreen(
-                      postId: int.tryParse(state.pathParameters['postId'] ?? '') ?? 0,
+                      postId:
+                          int.tryParse(state.pathParameters['postId'] ?? '') ??
+                          0,
                     ),
                   ),
                 ],

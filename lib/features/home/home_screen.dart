@@ -77,6 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_searching) return;
 
     final cleanNickname = (nickname ?? _nicknameController.text).trim();
+    final selectedPlatform = normalizePlayerPlatform(platform ?? _platform);
     if (cleanNickname.isEmpty) {
       if (!mounted) return;
       setState(() {
@@ -84,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       return;
     }
+    final requestUri = GoRouter.of(context).routeInformationProvider.value.uri;
 
     setState(() {
       _searching = true;
@@ -95,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final destination = await preparePlayerSearch(
         store: _store,
         nickname: cleanNickname,
-        platform: platform ?? _platform,
+        platform: selectedPlatform,
       );
       if (!mounted) return;
       if (destination == null) return;
@@ -111,6 +113,12 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
       if (!mounted) return;
+      if (!isPlayerSearchNavigationCurrent(
+        requestUri: requestUri,
+        currentUri: GoRouter.of(context).routeInformationProvider.value.uri,
+      )) {
+        return;
+      }
 
       context.go(destination.location);
     } catch (error, stackTrace) {
@@ -184,9 +192,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         ButtonSegment(value: 'kakao', label: Text('Kakao')),
                       ],
                       selected: {_platform},
-                      onSelectionChanged: (selection) {
-                        setState(() => _platform = selection.first);
-                      },
+                      onSelectionChanged: _searching
+                          ? null
+                          : (selection) {
+                              setState(() => _platform = selection.first);
+                            },
                     ),
                   ),
                   const SizedBox(height: 12),

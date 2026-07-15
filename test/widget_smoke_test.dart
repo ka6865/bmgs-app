@@ -7,6 +7,8 @@ import 'package:bgms_mobile_app/features/maps/map_models.dart';
 import 'package:bgms_mobile_app/features/maps/maps_repository.dart';
 import 'package:bgms_mobile_app/features/maps/maps_screen.dart';
 import 'package:bgms_mobile_app/features/maps/map_view_helpers.dart';
+import 'package:bgms_mobile_app/features/stats/stats_detail_screen.dart';
+import 'package:bgms_mobile_app/navigation/app_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -77,6 +79,9 @@ void main() {
       await tester.tap(find.text('전적 검색'));
       await tester.pump();
 
+      await tester.tap(find.text('Kakao'));
+      await tester.pump();
+
       expect(
         find.text('/stats?nickname=firstLaunchPlayer&platform=kakao'),
         findsNothing,
@@ -94,6 +99,32 @@ void main() {
       expect(recent, hasLength(1));
       expect(recent.single.nickname, 'firstLaunchPlayer');
       expect(recent.single.platform, 'kakao');
+    },
+  );
+
+  testWidgets(
+    'home delayed search does not replace navigation after moving tabs',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final preferencesReady = Completer<SharedPreferences>();
+      final router = createAppRouter(
+        homePreferencesLoader: () => preferencesReady.future,
+      );
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+
+      await tester.enterText(find.byType(TextField), 'homeDelayedPlayer');
+      await tester.tap(find.text('전적 검색'));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.map).last);
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, '/maps');
+
+      preferencesReady.complete(prefs);
+      await tester.pumpAndSettle();
+
+      expect(router.routeInformationProvider.value.uri.path, '/maps');
     },
   );
 
@@ -189,6 +220,42 @@ void main() {
     expect(find.text('다음 업데이트'), findsNothing);
     expect(find.textContaining('비교 모드'), findsNothing);
     expect(find.textContaining('bgmsTester'), findsNothing);
+  });
+
+  testWidgets('stats search hub uses the selected and recent player platform', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'bgms_recent_searches': ['kakao\trecentKakaoPlayer'],
+    });
+    final router = _createStatsSearchRouter();
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Kakao'));
+    await tester.enterText(find.byType(TextField), 'analysisKakaoPlayer');
+    await tester.tap(find.text('분석 시작'));
+    await tester.pump();
+
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/stats?nickname=analysisKakaoPlayer&platform=kakao',
+    );
+
+    router.go('/stats');
+    await tester.pumpAndSettle();
+    final recentPlayer = find.text('recentKakaoPlayer · kakao');
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, -240));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.ancestor(of: recentPlayer, matching: find.byType(InputChip)),
+    );
+    await tester.pump();
+
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/stats?nickname=recentKakaoPlayer&platform=kakao',
+    );
   });
 
   testWidgets('rankings tab renders ranking controls', (tester) async {
@@ -396,6 +463,23 @@ GoRouter _createHomeSearchRouter({
       GoRoute(
         path: '/stats',
         builder: (context, state) => Text(state.uri.toString()),
+      ),
+    ],
+  );
+}
+
+GoRouter _createStatsSearchRouter() {
+  return GoRouter(
+    initialLocation: '/stats',
+    routes: [
+      GoRoute(
+        path: '/stats',
+        builder: (context, state) {
+          if (state.uri.queryParameters['nickname'] != null) {
+            return Text(state.uri.toString());
+          }
+          return const StatsDetailScreen(nickname: null, platform: 'steam');
+        },
       ),
     ],
   );

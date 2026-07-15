@@ -1,6 +1,17 @@
 import '../observability/app_logger.dart';
 import '../storage/local_player_store.dart';
 
+String normalizePlayerPlatform(String platform) {
+  return platform.trim().toLowerCase() == 'kakao' ? 'kakao' : 'steam';
+}
+
+bool isPlayerSearchNavigationCurrent({
+  required Uri requestUri,
+  required Uri currentUri,
+}) {
+  return requestUri == currentUri;
+}
+
 class PlayerSearchDestination {
   const PlayerSearchDestination({
     required this.nickname,
@@ -23,10 +34,11 @@ Future<PlayerSearchDestination?> preparePlayerSearch({
 }) async {
   final cleanNickname = nickname.trim();
   if (cleanNickname.isEmpty) return null;
+  final normalizedPlatform = normalizePlayerPlatform(platform);
 
   if (store != null) {
     try {
-      await store.addRecentSearch(cleanNickname, platform: platform);
+      await store.addRecentSearch(cleanNickname, platform: normalizedPlatform);
     } catch (error, stackTrace) {
       AppObservability.logger.warning(
         '최근 검색 저장에 실패했습니다.',
@@ -35,11 +47,14 @@ Future<PlayerSearchDestination?> preparePlayerSearch({
         context: {
           'feature': 'player_search',
           'operation': 'add_recent_search',
-          'platform': platform,
+          'platform': normalizedPlatform,
         },
       );
     }
   }
 
-  return PlayerSearchDestination(nickname: cleanNickname, platform: platform);
+  return PlayerSearchDestination(
+    nickname: cleanNickname,
+    platform: normalizedPlatform,
+  );
 }

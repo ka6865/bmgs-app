@@ -180,7 +180,7 @@ class RecentActivitySection extends StatelessWidget {
       child: loading
           ? const LinearProgressIndicator()
           : Column(
-              children: players.take(1).map((player) {
+              children: players.map((player) {
                 return _PlayerRow(player: player, onTap: () => onTap(player));
               }).toList(),
             ),

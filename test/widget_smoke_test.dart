@@ -23,7 +23,11 @@ void main() {
 
   testWidgets('home separates latest, favorites, and activity', (tester) async {
     SharedPreferences.setMockInitialValues({
-      'bgms_recent_searches': ['steam\tlatestPlayer', 'kakao\tolderPlayer'],
+      'bgms_recent_searches': [
+        'steam\tlatestPlayer',
+        'kakao\tolderPlayer',
+        'steam\toldestPlayer',
+      ],
       'bgms_favorite_players': [
         'steam\tfavorite0',
         'steam\tfavorite1',
@@ -42,6 +46,7 @@ void main() {
     expect(find.textContaining('favorite5'), findsNothing);
     expect(find.text('최근 활동'), findsOneWidget);
     expect(find.textContaining('olderPlayer'), findsOneWidget);
+    expect(find.textContaining('oldestPlayer'), findsOneWidget);
   });
 
   testWidgets('home search shows validation message for empty nickname', (

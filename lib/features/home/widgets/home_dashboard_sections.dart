@@ -85,7 +85,29 @@ class FavoritePlayersSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!loading && players.isEmpty) return const SizedBox.shrink();
+    if (!loading && players.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '즐겨찾는 플레이어',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '즐겨찾기를 추가하면 빠르게 전적을 확인할 수 있습니다.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: BgmsColors.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
 
     return _DashboardSection(
       title: '즐겨찾는 플레이어',

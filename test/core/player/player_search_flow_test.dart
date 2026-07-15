@@ -1,3 +1,4 @@
+import 'package:bgms_mobile_app/core/observability/app_logger.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,4 +39,31 @@ void main() {
     expect(result, isNull);
     expect(await store.getRecentPlayers(), isEmpty);
   });
+
+  test(
+    'preparePlayerSearch navigates when recent search storage fails',
+    () async {
+      final logger = InMemoryAppLogger();
+      AppObservability.configure(logger: logger);
+      addTearDown(() => AppObservability.configure(logger: DebugAppLogger()));
+
+      final result = await preparePlayerSearch(
+        store: _FailingLocalPlayerStore(),
+        nickname: '  KakaoPlayer  ',
+        platform: 'kakao',
+      );
+
+      expect(result?.location, '/stats?nickname=KakaoPlayer&platform=kakao');
+      expect(logger.entries, hasLength(1));
+      expect(logger.entries.single.level, AppLogLevel.warning);
+      expect(logger.entries.single.context['operation'], 'add_recent_search');
+    },
+  );
+}
+
+class _FailingLocalPlayerStore extends Fake implements LocalPlayerStore {
+  @override
+  Future<void> addRecentSearch(String nickname, {String platform = 'steam'}) {
+    throw StateError('storage unavailable');
+  }
 }

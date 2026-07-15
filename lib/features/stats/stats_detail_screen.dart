@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/observability/app_logger.dart';
 import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/theme/bgms_theme.dart';
@@ -30,6 +31,7 @@ class StatsDetailScreen extends StatefulWidget {
 class _StatsDetailScreenState extends State<StatsDetailScreen> {
   final TextEditingController _searchController = TextEditingController();
   late final PlayerStatsRepository _repository;
+  late final Future<void> _storeReady;
   Future<PlayerStatsBundle>? _statsFuture;
   LocalPlayerStore? _store;
   List<StoredPlayer> _recentPlayers = const [];
@@ -44,7 +46,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     super.initState();
     _repository = widget.repository ?? PlayerStatsRepository();
     _searchPlatform = widget.platform;
-    _loadStore();
+    _storeReady = _loadStore();
     _startFetch();
   }
 
@@ -66,9 +68,22 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   }
 
   Future<void> _loadStore() async {
-    final prefs = await SharedPreferences.getInstance();
-    _store = LocalPlayerStore(prefs);
-    await _refreshPlayers();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _store = LocalPlayerStore(prefs);
+      await _refreshPlayers();
+    } catch (error, stackTrace) {
+      AppObservability.logger.warning(
+        '전적 플레이어 저장소를 불러오지 못했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'stats', 'operation': 'load_player_store'},
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingStore = false);
+      }
+    }
   }
 
   Future<void> _refreshPlayers() async {
@@ -78,7 +93,6 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     if (!mounted) return;
     setState(() {
       _recentPlayers = recent;
-      _loadingStore = false;
     });
   }
 
@@ -124,6 +138,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     });
 
     try {
+      await _storeReady;
       final destination = await preparePlayerSearch(
         store: _store,
         nickname: cleanNickname,
@@ -132,11 +147,26 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
       if (!mounted) return;
       if (destination == null) return;
 
-      await _refreshPlayers();
+      try {
+        await _refreshPlayers();
+      } catch (error, stackTrace) {
+        AppObservability.logger.warning(
+          '전적 최근 분석 목록을 새로고침하지 못했습니다.',
+          error: error,
+          stackTrace: stackTrace,
+          context: {'feature': 'stats', 'operation': 'refresh_player_list'},
+        );
+      }
       if (!mounted) return;
 
       context.go(destination.location);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppObservability.logger.error(
+        '전적 플레이어 검색 중 오류가 발생했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'stats', 'operation': 'search_player'},
+      );
       if (!mounted) return;
       setState(() => _searchError = '검색 중 오류가 발생했습니다.');
     } finally {

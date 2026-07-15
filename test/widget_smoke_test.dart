@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:bgms_mobile_app/app.dart';
+import 'package:bgms_mobile_app/core/storage/local_player_store.dart';
+import 'package:bgms_mobile_app/features/home/home_screen.dart';
 import 'package:bgms_mobile_app/features/maps/map_models.dart';
 import 'package:bgms_mobile_app/features/maps/maps_repository.dart';
 import 'package:bgms_mobile_app/features/maps/maps_screen.dart';
 import 'package:bgms_mobile_app/features/maps/map_view_helpers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -19,6 +24,8 @@ void main() {
     expect(find.text('지도'), findsWidgets);
     expect(find.text('게시판'), findsWidgets);
     expect(find.text('이어서 보기'), findsNothing);
+    expect(find.text('즐겨찾는 플레이어'), findsOneWidget);
+    expect(find.text('즐겨찾기를 추가하면 빠르게 전적을 확인할 수 있습니다.'), findsOneWidget);
   });
 
   testWidgets('home separates latest, favorites, and activity', (tester) async {
@@ -43,10 +50,75 @@ void main() {
     expect(find.text('이어서 보기'), findsOneWidget);
     expect(find.textContaining('latestPlayer'), findsOneWidget);
     expect(find.text('즐겨찾는 플레이어'), findsOneWidget);
+    expect(find.textContaining('favorite0'), findsOneWidget);
+    expect(find.textContaining('favorite1'), findsOneWidget);
+    expect(find.textContaining('favorite2'), findsOneWidget);
+    expect(find.textContaining('favorite3'), findsOneWidget);
+    expect(find.textContaining('favorite4'), findsOneWidget);
     expect(find.textContaining('favorite5'), findsNothing);
     expect(find.text('최근 활동'), findsOneWidget);
     expect(find.textContaining('olderPlayer'), findsOneWidget);
     expect(find.textContaining('oldestPlayer'), findsOneWidget);
+  });
+
+  testWidgets(
+    'home startup search waits for storage and preserves platform URI',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final preferencesReady = Completer<SharedPreferences>();
+      final router = _createHomeSearchRouter(
+        preferencesLoader: () => preferencesReady.future,
+      );
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+
+      await tester.tap(find.text('Kakao'));
+      await tester.enterText(find.byType(TextField), 'firstLaunchPlayer');
+      await tester.tap(find.text('전적 검색'));
+      await tester.pump();
+
+      expect(
+        find.text('/stats?nickname=firstLaunchPlayer&platform=kakao'),
+        findsNothing,
+      );
+
+      preferencesReady.complete(prefs);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('/stats?nickname=firstLaunchPlayer&platform=kakao'),
+        findsOneWidget,
+      );
+      final store = LocalPlayerStore(await SharedPreferences.getInstance());
+      final recent = await store.getRecentPlayers();
+      expect(recent, hasLength(1));
+      expect(recent.single.nickname, 'firstLaunchPlayer');
+      expect(recent.single.platform, 'kakao');
+    },
+  );
+
+  testWidgets('continue player tap preserves the stored platform', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'bgms_recent_searches': ['kakao\tcontinueKakaoPlayer'],
+    });
+    final router = _createHomeSearchRouter();
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    final continuePlayer = find.ancestor(
+      of: find.text('이어서 보기'),
+      matching: find.byType(InkWell),
+    );
+    expect(continuePlayer, findsOneWidget);
+    await tester.tap(continuePlayer);
+    await tester.pumpAndSettle();
+
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/stats?nickname=continueKakaoPlayer&platform=kakao',
+    );
   });
 
   testWidgets('home search shows validation message for empty nickname', (
@@ -309,6 +381,24 @@ void main() {
       closeTo(1.0 / 3.0, 0.001),
     );
   });
+}
+
+GoRouter _createHomeSearchRouter({
+  Future<SharedPreferences> Function()? preferencesLoader,
+}) {
+  return GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) =>
+            HomeScreen(preferencesLoader: preferencesLoader),
+      ),
+      GoRoute(
+        path: '/stats',
+        builder: (context, state) => Text(state.uri.toString()),
+      ),
+    ],
+  );
 }
 
 class FakeMapsRepository extends Fake implements MapsRepository {

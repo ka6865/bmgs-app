@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/observability/app_logger.dart';
 import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import 'widgets/home_dashboard_sections.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.preferencesLoader});
+
+  final Future<SharedPreferences> Function()? preferencesLoader;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -17,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _nicknameController = TextEditingController();
   String _platform = 'steam';
+  late final Future<void> _storeReady;
   LocalPlayerStore? _store;
   List<StoredPlayer> _recentPlayers = const [];
   List<StoredPlayer> _favoritePlayers = const [];
@@ -27,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStore();
+    _storeReady = _loadStore();
   }
 
   @override
@@ -37,9 +41,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadStore() async {
-    final prefs = await SharedPreferences.getInstance();
-    _store = LocalPlayerStore(prefs);
-    await _refreshPlayers();
+    try {
+      final prefs =
+          await (widget.preferencesLoader?.call() ??
+              SharedPreferences.getInstance());
+      _store = LocalPlayerStore(prefs);
+      await _refreshPlayers();
+    } catch (error, stackTrace) {
+      AppObservability.logger.warning(
+        '홈 플레이어 저장소를 불러오지 못했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'home', 'operation': 'load_player_store'},
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingStore = false);
+      }
+    }
   }
 
   Future<void> _refreshPlayers() async {
@@ -51,7 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _recentPlayers = recent;
       _favoritePlayers = favorites;
-      _loadingStore = false;
     });
   }
 
@@ -73,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
+      await _storeReady;
       final destination = await preparePlayerSearch(
         store: _store,
         nickname: cleanNickname,
@@ -81,11 +100,26 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       if (destination == null) return;
 
-      await _refreshPlayers();
+      try {
+        await _refreshPlayers();
+      } catch (error, stackTrace) {
+        AppObservability.logger.warning(
+          '홈 최근 플레이어 목록을 새로고침하지 못했습니다.',
+          error: error,
+          stackTrace: stackTrace,
+          context: {'feature': 'home', 'operation': 'refresh_player_list'},
+        );
+      }
       if (!mounted) return;
 
       context.go(destination.location);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppObservability.logger.error(
+        '홈 플레이어 검색 중 오류가 발생했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'home', 'operation': 'search_player'},
+      );
       if (!mounted) return;
       setState(() => _nicknameError = '검색 중 오류가 발생했습니다.');
     } finally {
@@ -184,15 +218,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ],
-          if (_loadingStore || _favoritePlayers.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            FavoritePlayersSection(
-              players: _favoritePlayers,
-              loading: _loadingStore,
-              onTap: (player) =>
-                  _search(nickname: player.nickname, platform: player.platform),
-            ),
-          ],
+          const SizedBox(height: 12),
+          FavoritePlayersSection(
+            players: _favoritePlayers,
+            loading: _loadingStore,
+            onTap: (player) =>
+                _search(nickname: player.nickname, platform: player.platform),
+          ),
           const SizedBox(height: 12),
           HomeQuickActions(
             onRankingsTap: () => context.go('/rankings'),

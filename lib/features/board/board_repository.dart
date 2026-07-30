@@ -1,7 +1,7 @@
-import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/network/bgms_api_client.dart';
 import 'board_models.dart';
 
@@ -23,10 +23,8 @@ class BoardRepository {
         query: query,
       );
       return BoardPostPage.fromJson(json);
-    } on DioException catch (error) {
-      throw BoardException(_dioMessage(error));
     } catch (error) {
-      throw BoardException('게시글 응답 파싱 실패: $error');
+      throw BoardException(ApiException.from(error).message);
     }
   }
 
@@ -34,10 +32,8 @@ class BoardRepository {
     try {
       final json = await _client.fetchBoardPost(postId: postId);
       return BoardPostDetail.fromJson(json);
-    } on DioException catch (error) {
-      throw BoardException(_dioMessage(error));
     } catch (error) {
-      throw BoardException('게시글 상세 응답 파싱 실패: $error');
+      throw BoardException(ApiException.from(error).message);
     }
   }
 
@@ -57,8 +53,8 @@ class BoardRepository {
         accessToken: token,
       );
       return int.tryParse(json['id']?.toString() ?? '') ?? 0;
-    } on DioException catch (error) {
-      throw BoardException(_dioMessage(error));
+    } catch (error) {
+      throw BoardException(ApiException.from(error).message);
     }
   }
 
@@ -75,8 +71,8 @@ class BoardRepository {
         content: content,
         accessToken: token,
       );
-    } on DioException catch (error) {
-      throw BoardException(_dioMessage(error));
+    } catch (error) {
+      throw BoardException(ApiException.from(error).message);
     }
   }
 
@@ -88,16 +84,6 @@ class BoardRepository {
     } catch (_) {
       return null;
     }
-  }
-
-  String _dioMessage(DioException error) {
-    final data = error.response?.data;
-    if (data is Map && data['error'] != null) return data['error'].toString();
-    return [
-      if (error.response?.statusCode != null)
-        'HTTP ${error.response!.statusCode}',
-      if (error.message != null) error.message!,
-    ].join(' · ');
   }
 }
 

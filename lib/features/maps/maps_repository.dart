@@ -1,7 +1,7 @@
-import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/network/bgms_api_client.dart';
 import 'map_models.dart';
 
@@ -15,37 +15,31 @@ class MapsRepository {
     BgmsMap(
       id: 'Erangel',
       name: '에란겔',
-      assetPath: 'assets/maps/Erangel_HeightMap.jpg',
       tilePath: 'Erangel',
     ),
     BgmsMap(
       id: 'Miramar',
       name: '미라마',
-      assetPath: 'assets/maps/Miramar_HeightMap.jpg',
       tilePath: 'Miramar',
     ),
     BgmsMap(
       id: 'Taego',
       name: '태이고',
-      assetPath: 'assets/maps/Taego_HeightMap.jpg',
       tilePath: 'Taego',
     ),
     BgmsMap(
       id: 'Rondo',
       name: '론도',
-      assetPath: 'assets/maps/Rondo_HeightMap.jpg',
       tilePath: 'Rondo',
     ),
     BgmsMap(
       id: 'Vikendi',
       name: '비켄디',
-      assetPath: 'assets/maps/Vikendi_HeightMap.jpg',
       tilePath: 'Vikendi',
     ),
     BgmsMap(
       id: 'Deston',
       name: '데스턴',
-      assetPath: 'assets/maps/Deston_HeightMap.jpg',
       tilePath: 'Deston',
     ),
   ];
@@ -78,18 +72,13 @@ class MapsRepository {
     try {
       final json = await _client.fetchMapMarkers(mapId: mapId, layers: layers);
       return MapMarkerLayer.fromJson(json, mapId: mapId);
-    } on DioException catch (error) {
-      final status = error.response?.statusCode;
-      return MapMarkerLayer.unavailable(
-        mapId: mapId,
-        message: status == 404
-            ? '이 맵의 마커 데이터를 준비하고 있습니다.'
-            : '지도 마커를 일시적으로 불러오지 못했습니다. ${_dioMessage(error)}',
-      );
     } catch (error) {
+      final apiError = ApiException.from(error);
       return MapMarkerLayer.unavailable(
         mapId: mapId,
-        message: '지도 마커를 표시하지 못했습니다. $error',
+        message: apiError.isMissingEndpoint
+            ? '이 맵의 마커 데이터를 준비하고 있습니다.'
+            : '지도 마커를 불러오지 못했습니다. ${apiError.message}',
       );
     }
   }
@@ -144,15 +133,5 @@ class MapsRepository {
     return availableLayers
         .where((l) => allowedSet.contains(l.toLowerCase()))
         .toList();
-  }
-
-  String _dioMessage(DioException error) {
-    final data = error.response?.data;
-    if (data is Map && data['error'] != null) return data['error'].toString();
-    return [
-      if (error.response?.statusCode != null)
-        'HTTP ${error.response!.statusCode}',
-      if (error.message != null) error.message!,
-    ].join(' · ');
   }
 }

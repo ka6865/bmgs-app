@@ -6,6 +6,7 @@ import '../../core/observability/app_logger.dart';
 import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/theme/bgms_theme.dart';
+import '../../core/widgets/app_panels.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import '../../navigation/shell_scaffold.dart';
 import 'ai_coaching_card.dart';
@@ -251,9 +252,12 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
                 );
               }
               if (snapshot.hasError) {
+                final error = snapshot.error;
+                final canRetry =
+                    error is! PlayerStatsException || error.isRetryable;
                 return _ErrorPanel(
-                  message: snapshot.error.toString(),
-                  onRetry: _retry,
+                  message: error.toString(),
+                  onRetry: canRetry ? _retry : null,
                 );
               }
               final bundle = snapshot.data;
@@ -515,10 +519,10 @@ class _StatsContentState extends State<_StatsContent> {
           ],
           // 레이더 차트 카드
           Card(
-            color: const Color(0xFF161b26),
+            color: BgmsColors.surface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFF232b3c)),
+              side: const BorderSide(color: BgmsColors.border),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -587,9 +591,9 @@ class _StatsContentState extends State<_StatsContent> {
   Widget _buildQueueSegmentedControl() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF161b26),
+        color: BgmsColors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF232b3c)),
+        border: Border.all(color: BgmsColors.border),
       ),
       padding: const EdgeInsets.all(4),
       child: Row(
@@ -654,7 +658,7 @@ class _StatsContentState extends State<_StatsContent> {
                 }
               },
               selectedColor: BgmsColors.accent,
-              backgroundColor: const Color(0xFF161b26),
+              backgroundColor: BgmsColors.surface,
               labelStyle: TextStyle(
                 color: isSelected ? Colors.black : Colors.white70,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -664,7 +668,7 @@ class _StatsContentState extends State<_StatsContent> {
                 side: BorderSide(
                   color: isSelected
                       ? BgmsColors.accent
-                      : const Color(0xFF232b3c),
+                      : BgmsColors.border,
                 ),
               ),
             ),
@@ -742,10 +746,10 @@ class _TierInfoPanel extends StatelessWidget {
     final IconData tierIcon = _getTierIcon(tierName);
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -888,10 +892,10 @@ class _MetricsGrid extends StatelessWidget {
           itemBuilder: (context, index) {
             final metric = metrics[index];
             return Card(
-              color: const Color(0xFF161b26),
+              color: BgmsColors.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(color: Color(0xFF232b3c)),
+                side: const BorderSide(color: BgmsColors.border),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(8),
@@ -946,10 +950,10 @@ class _EmptyStatsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
@@ -993,10 +997,10 @@ class _MatchSummaryPanel extends StatelessWidget {
     final matches = bundle.matches;
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1067,7 +1071,7 @@ class _MatchCard extends StatelessWidget {
         ? LinearGradient(
             colors: [
               Colors.amber.withValues(alpha: 0.08),
-              const Color(0xFF161b26).withValues(alpha: 0.95),
+              BgmsColors.surface.withValues(alpha: 0.95),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -1075,7 +1079,7 @@ class _MatchCard extends StatelessWidget {
         : mapGradient;
 
     final border = Border.all(
-      color: isChicken ? Colors.amber : const Color(0xFF232b3c),
+      color: isChicken ? Colors.amber : BgmsColors.border,
       width: isChicken ? 1.5 : 0.8,
     );
 
@@ -1174,7 +1178,7 @@ class _MatchCard extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: isChicken
                                     ? Colors.amber
-                                    : const Color(0xFF232b3c),
+                                    : BgmsColors.border,
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -1378,10 +1382,10 @@ class _StatePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -1418,29 +1422,61 @@ class _LoadingPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(BgmsSpacing.lg),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const CircularProgressIndicator(color: BgmsColors.accent),
-            const SizedBox(height: 24),
-            Text(
-              '$nickname 님의 전적을 분석 중입니다...',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+            Row(
+              children: [
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: BgmsColors.accent,
+                  ),
+                ),
+                const SizedBox(width: BgmsSpacing.sm),
+                Expanded(
+                  child: Text(
+                    '$nickname 님의 전적을 분석하고 있습니다',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Text(
+                  platform.toUpperCase(),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: BgmsColors.textMuted,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '플랫폼: ${platform.toUpperCase()}',
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            const SizedBox(height: BgmsSpacing.lg),
+            const SkeletonBox(height: 72, borderRadius: BgmsRadius.md),
+            const SizedBox(height: BgmsSpacing.sm),
+            const Row(
+              children: [
+                Expanded(child: SkeletonBox(height: 52)),
+                SizedBox(width: BgmsSpacing.sm),
+                Expanded(child: SkeletonBox(height: 52)),
+                SizedBox(width: BgmsSpacing.sm),
+                Expanded(child: SkeletonBox(height: 52)),
+              ],
             ),
+            const SizedBox(height: BgmsSpacing.sm),
+            const SkeletonBox(height: 44),
+            const SizedBox(height: BgmsSpacing.sm),
+            const SkeletonBox(height: 44),
           ],
         ),
       ),
@@ -1449,52 +1485,48 @@ class _LoadingPanel extends StatelessWidget {
 }
 
 class _ErrorPanel extends StatelessWidget {
-  const _ErrorPanel({required this.message, required this.onRetry});
+  const _ErrorPanel({required this.message, this.onRetry});
 
   final String message;
-  final VoidCallback onRetry;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
+    final onRetry = this.onRetry;
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+            const Icon(Icons.error_outline, size: 48, color: BgmsColors.danger),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               '전적을 불러오지 못했습니다',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontSize: 15,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white54, fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: BgmsColors.accent,
-                foregroundColor: Colors.black,
-              ),
-              icon: const Icon(Icons.refresh),
-              label: const Text(
-                '다시 시도',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: BgmsColors.textSecondary,
               ),
             ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('다시 시도'),
+              ),
+            ],
           ],
         ),
       ),
@@ -1530,10 +1562,10 @@ class _ProfileHeader extends StatelessWidget {
     final String currentSeasonId = selectedSeason ?? profile.seasonId ?? '';
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1575,7 +1607,7 @@ class _ProfileHeader extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            const Divider(color: Color(0xFF232b3c), height: 1),
+            const Divider(color: BgmsColors.border, height: 1),
             const SizedBox(height: 12),
 
             // 시즌 필터 드롭다운 UI
@@ -1601,7 +1633,9 @@ class _ProfileHeader extends StatelessWidget {
                 ),
                 if (seasons.isEmpty)
                   Text(
-                    currentSeasonId.isEmpty ? '기본 시즌' : currentSeasonId,
+                    currentSeasonId.isEmpty
+                        ? '기본 시즌'
+                        : seasonLabel(currentSeasonId),
                     style: const TextStyle(
                       color: BgmsColors.accent,
                       fontWeight: FontWeight.bold,
@@ -1612,7 +1646,7 @@ class _ProfileHeader extends StatelessWidget {
                     value: seasons.contains(currentSeasonId)
                         ? currentSeasonId
                         : seasons.first,
-                    dropdownColor: const Color(0xFF161b26),
+                    dropdownColor: BgmsColors.surface,
                     underline: const SizedBox(),
                     icon: const Icon(
                       Icons.arrow_drop_down,
@@ -1626,7 +1660,7 @@ class _ProfileHeader extends StatelessWidget {
                     items: seasons.map((season) {
                       return DropdownMenuItem<String>(
                         value: season,
-                        child: Text(season),
+                        child: Text(seasonLabel(season)),
                       );
                     }).toList(),
                     onChanged: onSeasonChanged,

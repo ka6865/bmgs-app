@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/bgms_theme.dart';
+import '../../core/widgets/app_panels.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import 'board_models.dart';
 import 'board_repository.dart';
@@ -133,11 +134,19 @@ class _BoardScreenState extends State<BoardScreen> {
           ),
           const SizedBox(height: 16),
           if (_loading)
-            const Center(child: CircularProgressIndicator())
+            const LoadingCard(lines: 5, label: '게시글을 불러오고 있습니다')
           else if (_error != null)
-            _ErrorPanel(message: _error!, onRetry: () => _load(reset: true))
+            ErrorPanel(
+              error: _error!,
+              onRetry: () => _load(reset: true),
+              title: '게시글을 불러오지 못했습니다',
+            )
           else if (_posts.isEmpty)
-            const _EmptyPanel()
+            const InfoPanel(
+              icon: Icons.forum_outlined,
+              title: '게시글이 없습니다',
+              body: '아직 이 조건에 맞는 글이 없습니다. 다른 분류를 선택하거나 첫 글을 남겨 보세요.',
+            )
           else
             ..._posts.map((post) => _PostTile(post: post)),
           if (_hasMore && !_loading)
@@ -356,46 +365,6 @@ class _BoardWriteDialogState extends State<_BoardWriteDialog> {
           child: Text(_submitting ? '저장 중...' : '등록'),
         ),
       ],
-    );
-  }
-}
-
-class _ErrorPanel extends StatelessWidget {
-  const _ErrorPanel({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: Theme.of(context).colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(message),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('다시 시도'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyPanel extends StatelessWidget {
-  const _EmptyPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Card(
-      child: Padding(padding: EdgeInsets.all(20), child: Text('게시글이 없습니다.')),
     );
   }
 }

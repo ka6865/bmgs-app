@@ -144,7 +144,7 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
               ),
               if (summary.hasActionableItems) ...[
                 const SizedBox(height: 16),
-                const Divider(color: Color(0xFF232b3c), height: 1),
+                const Divider(color: BgmsColors.border, height: 1),
                 const SizedBox(height: 14),
                 _InsightGroup(title: '🌟 장점 & 전술적 강점', items: summary.strengths, color: Colors.greenAccent),
                 _InsightGroup(title: '🚨 보완이 급한 약점', items: summary.weaknesses, color: Colors.amberAccent),
@@ -185,10 +185,10 @@ class _AiCardShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -210,7 +210,7 @@ class _AiCardShell extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF232b3c),
+                    color: BgmsColors.border,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(

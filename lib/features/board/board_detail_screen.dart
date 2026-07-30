@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/bgms_theme.dart';
+import '../../core/widgets/app_panels.dart';
 import 'board_models.dart';
 import 'board_repository.dart';
 
@@ -61,24 +62,19 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Padding(
+            padding: EdgeInsets.all(BgmsSpacing.xl),
+            child: LoadingCard(lines: 6, label: '게시글을 불러오고 있습니다'),
+          );
         }
         if (snapshot.hasError || !snapshot.hasData) {
           return ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(BgmsSpacing.xl),
             children: [
-              Card(
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(snapshot.error?.toString() ?? '게시글을 불러오지 못했습니다.'),
-                ),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: _reload,
-                icon: const Icon(Icons.refresh),
-                label: const Text('다시 시도'),
+              ErrorPanel(
+                error: snapshot.error ?? '게시글 응답이 비어 있습니다.',
+                onRetry: _reload,
+                title: '게시글을 불러오지 못했습니다',
               ),
             ],
           );

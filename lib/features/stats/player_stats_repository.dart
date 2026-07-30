@@ -1,6 +1,5 @@
-import 'package:dio/dio.dart';
-
 import '../../core/config/app_config.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/network/bgms_api_client.dart';
 import 'player_stats_models.dart';
 
@@ -59,32 +58,27 @@ class PlayerStatsRepository {
         matches: matches,
         summaryFallback: matches.any((match) => match.isFallback),
       );
-    } on DioException catch (error) {
-      throw PlayerStatsException(_dioMessage(error));
     } catch (error) {
-      throw PlayerStatsException(error.toString());
+      throw PlayerStatsException.from(ApiException.from(error));
     }
-  }
-
-  String _dioMessage(DioException error) {
-    final data = error.response?.data;
-    if (data is Map && data['error'] != null) {
-      return data['error'].toString();
-    }
-    if (error.response?.statusCode == 404) {
-      return '닉네임을 찾을 수 없습니다. 대소문자와 플랫폼을 확인해 주세요.';
-    }
-    if (error.response?.statusCode == 429) {
-      return 'PUBG API 호출 한도가 일시적으로 초과되었습니다. 잠시 후 다시 시도해 주세요.';
-    }
-    return error.message ?? '전적 서버에 연결하지 못했습니다.';
   }
 }
 
 class PlayerStatsException implements Exception {
-  const PlayerStatsException(this.message);
+  const PlayerStatsException(this.message, {this.isRetryable = true});
+
+  /// 정규화된 API 에러를 전적 화면 문구로 옮긴다.
+  factory PlayerStatsException.from(ApiException error) {
+    final message = switch (error.kind) {
+      ApiErrorKind.notFound => '닉네임을 찾을 수 없습니다. 대소문자와 플랫폼을 확인해 주세요.',
+      ApiErrorKind.rateLimited => 'PUBG API 호출 한도가 일시적으로 초과되었습니다. 잠시 후 다시 시도해 주세요.',
+      _ => error.message,
+    };
+    return PlayerStatsException(message, isRetryable: error.isRetryable);
+  }
 
   final String message;
+  final bool isRetryable;
 
   @override
   String toString() => message;

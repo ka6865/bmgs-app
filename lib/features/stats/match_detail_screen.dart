@@ -67,14 +67,14 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
         final detail = snapshot.data;
         return Scaffold(
           appBar: AppBar(
-            backgroundColor: const Color(0xFF0b0f19),
+            backgroundColor: BgmsColors.bgBase,
             elevation: 0,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
-          backgroundColor: const Color(0xFF0b0f19),
+          backgroundColor: BgmsColors.bgBase,
           body: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             children: [
@@ -181,10 +181,10 @@ class _MetadataCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -288,10 +288,10 @@ class _MetricGrid extends StatelessWidget {
           itemBuilder: (context, index) {
             final metric = metrics[index];
             return Card(
-              color: const Color(0xFF161b26),
+              color: BgmsColors.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(color: Color(0xFF232b3c)),
+                side: const BorderSide(color: BgmsColors.border),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -338,10 +338,10 @@ class _BenchmarkScoreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -504,10 +504,10 @@ class _TacticalPositioningCard extends StatelessWidget {
     final bool isHighlyIsolated = isolation.isolationIndex >= 3.5;
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -610,10 +610,10 @@ class _TeamBackupCard extends StatelessWidget {
     final double backupSec = trade.tradeLatencyMs / 1000;
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -708,10 +708,10 @@ class _SpecialCombatCard extends StatelessWidget {
     final hasVehicleStats = (vehicle.leadShotKills + vehicle.leadShotKnocks + vehicle.ridingShotKills + vehicle.ridingShotKnocks + vehicle.roadKills + vehicle.roadKnocks) > 0;
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -846,7 +846,7 @@ class _LoadingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Card(
-      color: Color(0xFF161b26),
+      color: BgmsColors.surface,
       child: Padding(
         padding: EdgeInsets.all(16),
         child: LinearProgressIndicator(color: BgmsColors.accent),

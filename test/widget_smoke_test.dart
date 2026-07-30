@@ -262,7 +262,7 @@ void main() {
     await tester.tap(find.text('지도').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('맵 선택'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '에란겔'), findsOneWidget);
   });
 
   testWidgets('home quick action opens board', (tester) async {
@@ -357,7 +357,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('지도'), findsWidgets);
-    expect(find.text('맵 선택'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '에란겔'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '미라마'), findsOneWidget);
     expect(find.text('차량'), findsWidgets);
   });
 
@@ -373,6 +374,25 @@ void main() {
     expect(find.text('로그인 준비 상태'), findsOneWidget);
     expect(find.text('최근 검색이 없습니다.'), findsOneWidget);
     expect(find.text('즐겨찾기가 없습니다.'), findsOneWidget);
+  });
+
+  testWidgets('my tab exposes terms, privacy policy and app version', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.person));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('약관 및 정보'), 200);
+    await tester.pumpAndSettle();
+
+    expect(find.text('이용약관'), findsOneWidget);
+    expect(find.text('개인정보처리방침'), findsOneWidget);
+    expect(find.text('BGMS 웹사이트'), findsOneWidget);
+    expect(find.text('앱 버전'), findsOneWidget);
   });
 
   testWidgets('maps screen renders markers and opens bottom sheet on tap', (
@@ -568,7 +588,6 @@ class FakeMapsRepository extends Fake implements MapsRepository {
     BgmsMap(
       id: 'Erangel',
       name: 'Erangel',
-      assetPath: 'assets/maps/Erangel_HeightMap.jpg',
       tilePath: 'Erangel',
     ),
   ];

@@ -476,6 +476,12 @@ class MapTileMosaic extends StatelessWidget {
   static const int _zoom = 2;
   static const int _tileCount = 4;
 
+  /// 타일 디코딩 폭 상한.
+  ///
+  /// 4x4 격자를 화면 폭에 맞춰 그리므로 원본 해상도가 필요하지 않다.
+  /// 폭을 제한하면 16장 합계 메모리와 디코딩 시간이 함께 줄어든다.
+  static const int _tileCacheWidth = 512;
+
   final BgmsMap map;
 
   @override
@@ -506,6 +512,14 @@ class MapTileMosaic extends StatelessWidget {
               fit: BoxFit.cover,
               gaplessPlayback: true,
               filterQuality: FilterQuality.medium,
+              // 타일 원본이 화면 표시 크기보다 크므로 디코딩 폭을 제한해
+              // 메모리와 디코딩 비용을 줄인다.
+              cacheWidth: _tileCacheWidth,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                // 로딩 중 빈 화면 대신 배경을 채워 깜빡임을 줄인다.
+                return const ColoredBox(color: BgmsColors.surface);
+              },
               errorBuilder: (context, error, stackTrace) {
                 return DecoratedBox(
                   decoration: BoxDecoration(

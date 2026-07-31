@@ -26,6 +26,8 @@ class TierIcon extends StatelessWidget {
         child: Image.network(
           url,
           fit: BoxFit.contain,
+          // 표시 크기에 맞춰 디코딩해 목록에서 아이콘이 반복될 때 메모리를 줄인다.
+          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
           errorBuilder: (context, error, stackTrace) =>
               Icon(Icons.shield_outlined, size: size * 0.8, color: color),
           loadingBuilder: (context, child, progress) {

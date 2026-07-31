@@ -56,7 +56,7 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
           children: [
             const Text(
               '최근 10경기를 기반으로 한 AI 전술 코칭 리포트는 수동으로 실행됩니다.',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+              style: TextStyle(color: BgmsColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 14),
             SizedBox(
@@ -67,10 +67,15 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
                   backgroundColor: BgmsColors.accent,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 icon: const Icon(Icons.psychology_alt, size: 20),
-                label: const Text('AI 스쿼드 분석 및 코칭 받기', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text(
+                  'AI 스쿼드 분석 및 코칭 받기',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ],
@@ -87,11 +92,17 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
             statusLabel: '전술 분석 중',
             child: Column(
               children: [
-                LinearProgressIndicator(color: BgmsColors.accent, backgroundColor: Colors.white10),
+                LinearProgressIndicator(
+                  color: BgmsColors.accent,
+                  backgroundColor: BgmsColors.border,
+                ),
                 SizedBox(height: 12),
                 Text(
                   'AI 분석관들이 텔레메트리 리플레이 조각들을 모으고 있습니다...',
-                  style: TextStyle(color: Colors.white60, fontSize: 12),
+                  style: TextStyle(
+                    color: BgmsColors.textSecondary,
+                    fontSize: 12,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -123,15 +134,25 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
                   ),
                   if (summary.grade != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.purple.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: Colors.purpleAccent, width: 0.5),
+                        border: Border.all(
+                          color: Colors.purpleAccent,
+                          width: 0.5,
+                        ),
                       ),
                       child: Text(
                         summary.grade!,
-                        style: const TextStyle(color: Colors.purpleAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.purpleAccent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                 ],
@@ -140,16 +161,40 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
               // AI 코칭 핵심 본문에 부드러운 타이핑 효과 적용
               _TypingText(
                 text: summary.summary,
-                style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                style: const TextStyle(
+                  color: BgmsColors.textPrimary,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
               ),
               if (summary.hasActionableItems) ...[
                 const SizedBox(height: 16),
-                const Divider(color: Color(0xFF232b3c), height: 1),
+                const Divider(color: BgmsColors.border, height: 1),
                 const SizedBox(height: 14),
-                _InsightGroup(title: '🌟 장점 & 전술적 강점', items: summary.strengths, color: Colors.greenAccent),
-                _InsightGroup(title: '🚨 보완이 급한 약점', items: summary.weaknesses, color: Colors.amberAccent),
-                _InsightGroup(title: '⚠️ 교전 경고 지표', items: summary.warnings, color: Colors.redAccent),
-                _InsightGroup(title: '🎯 즉각 개선을 위한 추천 액션', items: summary.improvements, color: BgmsColors.accent),
+                _InsightGroup(
+                  title: '장점 및 전술적 강점',
+                  items: summary.strengths,
+                  color: BgmsColors.success,
+                  icon: Icons.trending_up,
+                ),
+                _InsightGroup(
+                  title: '보완이 급한 약점',
+                  items: summary.weaknesses,
+                  color: BgmsColors.accent,
+                  icon: Icons.priority_high,
+                ),
+                _InsightGroup(
+                  title: '교전 경고 지표',
+                  items: summary.warnings,
+                  color: BgmsColors.danger,
+                  icon: Icons.warning_amber_outlined,
+                ),
+                _InsightGroup(
+                  title: '즉각 개선을 위한 추천 액션',
+                  items: summary.improvements,
+                  color: BgmsColors.accent,
+                  icon: Icons.track_changes,
+                ),
               ],
             ],
           ),
@@ -185,10 +230,10 @@ class _AiCardShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -197,32 +242,47 @@ class _AiCardShell extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.psychology_alt_outlined, size: 22, color: BgmsColors.accent),
+                const Icon(
+                  Icons.psychology_alt_outlined,
+                  size: 22,
+                  color: BgmsColors.accent,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w900,
-                    color: Colors.white,
+                    color: BgmsColors.textPrimary,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF232b3c),
+                    color: BgmsColors.border,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     statusLabel,
-                    style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: BgmsColors.textSecondary,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const Spacer(),
                 if (onRetry != null)
                   IconButton(
                     onPressed: onRetry,
-                    icon: const Icon(Icons.refresh, size: 18, color: Colors.white70),
+                    icon: const Icon(
+                      Icons.refresh,
+                      size: 18,
+                      color: BgmsColors.textSecondary,
+                    ),
                     tooltip: '다시 분석',
                     visualDensity: VisualDensity.compact,
                   ),
@@ -238,11 +298,17 @@ class _AiCardShell extends StatelessWidget {
 }
 
 class _InsightGroup extends StatelessWidget {
-  const _InsightGroup({required this.title, required this.items, required this.color});
+  const _InsightGroup({
+    required this.title,
+    required this.items,
+    required this.color,
+    required this.icon,
+  });
 
   final String title;
   final List<String> items;
   final Color color;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -253,9 +319,20 @@ class _InsightGroup extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           ...items.map(
@@ -269,7 +346,10 @@ class _InsightGroup extends StatelessWidget {
                   Expanded(
                     child: Text(
                       item,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: BgmsColors.textSecondary,
+                        height: 1.4,
+                      ),
                     ),
                   ),
                 ],
@@ -340,9 +420,6 @@ class _TypingTextState extends State<_TypingText> {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      _displayedText,
-      style: widget.style,
-    );
+    return Text(_displayedText, style: widget.style);
   }
 }

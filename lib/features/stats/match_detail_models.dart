@@ -235,7 +235,9 @@ class BenchmarkBreakdown {
 
   static BenchmarkBreakdown fromJson(Map<String, dynamic>? json) {
     if (json == null) return empty();
-    final breakdown = json['breakdown'] is Map ? json['breakdown'] as Map : const {};
+    final breakdown = json['breakdown'] is Map
+        ? json['breakdown'] as Map
+        : const {};
     return BenchmarkBreakdown(
       combat: _asDouble(breakdown['combat']),
       tactical: _asDouble(breakdown['tactical']),
@@ -307,16 +309,38 @@ class MatchDetail {
   final BenchmarkBreakdown benchmark;
 
   static MatchDetail fromJson(String matchId, Map<String, dynamic> json) {
-    final matchInfo = json['matchInfo'] is Map ? json['matchInfo'] as Map : null;
+    final matchInfo = json['matchInfo'] is Map
+        ? json['matchInfo'] as Map
+        : null;
     final player = json['player'] is Map ? json['player'] as Map : null;
     final stats = json['stats'] is Map ? json['stats'] as Map : null;
+    // 서버는 `team`을 팀원 스탯 배열로 내려준다. 과거 단일 객체 형태도 함께 지원한다.
     final team = json['team'] is Map ? json['team'] as Map : null;
+    final teamMembers = json['team'] is List
+        ? (json['team'] as List).whereType<Map>().toList()
+        : const <Map>[];
+    final teamKillsFromMembers = teamMembers.isEmpty
+        ? null
+        : teamMembers.fold<double>(
+            0,
+            (sum, member) => sum + _firstNum([member['kills']]),
+          );
 
-    final trade = json['tradeStats'] is Map ? Map<String, dynamic>.from(json['tradeStats']) : null;
-    final iso = json['isolationData'] is Map ? Map<String, dynamic>.from(json['isolationData']) : null;
-    final duel = json['duelStats'] is Map ? Map<String, dynamic>.from(json['duelStats']) : null;
-    final pressure = json['combatPressure'] is Map ? Map<String, dynamic>.from(json['combatPressure']) : null;
-    final bench = json['benchmark'] is Map ? Map<String, dynamic>.from(json['benchmark']) : null;
+    final trade = json['tradeStats'] is Map
+        ? Map<String, dynamic>.from(json['tradeStats'])
+        : null;
+    final iso = json['isolationData'] is Map
+        ? Map<String, dynamic>.from(json['isolationData'])
+        : null;
+    final duel = json['duelStats'] is Map
+        ? Map<String, dynamic>.from(json['duelStats'])
+        : null;
+    final pressure = json['combatPressure'] is Map
+        ? Map<String, dynamic>.from(json['combatPressure'])
+        : null;
+    final bench = json['benchmark'] is Map
+        ? Map<String, dynamic>.from(json['benchmark'])
+        : null;
 
     return MatchDetail(
       matchId: matchId,
@@ -368,15 +392,22 @@ class MatchDetail {
       ]).round(),
       teamKills: _firstNum([
         json['teamKills'],
+        teamKillsFromMembers,
         team?['kills'],
         team?['teamKills'],
       ]).round(),
       isFallback: false,
       message: json['message']?.toString(),
-      tradeStats: trade != null ? TradeStats.fromJson(trade) : TradeStats.empty(),
-      isolationData: iso != null ? IsolationData.fromJson(iso) : IsolationData.empty(),
+      tradeStats: trade != null
+          ? TradeStats.fromJson(trade)
+          : TradeStats.empty(),
+      isolationData: iso != null
+          ? IsolationData.fromJson(iso)
+          : IsolationData.empty(),
       duelStats: duel != null ? DuelStats.fromJson(duel) : DuelStats.empty(),
-      combatPressure: pressure != null ? CombatPressure.fromJson(pressure) : CombatPressure.empty(),
+      combatPressure: pressure != null
+          ? CombatPressure.fromJson(pressure)
+          : CombatPressure.empty(),
       vehicleCombat: VehicleCombatStats.fromJson(json),
       benchmark: BenchmarkBreakdown.fromJson(bench),
     );

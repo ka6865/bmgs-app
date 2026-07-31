@@ -39,9 +39,14 @@ dependencies:
   dio: ^5.10.0
   shared_preferences: ^2.5.5
   supabase_flutter: ^2.15.4
+  url_launcher: ^6.3.2
+  package_info_plus: ^10.2.1
+  flutter_local_notifications: 22.2.0
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
@@ -50,6 +55,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.8
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -62,9 +69,14 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
+  # iOS 무선 디버깅에서 LLDB 부착 대기로 앱이 스플래시에 멈추는 문제를 피한다.
+  config:
+    enable-lldb-debugging: false
+
+  # 지도 이미지는 서버 타일 API(/tiles/{map}/{z}/{x}/{y}.jpg)에서 받으므로
+  # 앱 번들에는 브랜딩 에셋만 포함한다.
   assets:
-    - assets/maps/
+    - assets/branding/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -91,3 +103,27 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# 런처 아이콘 생성 설정: dart run flutter_launcher_icons
+# icon.png는 배경이 있는 정사각 아이콘, icon_foreground.png는 적응형 마스킹
+# 안전 영역에 맞춰 여백을 둔 투명 배경 워드마크다.
+flutter_launcher_icons:
+  image_path: "assets/branding/icon.png"
+  android: "launcher_icon"
+  adaptive_icon_background: "#0D0D0D"
+  adaptive_icon_foreground: "assets/branding/icon_foreground.png"
+  min_sdk_android: 23
+  ios: true
+  remove_alpha_ios: true
+
+# 스플래시 생성 설정: dart run flutter_native_splash:create
+# 배경색은 BgmsColors.bgBase(#0D0D0D)와 동일하게 맞춘다.
+flutter_native_splash:
+  color: "#0D0D0D"
+  image: "assets/branding/splash.png"
+  android_12:
+    color: "#0D0D0D"
+    image: "assets/branding/splash_android12.png"
+  android: true
+  ios: true
+  web: false

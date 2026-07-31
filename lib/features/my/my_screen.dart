@@ -1,14 +1,20 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/network/api_exception.dart';
+import '../../core/network/bgms_api_client.dart';
+import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../../navigation/shell_scaffold.dart';
+import '../notifications/notification_settings_card.dart';
 
 class MyScreen extends StatefulWidget {
   const MyScreen({super.key});
@@ -19,11 +25,22 @@ class MyScreen extends StatefulWidget {
 
 class _MyScreenState extends State<MyScreen> {
   late Future<_MyScreenStateData> _stateFuture;
+  bool? _wasActive;
 
   @override
   void initState() {
     super.initState();
     _stateFuture = _loadState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isActive = ShellTabScope.maybeOf(context)?.currentIndex == 5;
+    if (isActive && _wasActive == false) {
+      _refresh();
+    }
+    _wasActive = isActive;
   }
 
   Future<_MyScreenStateData> _loadState() async {
@@ -41,9 +58,34 @@ class _MyScreenState extends State<MyScreen> {
     });
   }
 
+  /// 목록에서 선택한 플레이어의 전적 화면으로 이동한다.
+  void _openStats(StoredPlayer player) {
+    final destination = PlayerSearchDestination(
+      nickname: player.nickname,
+      platform: normalizePlayerPlatform(player.platform),
+    );
+    context.go(destination.location);
+  }
+
   Future<void> _clearRecent(_MyScreenStateData state) async {
+    // 삭제 전 목록을 보관해 되돌리기를 제공한다.
+    final removed = state.recentPlayers;
     await state.store.clearRecentSearches();
     _refresh();
+    if (!mounted || removed.isEmpty) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('최근 검색 ${removed.length}건을 삭제했습니다.'),
+        action: SnackBarAction(
+          label: '되돌리기',
+          onPressed: () async {
+            await state.store.restoreRecentPlayers(removed);
+            _refresh();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _removeFavorite(
@@ -55,17 +97,31 @@ class _MyScreenState extends State<MyScreen> {
       platform: player.platform,
     );
     _refresh();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${player.nickname} 님을 즐겨찾기에서 해제했습니다.'),
+        action: SnackBarAction(
+          label: '되돌리기',
+          onPressed: () async {
+            await state.store.toggleFavorite(
+              player.nickname,
+              platform: player.platform,
+            );
+            _refresh();
+          },
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        const BgmsBrandHeader(
-          title: '마이',
-          subtitle: '최근 검색, 즐겨찾기, 계정 연결 상태를 관리합니다.',
-        ),
+        const ScreenHeader(title: '내 정보'),
         const SizedBox(height: 16),
         // Supabase 초기화 여부에 따라 인증 섹션 분기
         if (!AppConfig.local.canInitializeSupabase)
@@ -114,6 +170,7 @@ class _MyScreenState extends State<MyScreen> {
                   title: '최근 검색',
                   emptyText: '최근 검색이 없습니다.',
                   players: state.recentPlayers,
+                  onPlayerTap: _openStats,
                   action: TextButton.icon(
                     onPressed: state.recentPlayers.isEmpty
                         ? null
@@ -127,6 +184,7 @@ class _MyScreenState extends State<MyScreen> {
                   title: '즐겨찾기',
                   emptyText: '즐겨찾기가 없습니다.',
                   players: state.favoritePlayers,
+                  onPlayerTap: _openStats,
                   trailingBuilder: (player) => IconButton(
                     tooltip: '즐겨찾기 해제',
                     onPressed: () => _removeFavorite(state, player),
@@ -134,10 +192,9 @@ class _MyScreenState extends State<MyScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const _InfoCard(
-                  title: '앱 설정',
-                  body: '알림, 동기화 설정은 서버 인증 연결 후 활성화됩니다.',
-                ),
+                const NotificationSettingsCard(),
+                const SizedBox(height: 12),
+                const _PolicyCard(),
               ],
             );
           },
@@ -396,16 +453,9 @@ class _SupabaseAuthCardState extends State<_SupabaseAuthCard> {
     });
 
     try {
-      final baseUrl = AppConfig.local.apiBaseUrl.replaceFirst(
-        RegExp(r'/$'),
-        '',
-      );
-      await Dio().post<void>(
-        '$baseUrl/api/auth/delete-account',
-        options: Options(
-          headers: {'Authorization': 'Bearer ${session.accessToken}'},
-        ),
-      );
+      await BgmsApiClient(
+        baseUrl: AppConfig.local.apiBaseUrl,
+      ).deleteAccount(accessToken: session.accessToken);
       await _supabase.auth.signOut();
       if (!mounted) return;
       setState(() {
@@ -414,21 +464,12 @@ class _SupabaseAuthCardState extends State<_SupabaseAuthCard> {
         _activityStats = null;
       });
       widget.onAuthChanged();
-    } on DioException catch (error) {
-      final data = error.response?.data;
-      final message = data is Map && data['error'] != null
-          ? data['error'].toString()
-          : '회원탈퇴 API 실패: ${error.message ?? '알 수 없는 오류'}';
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _errorMessage = message;
-      });
     } catch (error) {
+      final message = ApiException.from(error).message;
       if (!mounted) return;
       setState(() {
         _deleting = false;
-        _errorMessage = '회원탈퇴 중 오류가 발생했습니다: $error';
+        _errorMessage = '회원탈퇴에 실패했습니다. $message';
       });
     }
   }
@@ -972,18 +1013,27 @@ class _StatusCard extends StatelessWidget {
     final color = isError
         ? Theme.of(context).colorScheme.error
         : Theme.of(context).colorScheme.primary;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(message, style: TextStyle(color: color)),
+    // 로그인 카드 안과 화면 본문 양쪽에서 쓰이므로 카드가 아닌 배너로 둔다.
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: color),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -996,6 +1046,7 @@ class _PlayerListCard extends StatelessWidget {
     required this.players,
     this.action,
     this.trailingBuilder,
+    this.onPlayerTap,
   });
 
   final String title;
@@ -1003,6 +1054,9 @@ class _PlayerListCard extends StatelessWidget {
   final List<StoredPlayer> players;
   final Widget? action;
   final Widget Function(StoredPlayer player)? trailingBuilder;
+
+  /// 항목을 눌렀을 때 이동 동작. 홈과 동일하게 전적으로 진입시킨다.
+  final void Function(StoredPlayer player)? onPlayerTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1033,6 +1087,9 @@ class _PlayerListCard extends StatelessWidget {
                 (player) => ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.person_outline),
+                  onTap: onPlayerTap == null
+                      ? null
+                      : () => onPlayerTap!(player),
                   title: Text(
                     player.nickname,
                     maxLines: 1,
@@ -1073,6 +1130,133 @@ class _InfoCard extends StatelessWidget {
             Text(body),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 약관 및 정보 (스토어 심사 필수 항목)
+// ---------------------------------------------------------------------------
+
+class _PolicyCard extends StatelessWidget {
+  const _PolicyCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final config = AppConfig.local;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '약관 및 정보',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            _PolicyLinkTile(
+              icon: Icons.description_outlined,
+              label: '이용약관',
+              url: config.termsUrl,
+            ),
+            const Divider(height: 8),
+            _PolicyLinkTile(
+              icon: Icons.privacy_tip_outlined,
+              label: '개인정보처리방침',
+              url: config.privacyUrl,
+            ),
+            const Divider(height: 8),
+            _PolicyLinkTile(
+              icon: Icons.public,
+              label: 'BGMS 웹사이트',
+              url: config.normalizedBaseUrl,
+            ),
+            const Divider(height: 8),
+            const _AppVersionTile(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PolicyLinkTile extends StatelessWidget {
+  const _PolicyLinkTile({
+    required this.icon,
+    required this.label,
+    required this.url,
+  });
+
+  final IconData icon;
+  final String label;
+  final String url;
+
+  Future<void> _open(BuildContext context) async {
+    final uri = Uri.tryParse(url);
+    var launched = false;
+    if (uri != null) {
+      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('링크를 열 수 없습니다: $url')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, size: 20),
+      title: Text(label),
+      trailing: const Icon(Icons.open_in_new, size: 18),
+      onTap: () => _open(context),
+    );
+  }
+}
+
+class _AppVersionTile extends StatefulWidget {
+  const _AppVersionTile();
+
+  @override
+  State<_AppVersionTile> createState() => _AppVersionTileState();
+}
+
+class _AppVersionTileState extends State<_AppVersionTile> {
+  String? _version;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _version = '${info.version} (${info.buildNumber})');
+    } on Exception {
+      if (!mounted) return;
+      setState(() => _version = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.smartphone, size: 20),
+      title: const Text('앱 버전'),
+      trailing: Text(
+        _version ?? '확인 중',
+        style: Theme.of(context).textTheme.bodySmall,
       ),
     );
   }

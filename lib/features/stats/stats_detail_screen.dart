@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/network/api_exception.dart';
+import '../../core/observability/app_logger.dart';
+import '../../core/player/player_search_flow.dart';
+import '../../core/storage/local_player_store.dart';
 import '../../core/theme/bgms_theme.dart';
+import '../../core/widgets/app_panels.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../../core/widgets/player_search_bar.dart';
+import '../../navigation/shell_scaffold.dart';
 import 'ai_coaching_card.dart';
 import 'player_stats_models.dart';
 import 'player_stats_repository.dart';
+import 'all_matches_screen.dart';
+import 'widgets/match_card.dart';
 import 'widgets/radar_chart_widget.dart';
 
 class StatsDetailScreen extends StatefulWidget {
@@ -14,26 +24,58 @@ class StatsDetailScreen extends StatefulWidget {
     required this.nickname,
     required this.platform,
     this.repository,
+    this.preferencesLoader,
   });
 
   final String? nickname;
   final String platform;
   final PlayerStatsRepository? repository;
+  final Future<SharedPreferences> Function()? preferencesLoader;
 
   @override
   State<StatsDetailScreen> createState() => _StatsDetailScreenState();
 }
 
 class _StatsDetailScreenState extends State<StatsDetailScreen> {
+  final TextEditingController _searchController = TextEditingController();
   late final PlayerStatsRepository _repository;
+  late final Future<void> _storeReady;
   Future<PlayerStatsBundle>? _statsFuture;
+  LocalPlayerStore? _store;
+  List<StoredPlayer> _recentPlayers = const [];
   String? _selectedSeason;
+  String _searchPlatform = 'steam';
+  bool _loadingStore = true;
+  bool _searching = false;
+  String? _searchError;
+  bool? _wasActive;
+  bool _isFavorite = false;
+
+  String get _normalizedPlatform => normalizePlayerPlatform(widget.platform);
 
   @override
   void initState() {
     super.initState();
     _repository = widget.repository ?? PlayerStatsRepository();
+    _searchPlatform = _normalizedPlatform;
+    _storeReady = _loadStore();
     _startFetch();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isActive = ShellTabScope.maybeOf(context)?.currentIndex == 1;
+    if (isActive && _wasActive == false) {
+      _refreshPlayers();
+    }
+    _wasActive = isActive;
   }
 
   @override
@@ -42,7 +84,74 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     if (oldWidget.nickname != widget.nickname ||
         oldWidget.platform != widget.platform) {
       _selectedSeason = null; // 닉네임이나 플랫폼이 바뀌면 시즌 필터 초기화
+      _searchPlatform = _normalizedPlatform;
       _startFetch();
+    }
+  }
+
+  Future<void> _loadStore() async {
+    try {
+      final prefs =
+          await (widget.preferencesLoader?.call() ??
+              SharedPreferences.getInstance());
+      _store = LocalPlayerStore(prefs);
+      await _refreshPlayers();
+    } catch (error, stackTrace) {
+      AppObservability.logger.warning(
+        '전적 플레이어 저장소를 불러오지 못했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'stats', 'operation': 'load_player_store'},
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingStore = false);
+      }
+    }
+  }
+
+  Future<void> _refreshPlayers() async {
+    final store = _store;
+    if (store == null) return;
+    final recent = await store.getRecentPlayers();
+    final nickname = widget.nickname?.trim() ?? '';
+    final favorite = nickname.isEmpty
+        ? false
+        : await store.isFavorite(nickname, platform: _normalizedPlatform);
+    if (!mounted) return;
+    setState(() {
+      _recentPlayers = recent;
+      _isFavorite = favorite;
+    });
+  }
+
+  /// 지금 보고 있는 플레이어의 즐겨찾기를 토글한다.
+  ///
+  /// 홈으로 돌아가지 않고 전적 화면에서 바로 등록할 수 있게 한다.
+  Future<void> _toggleFavorite() async {
+    final nickname = widget.nickname?.trim() ?? '';
+    if (nickname.isEmpty) return;
+    try {
+      await _storeReady;
+      final store = _store;
+      if (store == null) return;
+
+      await store.toggleFavorite(nickname, platform: _normalizedPlatform);
+      await _refreshPlayers();
+      if (!mounted) return;
+      // _refreshPlayers 이후 _isFavorite은 이미 새 상태다.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isFavorite ? '즐겨찾기에 추가했습니다.' : '즐겨찾기에서 해제했습니다.'),
+        ),
+      );
+    } catch (error, stackTrace) {
+      AppObservability.logger.warning(
+        '전적 즐겨찾기를 변경하지 못했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'stats', 'operation': 'toggle_favorite'},
+      );
     }
   }
 
@@ -54,7 +163,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     }
     _statsFuture = _repository.fetchPlayerStats(
       nickname: nickname,
-      platform: widget.platform,
+      platform: _normalizedPlatform,
       season: _selectedSeason,
       refresh: refresh,
     );
@@ -72,30 +181,122 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     });
   }
 
+  Future<void> _searchPlayer({String? nickname, String? platform}) async {
+    if (_searching) return;
+
+    final cleanNickname = (nickname ?? _searchController.text).trim();
+    final selectedPlatform = normalizePlayerPlatform(
+      platform ?? _searchPlatform,
+    );
+    if (cleanNickname.isEmpty) {
+      if (!mounted) return;
+      setState(() => _searchError = '닉네임을 입력해 주세요.');
+      return;
+    }
+    final requestUri = GoRouter.of(context).routeInformationProvider.value.uri;
+
+    setState(() {
+      _searching = true;
+      _searchError = null;
+    });
+
+    try {
+      await _storeReady;
+      final destination = await preparePlayerSearch(
+        store: _store,
+        nickname: cleanNickname,
+        platform: selectedPlatform,
+      );
+      if (!mounted) return;
+      if (destination == null) return;
+
+      try {
+        await _refreshPlayers();
+      } catch (error, stackTrace) {
+        AppObservability.logger.warning(
+          '전적 최근 분석 목록을 새로고침하지 못했습니다.',
+          error: error,
+          stackTrace: stackTrace,
+          context: {'feature': 'stats', 'operation': 'refresh_player_list'},
+        );
+      }
+      if (!mounted) return;
+      if (!isPlayerSearchNavigationCurrent(
+        requestUri: requestUri,
+        currentUri: GoRouter.of(context).routeInformationProvider.value.uri,
+      )) {
+        return;
+      }
+
+      context.go(destination.location);
+    } catch (error, stackTrace) {
+      AppObservability.logger.error(
+        '전적 플레이어 검색 중 오류가 발생했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'stats', 'operation': 'search_player'},
+      );
+      if (!mounted) return;
+      setState(() => _searchError = '검색 중 오류가 발생했습니다.');
+    } finally {
+      if (mounted) {
+        setState(() => _searching = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final nickname = widget.nickname?.trim() ?? '';
 
-    return ListView(
-      padding: const EdgeInsets.all(20),
+    // 셸이 Scaffold를 제공하지만, 전적 화면을 단독으로 띄우는 경우에도
+    // TextField와 InkWell이 요구하는 Material 기반을 보장한다.
+    final list = ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        BgmsBrandHeader(
-          title: '전적',
-          subtitle: nickname.isEmpty ? '닉네임 검색 후 최근 기록을 확인합니다.' : nickname,
+        ScreenHeader(
+          title: nickname.isEmpty ? '전적 분석' : '전적',
+          subtitle: nickname.isEmpty ? null : nickname,
           trailing: nickname.isEmpty
               ? null
-              : IconButton(
-                  onPressed: _retry,
-                  icon: const Icon(Icons.refresh, color: BgmsColors.accent),
-                  tooltip: '새로고침',
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      onPressed: _toggleFavorite,
+                      icon: Icon(
+                        _isFavorite ? Icons.star : Icons.star_border,
+                        color: _isFavorite
+                            ? BgmsColors.accent
+                            : BgmsColors.textSecondary,
+                      ),
+                      tooltip: _isFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가',
+                    ),
+                    IconButton(
+                      onPressed: _retry,
+                      icon: const Icon(Icons.refresh, color: BgmsColors.accent),
+                      tooltip: '새로고침',
+                    ),
+                  ],
                 ),
         ),
         const SizedBox(height: 16),
         if (nickname.isEmpty)
-          const _StatePanel(
-            icon: Icons.search_off,
-            title: '검색할 닉네임이 없습니다',
-            body: '홈에서 Steam 또는 Kakao 플랫폼을 선택하고 닉네임을 검색해 주세요.',
+          _StatsSearchHub(
+            controller: _searchController,
+            platform: _searchPlatform,
+            recentPlayers: _recentPlayers,
+            loadingStore: _loadingStore,
+            searching: _searching,
+            errorText: _searchError,
+            onPlatformChanged: (platform) {
+              setState(() => _searchPlatform = platform);
+            },
+            onSearch: _searchPlayer,
+            onTextChanged: () {
+              if (_searchError == null) return;
+              setState(() => _searchError = null);
+            },
           )
         else
           FutureBuilder<PlayerStatsBundle>(
@@ -104,13 +305,30 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return _LoadingPanel(
                   nickname: nickname,
-                  platform: widget.platform,
+                  platform: _normalizedPlatform,
                 );
               }
               if (snapshot.hasError) {
+                final error = snapshot.error;
+                final canRetry =
+                    error is! PlayerStatsException || error.isRetryable;
+                // 레포지토리가 모든 예외를 PlayerStatsException으로 감싸지만,
+                // 예기치 못한 예외가 올라와도 원시 문자열을 노출하지 않는다.
+                final message = error is PlayerStatsException
+                    ? error.message
+                    : ApiException.from(error ?? '').message;
                 return _ErrorPanel(
-                  message: snapshot.error.toString(),
-                  onRetry: _retry,
+                  message: message,
+                  onRetry: canRetry ? _retry : null,
+                  suggestions: error is PlayerStatsException
+                      ? error.suggestions
+                      : const [],
+                  onSuggestionTap: (PlayerSuggestion suggestion) => context.go(
+                    PlayerSearchDestination(
+                      nickname: suggestion.nickname,
+                      platform: suggestion.platform,
+                    ).location,
+                  ),
                 );
               }
               final bundle = snapshot.data;
@@ -132,6 +350,133 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
             },
           ),
       ],
+    );
+
+    final content = Material(color: BgmsColors.bgBase, child: list);
+
+    // 검색 전에는 새로고침할 대상이 없으므로 결과 화면에서만 당겨서 새로고침을 붙인다.
+    if (nickname.isEmpty) return content;
+    return RefreshIndicator(onRefresh: () async => _retry(), child: content);
+  }
+}
+
+class _StatsSearchHub extends StatelessWidget {
+  const _StatsSearchHub({
+    required this.controller,
+    required this.platform,
+    required this.recentPlayers,
+    required this.loadingStore,
+    required this.searching,
+    required this.onPlatformChanged,
+    required this.onSearch,
+    required this.onTextChanged,
+    this.errorText,
+  });
+
+  final TextEditingController controller;
+  final String platform;
+  final List<StoredPlayer> recentPlayers;
+  final bool loadingStore;
+  final bool searching;
+  final String? errorText;
+  final ValueChanged<String> onPlatformChanged;
+  final Future<void> Function({String? nickname, String? platform}) onSearch;
+  final VoidCallback onTextChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 홈과 같은 검색 바를 재사용해 검색 UI가 중복되지 않게 한다.
+        PlayerSearchBar(
+          controller: controller,
+          platform: platform,
+          searching: searching,
+          errorText: errorText,
+          onPlatformChanged: onPlatformChanged,
+          onSearch: onSearch,
+          onTextChanged: onTextChanged,
+        ),
+        const SizedBox(height: 12),
+        _PlayerShortcutPanel(
+          title: '최근 분석',
+          icon: Icons.history,
+          players: recentPlayers,
+          loading: loadingStore,
+          emptyText: '최근에 분석한 플레이어가 없습니다.',
+          onTap: (player) =>
+              onSearch(nickname: player.nickname, platform: player.platform),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlayerShortcutPanel extends StatelessWidget {
+  const _PlayerShortcutPanel({
+    required this.title,
+    required this.icon,
+    required this.players,
+    required this.loading,
+    required this.emptyText,
+    required this.onTap,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<StoredPlayer> players;
+  final bool loading;
+  final String emptyText;
+  final ValueChanged<StoredPlayer> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: BgmsColors.accent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (loading)
+              const LinearProgressIndicator()
+            else if (players.isEmpty)
+              Text(
+                emptyText,
+                style: const TextStyle(color: BgmsColors.textSecondary),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: players
+                    .map(
+                      (player) => InputChip(
+                        avatar: const Icon(Icons.history, size: 18),
+                        label: Text('${player.nickname} · ${player.platform}'),
+                        onPressed: () => onTap(player),
+                      ),
+                    )
+                    .toList(),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -195,47 +540,39 @@ class _StatsContentState extends State<_StatsContent> {
             _TierInfoPanel(stats: currentStats),
             const SizedBox(height: 12),
           ],
-          // 레이더 차트 카드
-          Card(
-            color: const Color(0xFF161b26),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFF232b3c)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  const Text(
-                    '성향 분석',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 220,
-                    child: RadarChartWidget(
-                      combat: _calculateCombatScore(currentStats),
-                      tactical: _calculateTacticalScore(currentStats),
-                      survival: _calculateSurvivalScore(currentStats),
-                      teamwork: _calculateTeamworkScore(currentStats),
-                      grit: currentStats.top10Rate,
-                    ),
-                  ),
-                ],
+          SectionBand(
+            title: '성향 분석',
+            icon: Icons.radar_outlined,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: BgmsColors.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: BgmsColors.border),
+              ),
+              child: SizedBox(
+                height: 220,
+                child: RadarChartWidget(
+                  combat: _calculateCombatScore(currentStats),
+                  tactical: _calculateTacticalScore(currentStats),
+                  survival: _calculateSurvivalScore(currentStats),
+                  teamwork: _calculateTeamworkScore(currentStats),
+                  grit: currentStats.top10Rate,
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
 
           // 6개 주요 메트릭 그리드
           _MetricsGrid(
             stats: currentStats,
             recentMatches: widget.bundle.matches
-                .where((m) => m.gameMode.toLowerCase().contains(_selectedMode.toLowerCase()))
+                .where(
+                  (m) => m.gameMode.toLowerCase().contains(
+                    _selectedMode.toLowerCase(),
+                  ),
+                )
                 .take(20)
                 .toList(),
             isRanked: _selectedQueue == 'ranked',
@@ -246,8 +583,8 @@ class _StatsContentState extends State<_StatsContent> {
             modeLabel: _selectedMode == 'squad'
                 ? '스쿼드'
                 : _selectedMode == 'duo'
-                    ? '듀오'
-                    : '솔로',
+                ? '듀오'
+                : '솔로',
           ),
         ],
         const SizedBox(height: 12),
@@ -265,9 +602,9 @@ class _StatsContentState extends State<_StatsContent> {
   Widget _buildQueueSegmentedControl() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF161b26),
+        color: BgmsColors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF232b3c)),
+        border: Border.all(color: BgmsColors.border),
       ),
       padding: const EdgeInsets.all(4),
       child: Row(
@@ -299,7 +636,7 @@ class _StatsContentState extends State<_StatsContent> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.black : Colors.white70,
+            color: isSelected ? Colors.black : BgmsColors.textSecondary,
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
@@ -332,15 +669,15 @@ class _StatsContentState extends State<_StatsContent> {
                 }
               },
               selectedColor: BgmsColors.accent,
-              backgroundColor: const Color(0xFF161b26),
+              backgroundColor: BgmsColors.surface,
               labelStyle: TextStyle(
-                color: isSelected ? Colors.black : Colors.white70,
+                color: isSelected ? Colors.black : BgmsColors.textSecondary,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
-                  color: isSelected ? BgmsColors.accent : const Color(0xFF232b3c),
+                  color: isSelected ? BgmsColors.accent : BgmsColors.border,
                 ),
               ),
             ),
@@ -375,23 +712,28 @@ class _StatsContentState extends State<_StatsContent> {
   }
 }
 
+/// 티어 색상은 웹 TIER_STYLE과 대응하는 공용 토큰을 쓴다.
+///
+/// 화면마다 색이 갈리지 않도록 [BgmsColors.tierColor]로 위임한다.
 Color _getTierColor(String tierName) {
-  if (tierName.contains('Bronze')) return const Color(0xFFCD7F32);
-  if (tierName.contains('Silver')) return const Color(0xFFC0C0C0);
-  if (tierName.contains('Gold')) return const Color(0xFFFFD700);
-  if (tierName.contains('Platinum')) return const Color(0xFFE5E4E2);
-  if (tierName.contains('Diamond')) return const Color(0xFFB9F2FF);
-  if (tierName.contains('Master')) return const Color(0xFFFF007F);
-  if (tierName.contains('Grandmaster')) return const Color(0xFFFF3F3F);
-  return BgmsColors.accent;
+  if (tierName.isEmpty || tierName == '일반전') return BgmsColors.accent;
+  final color = BgmsColors.tierColor(tierName);
+  return color == BgmsColors.textMuted ? BgmsColors.accent : color;
 }
 
 IconData _getTierIcon(String tierName) {
-  if (tierName.contains('Bronze') || tierName.contains('Silver')) return Icons.shield;
+  if (tierName.contains('Bronze') || tierName.contains('Silver')) {
+    return Icons.shield;
+  }
   if (tierName.contains('Gold')) return Icons.emoji_events;
-  if (tierName.contains('Platinum') || tierName.contains('Diamond')) return Icons.diamond;
-  if (tierName.contains('Master')) return Icons.military_tech;
-  if (tierName.contains('Grandmaster')) return Icons.local_fire_department;
+  if (tierName.contains('Platinum') ||
+      tierName.contains('Diamond') ||
+      tierName.contains('Crystal')) {
+    return Icons.diamond;
+  }
+  if (tierName.contains('Master') || tierName.contains('Survivor')) {
+    return Icons.military_tech;
+  }
   return Icons.stars;
 }
 
@@ -414,10 +756,10 @@ class _TierInfoPanel extends StatelessWidget {
     final IconData tierIcon = _getTierIcon(tierName);
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -435,7 +777,7 @@ class _TierInfoPanel extends StatelessWidget {
                       Text(
                         tierName,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: BgmsColors.textPrimary,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
@@ -443,7 +785,10 @@ class _TierInfoPanel extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         '현재 RP: $rp  (최고 RP: $bestRp)',
-                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        style: const TextStyle(
+                          color: BgmsColors.textMuted,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -453,7 +798,7 @@ class _TierInfoPanel extends StatelessWidget {
             const SizedBox(height: 12),
             LinearProgressIndicator(
               value: progress,
-              backgroundColor: Colors.white10,
+              backgroundColor: BgmsColors.border,
               color: tierColor,
               minHeight: 6,
               borderRadius: BorderRadius.circular(3),
@@ -488,31 +833,49 @@ class _MetricsGrid extends StatelessWidget {
     if (isRanked) {
       if (validMatches.isNotEmpty) {
         // top10 진입 횟수 계산 (rank가 1~10 사이)
-        final top10Count = validMatches.where((m) => m.rank != null && m.rank! <= 10).length;
+        final top10Count = validMatches
+            .where((m) => m.rank != null && m.rank! <= 10)
+            .length;
         top10Rate = (top10Count / validMatches.length) * 100.0;
 
         // 헤드샷 비율 계산
         final totalKills = validMatches.fold<int>(0, (sum, m) => sum + m.kills);
-        final totalHeadshots = validMatches.fold<int>(0, (sum, m) => sum + m.headshotKills);
-        headshotRate = totalKills > 0 ? (totalHeadshots / totalKills * 100.0) : 0.0;
-        
+        final totalHeadshots = validMatches.fold<int>(
+          0,
+          (sum, m) => sum + m.headshotKills,
+        );
+        headshotRate = totalKills > 0
+            ? (totalHeadshots / totalKills * 100.0)
+            : 0.0;
+
         // 생존 시간 계산
-        final totalSurvival = validMatches.fold<double>(0, (sum, m) => sum + m.timeSurvived);
+        final totalSurvival = validMatches.fold<double>(
+          0,
+          (sum, m) => sum + m.timeSurvived,
+        );
         avgSurvivalTime = totalSurvival / validMatches.length;
       }
     } else {
       // 일반전일 때는 기존 PUBG API 제공값 기반
-      avgSurvivalTime = stats.roundsPlayed > 0 ? stats.timeSurvived / stats.roundsPlayed : 0.0;
+      avgSurvivalTime = stats.roundsPlayed > 0
+          ? stats.timeSurvived / stats.roundsPlayed
+          : 0.0;
       top10Rate = stats.top10Rate;
-      headshotRate = stats.kills > 0 ? (stats.headshotKills / stats.kills * 100.0) : 0.0;
+      headshotRate = stats.kills > 0
+          ? (stats.headshotKills / stats.kills * 100.0)
+          : 0.0;
     }
 
     final survivalMinutes = (avgSurvivalTime / 60).floor();
     final survivalSeconds = (avgSurvivalTime % 60).round();
-    
+
     // 생존 시간 표시 조건 (라운드 기록이 있거나 validMatches가 있을 때만 노출)
-    final hasSurvivalData = isRanked ? validMatches.isNotEmpty : stats.roundsPlayed > 0;
-    final survivalStr = hasSurvivalData ? '$survivalMinutes분 $survivalSeconds초' : '-';
+    final hasSurvivalData = isRanked
+        ? validMatches.isNotEmpty
+        : stats.roundsPlayed > 0;
+    final survivalStr = hasSurvivalData
+        ? '$survivalMinutes분 $survivalSeconds초'
+        : '-';
 
     final metrics = [
       _Metric('KDA', stats.kda.toStringAsFixed(2), Icons.adjust),
@@ -523,39 +886,51 @@ class _MetricsGrid extends StatelessWidget {
       _Metric('헤드샷 비율', '${headshotRate.toStringAsFixed(1)}%', Icons.gps_fixed),
     ];
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossCount = constraints.maxWidth < 360 ? 2 : 3;
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: metrics.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossCount,
-            childAspectRatio: 1.25,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-          ),
-          itemBuilder: (context, index) {
-            final metric = metrics[index];
-            return Card(
-              color: const Color(0xFF161b26),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(color: Color(0xFF232b3c)),
-              ),
-              child: Padding(
+    return SectionBand(
+      title: '주요 지표',
+      icon: Icons.insights_outlined,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final crossCount = constraints.maxWidth < 360 ? 2 : 3;
+          return GridView.builder(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: metrics.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossCount,
+              childAspectRatio: 1.25,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemBuilder: (context, index) {
+              final metric = metrics[index];
+              return Container(
                 padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: BgmsColors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: BgmsColors.border),
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(metric.icon, size: 18, color: index == 0 ? BgmsColors.accent : Colors.white70),
+                    Icon(
+                      metric.icon,
+                      size: 18,
+                      color: index == 0
+                          ? BgmsColors.accent
+                          : BgmsColors.textSecondary,
+                    ),
                     const SizedBox(height: 4),
                     FittedBox(
                       child: Text(
                         metric.value,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: index == 0 ? BgmsColors.accent : BgmsColors.textPrimary,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: index == 0
+                                  ? BgmsColors.accent
+                                  : BgmsColors.textPrimary,
                               fontWeight: FontWeight.w800,
                             ),
                       ),
@@ -565,24 +940,24 @@ class _MetricsGrid extends StatelessWidget {
                       metric.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 10, color: Colors.white60),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: BgmsColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
 
 class _EmptyStatsPanel extends StatelessWidget {
-  const _EmptyStatsPanel({
-    required this.queueLabel,
-    required this.modeLabel,
-  });
+  const _EmptyStatsPanel({required this.queueLabel, required this.modeLabel});
 
   final String queueLabel;
   final String modeLabel;
@@ -590,10 +965,10 @@ class _EmptyStatsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
@@ -603,14 +978,14 @@ class _EmptyStatsPanel extends StatelessWidget {
             const Icon(
               Icons.warning_amber_rounded,
               size: 48,
-              color: Colors.white30,
+              color: BgmsColors.textMuted,
             ),
             const SizedBox(height: 16),
             const Text(
               '해당 모드 플레이 기록 없음',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: BgmsColors.textPrimary,
                 fontSize: 15,
               ),
             ),
@@ -618,7 +993,7 @@ class _EmptyStatsPanel extends StatelessWidget {
             Text(
               '현재 시즌의 $queueLabel ($modeLabel) 플레이 기록이 아직 없습니다.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white54, fontSize: 13),
+              style: const TextStyle(color: BgmsColors.textMuted, fontSize: 13),
             ),
           ],
         ),
@@ -632,345 +1007,81 @@ class _MatchSummaryPanel extends StatelessWidget {
 
   final PlayerStatsBundle bundle;
 
+  /// 전적 화면에 미리 보여줄 매치 수. 나머지는 전체 보기에서 확인한다.
+  static const _previewCount = 5;
+
   @override
   Widget build(BuildContext context) {
     final matches = bundle.matches;
 
-    return Card(
-      color: const Color(0xFF161b26),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+    // 전적 화면에는 앞쪽 몇 건만 미리 보여준다.
+    // 전체 목록과 모드 필터는 '전체 보기'로 열리는 별도 화면에서 제공한다.
+    // 상단 큐/모드 선택은 시즌 지표용이라 이 리스트에는 걸지 않는다.
+    final preview = matches.take(_previewCount).toList();
+    final hasMore = matches.length > _previewCount;
+
+    return SectionBand(
+      title: '최근 매치',
+      icon: Icons.receipt_long_outlined,
+      action: Text(
+        '${matches.length}경기',
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (bundle.summaryFallback) ...[
             Text(
-              '최근 매치 리스트',
+              '일부 매치는 서버 분석이 끝나지 않아 요약만 표시합니다.',
               style: Theme.of(
                 context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: Colors.white),
+              ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
             ),
-            if (bundle.summaryFallback) ...[
-              const SizedBox(height: 8),
-              const Text('일부 매치는 상세 분석 캐시가 없어 모드 정보만 표시합니다.', style: TextStyle(color: Colors.white30, fontSize: 11)),
-            ],
-            const SizedBox(height: 12),
-            if (matches.isEmpty)
-              const Text('최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.', style: TextStyle(color: Colors.white60))
-            else
-              ...matches.map(
-                (match) => _MatchCard(
-                  match: match,
-                  profile: bundle.profile,
+            const SizedBox(height: 10),
+          ],
+          if (matches.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              decoration: BoxDecoration(
+                color: BgmsColors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: BgmsColors.border),
+              ),
+              child: Text(
+                '최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: BgmsColors.textSecondary,
                 ),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MatchCard extends StatelessWidget {
-  const _MatchCard({
-    required this.match,
-    required this.profile,
-  });
-
-  final MatchSummary match;
-  final PlayerStatsProfile profile;
-
-  String _formatElapsedTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime.toLocal());
-
-    if (difference.inMinutes < 1) {
-      return '방금 전';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}분 전';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}시간 전';
-    } else {
-      return '${difference.inDays}일 전';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isChicken = match.rank == 1;
-
-    // 맵 그라데이션 획득
-    final mapGradient = _getMapGradient(match.mapName);
-
-    // 치킨 하이라이트 보완 그라데이션
-    final finalGradient = isChicken
-        ? LinearGradient(
-            colors: [
-              Colors.amber.withValues(alpha: 0.08),
-              const Color(0xFF161b26).withValues(alpha: 0.95),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          )
-        : mapGradient;
-
-    final border = Border.all(
-      color: isChicken ? Colors.amber : const Color(0xFF232b3c),
-      width: isChicken ? 1.5 : 0.8,
-    );
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            context.push(
-              '/stats/match/${match.matchId}',
-              extra: {
-                'nickname': profile.nickname,
-                'platform': profile.platform,
-                'summary': match,
-              },
-            );
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: finalGradient,
-              borderRadius: BorderRadius.circular(12),
-              border: border,
-              boxShadow: isChicken
-                  ? [
-                      BoxShadow(
-                        color: Colors.amber.withValues(alpha: 0.15),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                      )
-                    ]
-                  : null,
+            )
+          else ...[
+            ...preview.map(
+              (match) => MatchCard(match: match, profile: bundle.profile),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              children: [
-                // 맵 전경의 기하학적 백그라운드 연출 (우측에 은은하게 위치)
-                Positioned(
-                  right: -20,
-                  bottom: -20,
-                  top: -20,
-                  child: Opacity(
-                    opacity: 0.08,
-                    child: Icon(
-                      Icons.map_outlined,
-                      size: 130,
-                      color: isChicken ? Colors.amber : Colors.white,
+            const SizedBox(height: 4),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => AllMatchesScreen(
+                      matches: matches,
+                      profile: bundle.profile,
+                      summaryFallback: bundle.summaryFallback,
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 상단 윙 & 태그 라인
-                      Row(
-                        children: [
-                          // 맵 종류 & 모드
-                          Expanded(
-                            child: Text(
-                              '${match.mapName} · ${match.gameMode.toUpperCase()}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _formatElapsedTime(match.createdAt),
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // 티어 뱃지 노출
-                          if (match.tier != null) ...[
-                            _buildTierBadge(match.tierName),
-                            const SizedBox(width: 8),
-                          ],
-                          // 순위 정보
-                          if (match.rank != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isChicken ? Colors.amber : const Color(0xFF232b3c),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '#${match.rank}',
-                                style: TextStyle(
-                                  color: isChicken ? Colors.black : Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // 중단 지표 라인
-                      Row(
-                        children: [
-                          _buildMetricColumn('KILLS', '${match.kills}', Colors.redAccent),
-                          const SizedBox(width: 24),
-                          _buildMetricColumn('DAMAGE', match.damage.toStringAsFixed(0), Colors.amber),
-                          const Spacer(),
-                          const Icon(Icons.chevron_right, color: Colors.white30),
-                        ],
-                      ),
-                      // 하단 우승(치킨) 리본 라벨 추가
-                      if (isChicken) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Colors.amber, Colors.orangeAccent],
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            'WINNER WINNER CHICKEN DINNER',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
+                );
+              },
+              icon: const Icon(Icons.list_alt, size: 18),
+              label: Text(
+                hasMore ? '전체 보기 (${matches.length}경기)' : '전체 보기 · 모드별 필터',
+              ),
             ),
-          ),
-        ),
+          ],
+        ],
       ),
-    );
-  }
-
-  Widget _buildMetricColumn(String label, String value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTierBadge(String tierName) {
-    final Color tierColor = _getTierColor(tierName);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: tierColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: tierColor.withValues(alpha: 0.3), width: 0.8),
-      ),
-      child: Text(
-        tierName,
-        style: TextStyle(
-          color: tierColor,
-          fontWeight: FontWeight.bold,
-          fontSize: 10,
-        ),
-      ),
-    );
-  }
-
-  Gradient _getMapGradient(String mapName) {
-    final name = mapName.toLowerCase();
-    if (name.contains('erangel')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF1b3c33).withValues(alpha: 0.8),
-          const Color(0xFF0F2027).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else if (name.contains('miramar') || name.contains('desert')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF5A442E).withValues(alpha: 0.8),
-          const Color(0xFF14110F).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else if (name.contains('sanhok')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF132e18).withValues(alpha: 0.8),
-          const Color(0xFF08120a).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else if (name.contains('vikendi')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF243B55).withValues(alpha: 0.8),
-          const Color(0xFF141E30).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else if (name.contains('deston')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF373B44).withValues(alpha: 0.8),
-          const Color(0xFF1D2026).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else if (name.contains('taego')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF4B2329).withValues(alpha: 0.8),
-          const Color(0xFF180A0C).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    }
-    return LinearGradient(
-      colors: [
-        const Color(0xFF1e293b).withValues(alpha: 0.8),
-        const Color(0xFF0f172a).withValues(alpha: 0.9),
-      ],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
     );
   }
 }
@@ -989,29 +1100,32 @@ class _StatePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(icon, size: 48, color: Colors.white30),
+            Icon(icon, size: 48, color: BgmsColors.textMuted),
             const SizedBox(height: 16),
             Text(
               title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: BgmsColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               body,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60, fontSize: 13),
+              style: const TextStyle(
+                color: BgmsColors.textSecondary,
+                fontSize: 13,
+              ),
             ),
           ],
         ),
@@ -1029,26 +1143,61 @@ class _LoadingPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(BgmsSpacing.lg),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const CircularProgressIndicator(color: BgmsColors.accent),
-            const SizedBox(height: 24),
-            Text(
-              '$nickname 님의 전적을 분석 중입니다...',
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            Row(
+              children: [
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: BgmsColors.accent,
+                  ),
+                ),
+                const SizedBox(width: BgmsSpacing.sm),
+                Expanded(
+                  child: Text(
+                    '$nickname 님의 전적을 분석하고 있습니다',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Text(
+                  platform.toUpperCase(),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: BgmsColors.textMuted),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '플랫폼: ${platform.toUpperCase()}',
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            const SizedBox(height: BgmsSpacing.lg),
+            const SkeletonBox(height: 72, borderRadius: BgmsRadius.md),
+            const SizedBox(height: BgmsSpacing.sm),
+            const Row(
+              children: [
+                Expanded(child: SkeletonBox(height: 52)),
+                SizedBox(width: BgmsSpacing.sm),
+                Expanded(child: SkeletonBox(height: 52)),
+                SizedBox(width: BgmsSpacing.sm),
+                Expanded(child: SkeletonBox(height: 52)),
+              ],
             ),
+            const SizedBox(height: BgmsSpacing.sm),
+            const SkeletonBox(height: 44),
+            const SizedBox(height: BgmsSpacing.sm),
+            const SkeletonBox(height: 44),
           ],
         ),
       ),
@@ -1057,45 +1206,84 @@ class _LoadingPanel extends StatelessWidget {
 }
 
 class _ErrorPanel extends StatelessWidget {
-  const _ErrorPanel({required this.message, required this.onRetry});
+  const _ErrorPanel({
+    required this.message,
+    this.onRetry,
+    this.suggestions = const [],
+    this.onSuggestionTap,
+  });
 
   final String message;
-  final VoidCallback onRetry;
+  final VoidCallback? onRetry;
+
+  /// 닉네임을 찾지 못했을 때 서버가 제안한 유사 플레이어.
+  final List<PlayerSuggestion> suggestions;
+  final void Function(PlayerSuggestion suggestion)? onSuggestionTap;
 
   @override
   Widget build(BuildContext context) {
+    final onRetry = this.onRetry;
+    final onSuggestionTap = this.onSuggestionTap;
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+            const Icon(Icons.error_outline, size: 48, color: BgmsColors.danger),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               '전적을 불러오지 못했습니다',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white54, fontSize: 13),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: BgmsColors.textSecondary),
             ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: BgmsColors.accent,
-                foregroundColor: Colors.black,
+            if (suggestions.isNotEmpty && onSuggestionTap != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                '혹시 이 플레이어를 찾으셨나요?',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: BgmsColors.textSecondary,
+                  letterSpacing: 0,
+                ),
               ),
-              icon: const Icon(Icons.refresh),
-              label: const Text('다시 시도', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
+              const SizedBox(height: 8),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final suggestion in suggestions.take(6))
+                    ActionChip(
+                      avatar: const Icon(Icons.person_search, size: 16),
+                      label: Text(
+                        '${suggestion.nickname} · ${suggestion.platform}',
+                      ),
+                      onPressed: () => onSuggestionTap(suggestion),
+                    ),
+                ],
+              ),
+            ],
+            if (onRetry != null) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('다시 시도'),
+              ),
+            ],
           ],
         ),
       ),
@@ -1131,10 +1319,10 @@ class _ProfileHeader extends StatelessWidget {
     final String currentSeasonId = selectedSeason ?? profile.seasonId ?? '';
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1165,7 +1353,10 @@ class _ProfileHeader extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         profile.platform.toUpperCase(),
-                        style: const TextStyle(color: Colors.white54, fontSize: 13),
+                        style: const TextStyle(
+                          color: BgmsColors.textMuted,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
@@ -1173,7 +1364,7 @@ class _ProfileHeader extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            const Divider(color: Color(0xFF232b3c), height: 1),
+            const Divider(color: BgmsColors.border, height: 1),
             const SizedBox(height: 12),
 
             // 시즌 필터 드롭다운 UI
@@ -1182,25 +1373,42 @@ class _ProfileHeader extends StatelessWidget {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.calendar_month_outlined, size: 18, color: Colors.white70),
+                    Icon(
+                      Icons.calendar_month_outlined,
+                      size: 18,
+                      color: BgmsColors.textSecondary,
+                    ),
                     SizedBox(width: 6),
                     Text(
                       '조회 시즌',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: BgmsColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
                 if (seasons.isEmpty)
                   Text(
-                    currentSeasonId.isEmpty ? '기본 시즌' : currentSeasonId,
-                    style: const TextStyle(color: BgmsColors.accent, fontWeight: FontWeight.bold),
+                    currentSeasonId.isEmpty
+                        ? '기본 시즌'
+                        : seasonLabel(currentSeasonId),
+                    style: const TextStyle(
+                      color: BgmsColors.accent,
+                      fontWeight: FontWeight.bold,
+                    ),
                   )
                 else
                   DropdownButton<String>(
-                    value: seasons.contains(currentSeasonId) ? currentSeasonId : seasons.first,
-                    dropdownColor: const Color(0xFF161b26),
+                    value: seasons.contains(currentSeasonId)
+                        ? currentSeasonId
+                        : seasons.first,
+                    dropdownColor: BgmsColors.surface,
                     underline: const SizedBox(),
-                    icon: const Icon(Icons.arrow_drop_down, color: BgmsColors.accent),
+                    icon: const Icon(
+                      Icons.arrow_drop_down,
+                      color: BgmsColors.accent,
+                    ),
                     style: const TextStyle(
                       color: BgmsColors.accent,
                       fontWeight: FontWeight.bold,
@@ -1209,7 +1417,7 @@ class _ProfileHeader extends StatelessWidget {
                     items: seasons.map((season) {
                       return DropdownMenuItem<String>(
                         value: season,
-                        child: Text(season),
+                        child: Text(seasonLabel(season)),
                       );
                     }).toList(),
                     onChanged: onSeasonChanged,
@@ -1220,7 +1428,10 @@ class _ProfileHeader extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 '동기화 시간: ${updatedAt.toLocal()}'.split('.').first,
-                style: const TextStyle(color: BgmsColors.textMuted, fontSize: 11),
+                style: const TextStyle(
+                  color: BgmsColors.textMuted,
+                  fontSize: 11,
+                ),
               ),
             ],
           ],

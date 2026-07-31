@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/bgms_theme.dart';
+import '../../core/widgets/app_panels.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import 'board_models.dart';
 import 'board_repository.dart';
@@ -23,6 +24,14 @@ class _BoardScreenState extends State<BoardScreen> {
   bool _loading = true;
   bool _loadingMore = false;
   String? _error;
+
+  /// 게시판 분류 키와 표시 라벨.
+  static const _categories = <MapEntry<String, String>>[
+    MapEntry('all', '전체'),
+    MapEntry('free', '자유'),
+    MapEntry('strategy', '공략'),
+    MapEntry('question', '질문'),
+  ];
 
   @override
   void initState() {
@@ -53,6 +62,7 @@ class _BoardScreenState extends State<BoardScreen> {
         cursor: reset ? null : _cursor,
         query: _searchController.text,
       );
+      if (!mounted) return;
       setState(() {
         if (reset) _posts.clear();
         _posts.addAll(page.items);
@@ -60,6 +70,7 @@ class _BoardScreenState extends State<BoardScreen> {
         _hasMore = page.hasMore;
       });
     } on BoardException catch (error) {
+      if (!mounted) return;
       setState(() => _error = error.message);
     } finally {
       if (mounted) {
@@ -72,6 +83,21 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   Future<void> _openWriteDialog() async {
+    // 글을 다 쓴 뒤 401을 받는 대신, 로그인 여부를 먼저 알린다.
+    if (!_repository.canWrite) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('글쓰기는 로그인 후 이용할 수 있습니다.'),
+          action: SnackBarAction(
+            label: '로그인',
+            onPressed: () => context.go('/my'),
+          ),
+        ),
+      );
+      return;
+    }
+
     final createdId = await showDialog<int>(
       context: context,
       builder: (context) => const _BoardWriteDialog(),
@@ -86,58 +112,84 @@ class _BoardScreenState extends State<BoardScreen> {
     return RefreshIndicator(
       onRefresh: () => _load(reset: true),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          const BgmsBrandHeader(
-            title: '게시판',
-            subtitle: 'BGMS 커뮤니티 글을 확인하고 로그인 후 글과 댓글을 작성합니다.',
+          ScreenHeader(
+            title: '커뮤니티',
+            trailing: IconButton(
+              onPressed: _openWriteDialog,
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: '글쓰기',
+              style: IconButton.styleFrom(
+                backgroundColor: BgmsColors.accent,
+                foregroundColor: BgmsColors.bgBase,
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  textInputAction: TextInputAction.search,
-                  decoration: const InputDecoration(
-                    labelText: '검색',
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                  onSubmitted: (_) => _load(reset: true),
+          const SizedBox(height: 14),
+          // 지우기 버튼만 입력값에 반응하도록 해서 화면 전체 재빌드를 피한다.
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _searchController,
+            builder: (context, value, child) {
+              return TextField(
+                controller: _searchController,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: '제목이나 내용 검색',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: value.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          tooltip: '검색어 지우기',
+                          onPressed: () {
+                            _searchController.clear();
+                            _load(reset: true);
+                          },
+                        ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              FilledButton.icon(
-                onPressed: _openWriteDialog,
-                icon: const Icon(Icons.edit),
-                label: const Text('글쓰기'),
-              ),
-            ],
+                onSubmitted: (_) => _load(reset: true),
+              );
+            },
           ),
           const SizedBox(height: 12),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'all', label: Text('전체')),
-                ButtonSegment(value: 'free', label: Text('자유')),
-                ButtonSegment(value: 'strategy', label: Text('공략')),
-                ButtonSegment(value: 'question', label: Text('질문')),
+            child: Row(
+              children: [
+                for (final category in _categories)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(category.value),
+                      selected: _category == category.key,
+                      showCheckmark: false,
+                      onSelected: (selected) {
+                        if (!selected || _category == category.key) return;
+                        setState(() => _category = category.key);
+                        _load(reset: true);
+                      },
+                    ),
+                  ),
               ],
-              selected: {_category},
-              onSelectionChanged: (values) {
-                setState(() => _category = values.first);
-                _load(reset: true);
-              },
             ),
           ),
           const SizedBox(height: 16),
           if (_loading)
-            const Center(child: CircularProgressIndicator())
+            const LoadingCard(lines: 5, label: '게시글을 불러오고 있습니다')
           else if (_error != null)
-            _ErrorPanel(message: _error!, onRetry: () => _load(reset: true))
+            ErrorPanel(
+              error: _error!,
+              onRetry: () => _load(reset: true),
+              title: '게시글을 불러오지 못했습니다',
+            )
           else if (_posts.isEmpty)
-            const _EmptyPanel()
+            const InfoPanel(
+              icon: Icons.forum_outlined,
+              title: '게시글이 없습니다',
+              body: '아직 이 조건에 맞는 글이 없습니다. 다른 분류를 선택하거나 첫 글을 남겨 보세요.',
+            )
           else
             ..._posts.map((post) => _PostTile(post: post)),
           if (_hasMore && !_loading)
@@ -179,7 +231,12 @@ class _PostTile extends StatelessWidget {
                     width: 72,
                     height: 72,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    // 실패해도 72px 자리를 유지해 목록 행 높이가 흔들리지 않게 한다.
+                    errorBuilder: (_, _, _) => const _ThumbnailPlaceholder(),
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const _ThumbnailPlaceholder();
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -360,47 +417,33 @@ class _BoardWriteDialogState extends State<_BoardWriteDialog> {
   }
 }
 
-class _ErrorPanel extends StatelessWidget {
-  const _ErrorPanel({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: Theme.of(context).colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(message),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('다시 시도'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyPanel extends StatelessWidget {
-  const _EmptyPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Card(
-      child: Padding(padding: EdgeInsets.all(20), child: Text('게시글이 없습니다.')),
-    );
-  }
-}
-
 String _shortDate(String value) {
   if (value.length >= 10) return value.substring(0, 10);
   return value;
+}
+
+/// 게시글 썸네일 자리를 지키는 대체 박스.
+///
+/// 로딩 중과 실패 상황 모두 같은 크기를 차지해 목록 행 높이가 변하지 않는다.
+class _ThumbnailPlaceholder extends StatelessWidget {
+  const _ThumbnailPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 72,
+      height: 72,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: BgmsColors.surface,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: BgmsColors.border),
+      ),
+      child: const Icon(
+        Icons.image_outlined,
+        size: 20,
+        color: BgmsColors.textMuted,
+      ),
+    );
+  }
 }

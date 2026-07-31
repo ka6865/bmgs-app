@@ -13,6 +13,55 @@ class BgmsColors {
   static const textPrimary = Color(0xFFFFFFFF);
   static const textSecondary = Color(0x99FFFFFF);
   static const textMuted = Color(0x4DFFFFFF);
+
+  /// PUBG 랭크 티어별 강조 색상. 웹 TIER_STYLE과 대응한다.
+  static const tierColors = <String, Color>{
+    'Master': Color(0xFFD8B4FE),
+    'Survivor': Color(0xFFFDE68A),
+    'Diamond': Color(0xFF67E8F9),
+    'Crystal': Color(0xFF7DD3FC),
+    'Platinum': Color(0xFF5EEAD4),
+    'Gold': Color(0xFFFCD34D),
+    'Silver': Color(0xFFCBD5E1),
+    'Bronze': Color(0xFFFB923C),
+  };
+
+  static Color tierColor(String? tier) {
+    if (tier == null || tier.isEmpty) return textMuted;
+    for (final entry in tierColors.entries) {
+      if (tier.toLowerCase().contains(entry.key.toLowerCase())) {
+        return entry.value;
+      }
+    }
+    return textMuted;
+  }
+}
+
+/// 화면 간 여백을 통일하기 위한 스페이싱 토큰.
+class BgmsSpacing {
+  const BgmsSpacing._();
+
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 20;
+  static const double xxl = 28;
+
+  static const EdgeInsets screen = EdgeInsets.symmetric(
+    horizontal: lg,
+    vertical: md,
+  );
+  static const EdgeInsets card = EdgeInsets.all(lg);
+}
+
+/// 모서리 반경 토큰. 카드는 12를 넘기지 않는다.
+class BgmsRadius {
+  const BgmsRadius._();
+
+  static const BorderRadius sm = BorderRadius.all(Radius.circular(6));
+  static const BorderRadius md = BorderRadius.all(Radius.circular(8));
+  static const BorderRadius lg = BorderRadius.all(Radius.circular(12));
 }
 
 class BgmsTheme {

@@ -13,12 +13,14 @@ class MatchDetailScreen extends StatefulWidget {
     required this.nickname,
     required this.platform,
     required this.summary,
+    this.repository,
   });
 
   final String matchId;
   final String nickname;
   final String platform;
   final MatchSummary summary;
+  final MatchDetailRepository? repository;
 
   @override
   State<MatchDetailScreen> createState() => _MatchDetailScreenState();
@@ -31,7 +33,7 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _repository = MatchDetailRepository();
+    _repository = widget.repository ?? MatchDetailRepository();
     _detailFuture = _loadDetail();
   }
 
@@ -65,18 +67,22 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
         final detail = snapshot.data;
         return Scaffold(
           appBar: AppBar(
-            backgroundColor: const Color(0xFF0b0f19),
+            backgroundColor: BgmsColors.bgBase,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: BgmsColors.textPrimary,
+              ),
+              tooltip: '뒤로',
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
-          backgroundColor: const Color(0xFF0b0f19),
+          backgroundColor: BgmsColors.bgBase,
           body: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              BgmsBrandHeader(
+              ScreenHeader(
                 title: '매치 분석 리포트',
                 subtitle: detail == null
                     ? widget.matchId
@@ -153,19 +159,23 @@ class _DetailContent extends StatelessWidget {
           ),
           const SizedBox(height: 12),
         ],
-
-
       ],
     );
   }
 
   bool _hasSpecialStats(MatchDetail detail) {
     final v = detail.vehicleCombat;
-    final totalVehicle = v.leadShotKills + v.leadShotKnocks + v.ridingShotKills + v.ridingShotKnocks + v.roadKills + v.roadKnocks;
-    return totalVehicle > 0 || detail.combatPressure.pressureIndex > 0 || detail.duelStats.reversalAttempts > 0;
+    final totalVehicle =
+        v.leadShotKills +
+        v.leadShotKnocks +
+        v.ridingShotKills +
+        v.ridingShotKnocks +
+        v.roadKills +
+        v.roadKnocks;
+    return totalVehicle > 0 ||
+        detail.combatPressure.pressureIndex > 0 ||
+        detail.duelStats.reversalAttempts > 0;
   }
-
-
 }
 
 // ---------------------------------------------------------------------------
@@ -179,10 +189,10 @@ class _MetadataCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -203,9 +213,14 @@ class _MetadataCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: detail.isFallback ? Colors.amber.withValues(alpha: 0.15) : Colors.green.withValues(alpha: 0.15),
+                    color: detail.isFallback
+                        ? Colors.amber.withValues(alpha: 0.15)
+                        : Colors.green.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
                       color: detail.isFallback ? Colors.amber : Colors.green,
@@ -215,7 +230,9 @@ class _MetadataCard extends StatelessWidget {
                   child: Text(
                     detail.isFallback ? '대기 중' : '분석 완료',
                     style: TextStyle(
-                      color: detail.isFallback ? Colors.amber : Colors.greenAccent,
+                      color: detail.isFallback
+                          ? Colors.amber
+                          : Colors.greenAccent,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -226,16 +243,16 @@ class _MetadataCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '${detail.mapName} · ${detail.gameMode}',
-              style: const TextStyle(color: Colors.white70),
+              style: const TextStyle(color: BgmsColors.textSecondary),
             ),
             const SizedBox(height: 12),
             Text(
               '매치 ID: ${detail.matchId}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: BgmsColors.textMuted,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: BgmsColors.textMuted),
             ),
             if (detail.message != null) ...[
               const SizedBox(height: 12),
@@ -266,7 +283,10 @@ class _MetricGrid extends StatelessWidget {
       _DetailMetric('개인 킬', '${detail.kills}'),
       _DetailMetric('가한 피해량', detail.damage.toStringAsFixed(0)),
       _DetailMetric('생존 시간', detail.survivalText),
-      _DetailMetric('스쿼드 총 킬', detail.teamKills > 0 ? '${detail.teamKills}' : '-'),
+      _DetailMetric(
+        '스쿼드 총 킬',
+        detail.teamKills > 0 ? '${detail.teamKills}' : '-',
+      ),
       _DetailMetric('맵 코드', detail.mapId ?? detail.mapName),
     ];
 
@@ -286,10 +306,10 @@ class _MetricGrid extends StatelessWidget {
           itemBuilder: (context, index) {
             final metric = metrics[index];
             return Card(
-              color: const Color(0xFF161b26),
+              color: BgmsColors.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(color: Color(0xFF232b3c)),
+                side: const BorderSide(color: BgmsColors.border),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -312,7 +332,10 @@ class _MetricGrid extends StatelessWidget {
                       metric.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: BgmsColors.textSecondary, fontSize: 11),
+                      style: const TextStyle(
+                        color: BgmsColors.textSecondary,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -336,10 +359,10 @@ class _BenchmarkScoreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -349,13 +372,18 @@ class _BenchmarkScoreCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   '상위권 벤치마크 점수',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 Text(
                   '${benchmark.tier} 등급',
-                  style: const TextStyle(color: BgmsColors.accent, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: BgmsColors.accent,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -392,13 +420,19 @@ class _BenchmarkScoreCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
+                color: BgmsColors.textPrimary.withValues(alpha: 0.03),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('전술 매치 종합 점수', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const Text(
+                    '전술 매치 종합 점수',
+                    style: TextStyle(
+                      color: BgmsColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -406,21 +440,41 @@ class _BenchmarkScoreCard extends StatelessWidget {
                     children: [
                       Text(
                         benchmark.score.toStringAsFixed(1),
-                        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: BgmsColors.accent),
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: BgmsColors.accent,
+                        ),
                       ),
-                      const Text(' / 100 점', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                      const Text(
+                        ' / 100 점',
+                        style: TextStyle(
+                          color: BgmsColors.textMuted,
+                          fontSize: 13,
+                        ),
+                      ),
                       if (benchmark.impactGrade != null) ...[
                         const Spacer(),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.deepPurple.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.purpleAccent, width: 0.5),
+                            border: Border.all(
+                              color: Colors.purpleAccent,
+                              width: 0.5,
+                            ),
                           ),
                           child: Text(
                             benchmark.impactGrade!,
-                            style: const TextStyle(color: Colors.purpleAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: Colors.purpleAccent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -431,17 +485,29 @@ class _BenchmarkScoreCard extends StatelessWidget {
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
-                      children: benchmark.impactReasons.map((reason) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          reason,
-                          style: const TextStyle(color: Colors.white54, fontSize: 11),
-                        ),
-                      )).toList(),
+                      children: benchmark.impactReasons
+                          .map(
+                            (reason) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: BgmsColors.textPrimary.withValues(
+                                  alpha: 0.05,
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                reason,
+                                style: const TextStyle(
+                                  color: BgmsColors.textMuted,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ],
                 ],
@@ -470,11 +536,14 @@ class _BenchmarkMetricIndicator extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        Text(
+          label,
+          style: const TextStyle(color: BgmsColors.textSecondary, fontSize: 12),
+        ),
         const SizedBox(height: 6),
         LinearProgressIndicator(
           value: score / 100,
-          backgroundColor: Colors.white10,
+          backgroundColor: BgmsColors.border,
           color: color,
           minHeight: 6,
           borderRadius: BorderRadius.circular(3),
@@ -482,7 +551,11 @@ class _BenchmarkMetricIndicator extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           '${score.toStringAsFixed(1)}점',
-          style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12),
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
         ),
       ],
     );
@@ -502,19 +575,21 @@ class _TacticalPositioningCard extends StatelessWidget {
     final bool isHighlyIsolated = isolation.isolationIndex >= 3.5;
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '교전 포지셔닝 및 고립 지수',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 16),
             Row(
@@ -523,7 +598,9 @@ class _TacticalPositioningCard extends StatelessWidget {
                   child: _MiniDataBox(
                     label: '고립 지수 (Isolation)',
                     value: isolation.isolationIndex.toStringAsFixed(2),
-                    valueColor: isHighlyIsolated ? Colors.redAccent : BgmsColors.accent,
+                    valueColor: isHighlyIsolated
+                        ? Colors.redAccent
+                        : BgmsColors.accent,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -549,7 +626,9 @@ class _TacticalPositioningCard extends StatelessWidget {
                   child: _MiniDataBox(
                     label: '교차 피격(포위) 여부',
                     value: isolation.isCrossfire ? '피격 노출' : '안전',
-                    valueColor: isolation.isCrossfire ? Colors.redAccent : Colors.greenAccent,
+                    valueColor: isolation.isCrossfire
+                        ? Colors.redAccent
+                        : Colors.greenAccent,
                   ),
                 ),
               ],
@@ -558,18 +637,26 @@ class _TacticalPositioningCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isHighlyIsolated ? Colors.redAccent.withValues(alpha: 0.05) : Colors.greenAccent.withValues(alpha: 0.05),
+                color: isHighlyIsolated
+                    ? Colors.redAccent.withValues(alpha: 0.05)
+                    : Colors.greenAccent.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isHighlyIsolated ? Colors.redAccent.withValues(alpha: 0.2) : Colors.greenAccent.withValues(alpha: 0.2),
+                  color: isHighlyIsolated
+                      ? Colors.redAccent.withValues(alpha: 0.2)
+                      : Colors.greenAccent.withValues(alpha: 0.2),
                   width: 0.5,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
-                    isHighlyIsolated ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                    color: isHighlyIsolated ? Colors.redAccent : Colors.greenAccent,
+                    isHighlyIsolated
+                        ? Icons.warning_amber_rounded
+                        : Icons.check_circle_outline,
+                    color: isHighlyIsolated
+                        ? Colors.redAccent
+                        : Colors.greenAccent,
                     size: 20,
                   ),
                   const SizedBox(width: 10),
@@ -579,7 +666,9 @@ class _TacticalPositioningCard extends StatelessWidget {
                           ? '교전 중 대열을 이탈해 혼자 고립되는 경향이 발견되었습니다. 팀원과의 거리를 유지해 백업을 확보하세요.'
                           : '팀과의 안정적인 대열 유지를 유지하며 안전하게 교전을 진행했습니다.',
                       style: TextStyle(
-                        color: isHighlyIsolated ? Colors.redAccent : Colors.white70,
+                        color: isHighlyIsolated
+                            ? Colors.redAccent
+                            : BgmsColors.textSecondary,
                         fontSize: 12,
                       ),
                     ),
@@ -608,19 +697,21 @@ class _TeamBackupCard extends StatelessWidget {
     final double backupSec = trade.tradeLatencyMs / 1000;
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '팀 백업 및 소생 기여도',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 16),
             Row(
@@ -628,10 +719,14 @@ class _TeamBackupCard extends StatelessWidget {
                 Expanded(
                   child: _MiniDataBox(
                     label: '평균 백업 시간 (초)',
-                    value: hasTradeLatency ? '${backupSec.toStringAsFixed(2)}초' : 'N/A',
+                    value: hasTradeLatency
+                        ? '${backupSec.toStringAsFixed(2)}초'
+                        : 'N/A',
                     valueColor: hasTradeLatency
-                        ? (backupSec < 10.0 ? Colors.greenAccent : Colors.amberAccent)
-                        : Colors.white30,
+                        ? (backupSec < 10.0
+                              ? Colors.greenAccent
+                              : Colors.amberAccent)
+                        : BgmsColors.textMuted,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -663,21 +758,31 @@ class _TeamBackupCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             if (hasTradeLatency) ...[
-              const Text('백업 반응 속도 평가', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const Text(
+                '백업 반응 속도 평가',
+                style: TextStyle(color: BgmsColors.textSecondary, fontSize: 12),
+              ),
               const SizedBox(height: 6),
               LinearProgressIndicator(
                 value: (20.0 - backupSec).clamp(0.0, 20.0) / 20.0,
-                backgroundColor: Colors.white10,
-                color: backupSec < 8 ? Colors.greenAccent : (backupSec < 15 ? Colors.amberAccent : Colors.redAccent),
+                backgroundColor: BgmsColors.border,
+                color: backupSec < 8
+                    ? Colors.greenAccent
+                    : (backupSec < 15 ? Colors.amberAccent : Colors.redAccent),
                 minHeight: 4,
                 borderRadius: BorderRadius.circular(2),
               ),
               const SizedBox(height: 4),
               Text(
                 backupSec < 8
-                    ? '⚡ 초광속 백업! 아군이 쓰러지자마자 적을 처리했습니다.'
-                    : (backupSec < 15 ? '안정적인 대응 속도로 아군 교전을 지원했습니다.' : '백업 템포가 약간 느립니다. 팀원이 싸우는 위치에 더 빠르게 개입하세요.'),
-                style: const TextStyle(color: Colors.white54, fontSize: 11),
+                    ? '초광속 백업. 아군이 쓰러지자마자 적을 처리했습니다.'
+                    : (backupSec < 15
+                          ? '안정적인 대응 속도로 아군 교전을 지원했습니다.'
+                          : '백업 템포가 약간 느립니다. 팀원이 싸우는 위치에 더 빠르게 개입하세요.'),
+                style: const TextStyle(
+                  color: BgmsColors.textMuted,
+                  fontSize: 11,
+                ),
               ),
             ],
           ],
@@ -703,47 +808,64 @@ class _SpecialCombatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasVehicleStats = (vehicle.leadShotKills + vehicle.leadShotKnocks + vehicle.ridingShotKills + vehicle.ridingShotKnocks + vehicle.roadKills + vehicle.roadKnocks) > 0;
+    final hasVehicleStats =
+        (vehicle.leadShotKills +
+            vehicle.leadShotKnocks +
+            vehicle.ridingShotKills +
+            vehicle.ridingShotKnocks +
+            vehicle.roadKills +
+            vehicle.roadKnocks) >
+        0;
 
     return Card(
-      color: const Color(0xFF161b26),
+      color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF232b3c)),
+        side: const BorderSide(color: BgmsColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '특수 전투 지표 및 1:1 결정력',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             if (hasVehicleStats) ...[
               const SizedBox(height: 16),
-              const Text('🚗 차량 교전 성과', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+              const _SubsectionLabel(
+                icon: Icons.directions_car_filled_outlined,
+                text: '차량 교전 성과',
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: _MiniDataBox(
                       label: '리드샷 (주행차 표적 사격)',
-                      value: '기절 ${vehicle.leadShotKnocks} / 킬 ${vehicle.leadShotKills}',
+                      value:
+                          '기절 ${vehicle.leadShotKnocks} / 킬 ${vehicle.leadShotKills}',
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _MiniDataBox(
                       label: '라이딩샷 (탑승 사격)',
-                      value: '기절 ${vehicle.ridingShotKnocks} / 킬 ${vehicle.ridingShotKills}',
+                      value:
+                          '기절 ${vehicle.ridingShotKnocks} / 킬 ${vehicle.ridingShotKills}',
                     ),
                   ),
                 ],
               ),
             ],
             const SizedBox(height: 16),
-            const Text('🔥 교전 컨트롤 및 결투 승률', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+            const _SubsectionLabel(
+              icon: Icons.local_fire_department_outlined,
+              text: '교전 컨트롤 및 결투 승률',
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -751,7 +873,11 @@ class _SpecialCombatCard extends StatelessWidget {
                   child: _MiniDataBox(
                     label: '1대1 결투 승률',
                     value: '${duel.duelWinRate.toStringAsFixed(0)}%',
-                    valueColor: duel.duelWinRate >= 60 ? Colors.greenAccent : (duel.duelWinRate >= 45 ? Colors.white : Colors.redAccent),
+                    valueColor: duel.duelWinRate >= 60
+                        ? Colors.greenAccent
+                        : (duel.duelWinRate >= 45
+                              ? BgmsColors.textPrimary
+                              : Colors.redAccent),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -770,7 +896,9 @@ class _SpecialCombatCard extends StatelessWidget {
                   child: _MiniDataBox(
                     label: '교전 위기 극복(클러치)',
                     value: pressure.isClutched ? '클러치 성공!' : '없음',
-                    valueColor: pressure.isClutched ? BgmsColors.accent : Colors.white30,
+                    valueColor: pressure.isClutched
+                        ? BgmsColors.accent
+                        : BgmsColors.textMuted,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -792,6 +920,33 @@ class _SpecialCombatCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // 공통 소형 데이터 박스 위젯
 // ---------------------------------------------------------------------------
+/// 카드 안 소제목. 아이콘과 라벨을 한 줄로 둔다.
+class _SubsectionLabel extends StatelessWidget {
+  const _SubsectionLabel({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: BgmsColors.textSecondary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: BgmsColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _MiniDataBox extends StatelessWidget {
   const _MiniDataBox({
     required this.label,
@@ -808,16 +963,19 @@ class _MiniDataBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.02),
+        color: BgmsColors.textPrimary.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04), width: 0.5),
+        border: Border.all(
+          color: BgmsColors.textPrimary.withValues(alpha: 0.04),
+          width: 0.5,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: Colors.white54),
+            style: const TextStyle(fontSize: 10, color: BgmsColors.textMuted),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -827,7 +985,7 @@ class _MiniDataBox extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: valueColor ?? Colors.white,
+              color: valueColor ?? BgmsColors.textPrimary,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -844,7 +1002,7 @@ class _LoadingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Card(
-      color: Color(0xFF161b26),
+      color: BgmsColors.surface,
       child: Padding(
         padding: EdgeInsets.all(16),
         child: LinearProgressIndicator(color: BgmsColors.accent),

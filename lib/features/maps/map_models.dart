@@ -1,16 +1,12 @@
 enum MapMarkerSource { api, fallback }
 
 class BgmsMap {
-  const BgmsMap({
-    required this.id,
-    required this.name,
-    required this.assetPath,
-    required this.tilePath,
-  });
+  const BgmsMap({required this.id, required this.name, required this.tilePath});
 
   final String id;
   final String name;
-  final String assetPath;
+
+  /// 서버 타일 피라미드 경로. `/tiles/{tilePath}/{z}/{x}/{y}.jpg`로 조합한다.
   final String tilePath;
 }
 

@@ -1,0 +1,394 @@
+{
+  "matchId": "07d78d1f-706c-4186-bcb5-7789c3bb187b",
+  "v": 72,
+  "processedAt": "2026-07-30T11:46:15.955Z",
+  "createdAt": "2026-07-21T16:48:02Z",
+  "stats": {
+    "DBNOs": 7,
+    "assists": 5,
+    "boosts": 8,
+    "damageDealt": 1161.2477,
+    "deathType": "alive",
+    "headshotKills": 3,
+    "heals": 7,
+    "killPlace": 1,
+    "killStreaks": 3,
+    "kills": 13,
+    "longestKill": 216.7032,
+    "name": "TGLTN",
+    "playerId": "20bd534a8df206d18a332d861907f5c8",
+    "revives": 0,
+    "rideDistance": 8958.97,
+    "roadKills": 0,
+    "swimDistance": 0,
+    "teamKills": 0,
+    "timeSurvived": 1219,
+    "vehicleDestroys": 1,
+    "walkDistance": 2213.6692,
+    "weaponsAcquired": 17,
+    "winPlace": 1,
+    "processedDamageDealt": 1025
+  },
+  "team": [
+    {
+      "DBNOs": 5,
+      "assists": 4,
+      "boosts": 5,
+      "damageDealt": 1095.6171,
+      "deathType": "alive",
+      "headshotKills": 8,
+      "heals": 3,
+      "killPlace": 2,
+      "killStreaks": 2,
+      "kills": 11,
+      "longestKill": 123.12778,
+      "name": "FLC_Kickstart",
+      "playerId": "ed6a7f1fcf7232f53d929b3edad08bbb",
+      "revives": 1,
+      "rideDistance": 10302.185,
+      "roadKills": 0,
+      "swimDistance": 0,
+      "teamKills": 0,
+      "timeSurvived": 1219,
+      "vehicleDestroys": 0,
+      "walkDistance": 1669.9362,
+      "weaponsAcquired": 12,
+      "winPlace": 1
+    },
+    {
+      "DBNOs": 5,
+      "assists": 13,
+      "boosts": 5,
+      "damageDealt": 802.14075,
+      "deathType": "byplayer",
+      "headshotKills": 1,
+      "heals": 2,
+      "killPlace": 3,
+      "killStreaks": 1,
+      "kills": 5,
+      "longestKill": 178.91505,
+      "name": "Shrimzy",
+      "playerId": "16f3add97ccd7ef65512c4807af007aa",
+      "revives": 0,
+      "rideDistance": 7231.057,
+      "roadKills": 0,
+      "swimDistance": 0,
+      "teamKills": 0,
+      "timeSurvived": 1214,
+      "vehicleDestroys": 0,
+      "walkDistance": 2783.1804,
+      "weaponsAcquired": 14,
+      "winPlace": 1
+    },
+    {
+      "DBNOs": 6,
+      "assists": 5,
+      "boosts": 3,
+      "damageDealt": 942.07086,
+      "deathType": "byplayer",
+      "headshotKills": 0,
+      "heals": 3,
+      "killPlace": 4,
+      "killStreaks": 2,
+      "kills": 5,
+      "longestKill": 215.2517,
+      "name": "GustavIRL",
+      "playerId": "ee89489978189fba521b25a35b4f9416",
+      "revives": 0,
+      "rideDistance": 5676.337,
+      "roadKills": 0,
+      "swimDistance": 0,
+      "teamKills": 0,
+      "timeSurvived": 1063,
+      "vehicleDestroys": 0,
+      "walkDistance": 2475.1726,
+      "weaponsAcquired": 12,
+      "winPlace": 1
+    },
+    {
+      "DBNOs": 7,
+      "assists": 5,
+      "boosts": 8,
+      "damageDealt": 1161.2477,
+      "deathType": "alive",
+      "headshotKills": 3,
+      "heals": 7,
+      "killPlace": 1,
+      "killStreaks": 3,
+      "kills": 13,
+      "longestKill": 216.7032,
+      "name": "TGLTN",
+      "playerId": "20bd534a8df206d18a332d861907f5c8",
+      "revives": 0,
+      "rideDistance": 8958.97,
+      "roadKills": 0,
+      "swimDistance": 0,
+      "teamKills": 0,
+      "timeSurvived": 1219,
+      "vehicleDestroys": 1,
+      "walkDistance": 2213.6692,
+      "weaponsAcquired": 17,
+      "winPlace": 1
+    }
+  ],
+  "deathPhase": 5,
+  "mapName": "론도",
+  "gameMode": "squad",
+  "matchType": "competitive",
+  "totalTeams": 17,
+  "totalPlayers": 63,
+  "teamImpact": {
+    "damageImpact": 137,
+    "killImpact": 228,
+    "teamDamageShare": 29,
+    "teamKillShare": 38,
+    "totalTeamDamage": 4001.0764099999997,
+    "totalTeamKills": 34
+  },
+  "badges": [
+    {
+      "id": "slayer",
+      "name": "슬레이어",
+      "desc": "한 매치에서 5킬 이상 달성"
+    }
+  ],
+  "weaponStats": {
+    "SCAR-L": {
+      "kills": 1,
+      "dbnos": 0,
+      "damage": 75.99999618530273,
+      "hits": 5,
+      "hitDetails": [
+        {
+          "bodyPart": "ArmShot",
+          "kills": 0,
+          "dBNOs": 0,
+          "hits": 4,
+          "dBNOHits": 0,
+          "damage": 75,
+          "dBNODamage": 0
+        },
+        {
+          "bodyPart": "TorsoShot",
+          "kills": 1,
+          "dBNOs": 0,
+          "hits": 1,
+          "dBNOHits": 0,
+          "damage": 0,
+          "dBNODamage": 0
+        }
+      ],
+      "shots": 11,
+      "dBNODamage": 0,
+      "dBNOHits": 0,
+      "holdingTime": 79,
+      "accuracy": 45
+    },
+    "AUG": {
+      "kills": 9,
+      "dbnos": 5,
+      "damage": 855.7038946151733,
+      "hits": 39,
+      "hitDetails": [
+        {
+          "bodyPart": "TorsoShot",
+          "kills": 1,
+          "dBNOs": 1,
+          "hits": 17,
+          "dBNOHits": 2,
+          "damage": 287,
+          "dBNODamage": 36
+        },
+        {
+          "bodyPart": "ArmShot",
+          "kills": 2,
+          "dBNOs": 1,
+          "hits": 12,
+          "dBNOHits": 2,
+          "damage": 180,
+          "dBNODamage": 19
+        },
+        {
+          "bodyPart": "HeadShot",
+          "kills": 1,
+          "dBNOs": 2,
+          "hits": 8,
+          "dBNOHits": 2,
+          "damage": 244,
+          "dBNODamage": 84
+        },
+        {
+          "bodyPart": "PelvisShot",
+          "kills": 1,
+          "dBNOs": 0,
+          "hits": 4,
+          "dBNOHits": 0,
+          "damage": 61,
+          "dBNODamage": 0
+        },
+        {
+          "bodyPart": "LegShot",
+          "kills": 0,
+          "dBNOs": 1,
+          "hits": 4,
+          "dBNOHits": 0,
+          "damage": 82,
+          "dBNODamage": 0
+        }
+      ],
+      "shots": 389,
+      "dBNODamage": 140,
+      "dBNOHits": 6,
+      "holdingTime": 987,
+      "accuracy": 10
+    },
+    "BP_FireEffectController": {
+      "kills": 0,
+      "dbnos": 0,
+      "damage": 16,
+      "hits": 4,
+      "hitDetails": [
+        {
+          "bodyPart": "NonSpecific",
+          "kills": 0,
+          "dBNOs": 0,
+          "hits": 20,
+          "dBNOHits": 16,
+          "damage": 16,
+          "dBNODamage": 64
+        }
+      ],
+      "shots": 0,
+      "dBNODamage": 64,
+      "dBNOHits": 16,
+      "holdingTime": 0,
+      "accuracy": 0
+    },
+    "BP_MolotovFireDebuff": {
+      "kills": 0,
+      "dbnos": 0,
+      "damage": 30,
+      "hits": 3,
+      "hitDetails": [
+        {
+          "bodyPart": "TorsoShot",
+          "kills": 0,
+          "dBNOs": 0,
+          "hits": 3,
+          "dBNOHits": 0,
+          "damage": 30,
+          "dBNODamage": 0
+        }
+      ]
+    },
+    "Mk12": {
+      "kills": 0,
+      "dbnos": 0,
+      "damage": 25.679174423217773,
+      "hits": 1,
+      "hitDetails": [
+        {
+          "bodyPart": "PelvisShot",
+          "kills": 0,
+          "dBNOs": 0,
+          "hits": 1,
+          "dBNOHits": 0,
+          "damage": 25,
+          "dBNODamage": 0
+        }
+      ],
+      "shots": 9,
+      "dBNODamage": 0,
+      "dBNOHits": 0,
+      "holdingTime": 380,
+      "accuracy": 11
+    },
+    "ProjGrenade": {
+      "kills": 1,
+      "dbnos": 1,
+      "damage": 22.000003814697266,
+      "hits": 1,
+      "hitDetails": [
+        {
+          "bodyPart": "TorsoShot",
+          "kills": 1,
+          "dBNOs": 1,
+          "hits": 1,
+          "dBNOHits": 1,
+          "damage": 22,
+          "dBNODamage": 0
+        }
+      ]
+    }
+  },
+  "wasZoneMovingAtDeath": false,
+  "initiative_rate": 76.47058823529412,
+  "initiativeSampleCount": 17,
+  "deathDistance": 0,
+  "edgePlay": 8,
+  "bluezoneWaste": 10.005500078201294,
+  "avgCircleLuck": 78,
+  "avgVehicleMastery": 100,
+  "weaponMatchCount": [],
+  "leadShotKills": 0,
+  "leadShotKnocks": 0,
+  "ridingShotKills": 0,
+  "ridingShotKnocks": 0,
+  "roadKills": 0,
+  "roadKnocks": 1,
+  "benchmark": {
+    "avg_damage": 200,
+    "breakdown": {
+      "combat": 30,
+      "tactical": 14.3,
+      "survival": 23.8
+    },
+    "avgDamage": 847,
+    "avgKills": 5.7,
+    "avgSurvivalTime": 1530,
+    "avgDuelWinRate": 93,
+    "avgInitiativeRate": 68,
+    "avgTradeRate": 32,
+    "avgReviveRate": 21,
+    "avgSmokeRate": 11,
+    "avgPressureIndex": 6.6,
+    "avgTeamWipes": 7.94,
+    "avgReversalRate": 39,
+    "avgIsolationIndex": 1.66,
+    "avgMinDist": 92,
+    "avgCounterLatency": 0.5,
+    "avgTradeLatency": 11.52,
+    "avgSoloKillRate": 50,
+    "avgDeathPhase": 7.2,
+    "tier": "A",
+    "score": 68.1,
+    "impactScore": 114.1,
+    "impactGrade": "HARD_CARRY",
+    "impactBonus": 46,
+    "impactReasons": [
+      "10킬 이상 화력 캐리",
+      "1000딜 이상 압도적 화력",
+      "딜량 상위 3%",
+      "적 팀 전멸 다수 결정 기여",
+      "트레이드 성공",
+      "승리 기여 근거 4개 이상"
+    ],
+    "contributionTypes": [
+      "FIREPOWER",
+      "FINISHER",
+      "SUPPORT",
+      "SURVIVAL_CONTROL"
+    ]
+  },
+  "isValidBenchmark": true,
+  "player_id": "tgltn",
+  "platform": "steam",
+  "matchInfo": {
+    "mapId": "erangel",
+    "date": "2026-07-21T16:48:02Z",
+    "mode": "squad",
+    "duration": 1219,
+    "rankPct": 0.015873015873015872,
+    "tier": "S"
+  }
+}

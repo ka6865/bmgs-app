@@ -1,6 +1,5 @@
-import 'package:dio/dio.dart';
-
 import '../../core/config/app_config.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/network/bgms_api_client.dart';
 import 'match_detail_models.dart';
 import 'player_stats_models.dart';
@@ -30,27 +29,15 @@ class MatchDetailRepository {
         );
       }
       return MatchDetail.fromJson(summary.matchId, json);
-    } on DioException catch (error) {
-      return MatchDetail.fromSummary(
-        summary,
-        nickname: nickname,
-        message: _dioMessage(error),
-      );
     } catch (error) {
+      final apiError = ApiException.from(error);
       return MatchDetail.fromSummary(
         summary,
         nickname: nickname,
-        message: error.toString(),
+        message: apiError.kind == ApiErrorKind.rateLimited
+            ? 'PUBG API 호출 한도가 일시적으로 초과되었습니다.'
+            : apiError.message,
       );
     }
-  }
-
-  String _dioMessage(DioException error) {
-    final data = error.response?.data;
-    if (data is Map && data['error'] != null) return data['error'].toString();
-    if (error.response?.statusCode == 429) {
-      return 'PUBG API 호출 한도가 일시적으로 초과되었습니다.';
-    }
-    return error.message ?? '매치 상세를 불러오지 못했습니다.';
   }
 }

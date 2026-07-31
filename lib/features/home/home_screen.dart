@@ -2,11 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/network/api_exception.dart';
+import '../../core/observability/app_logger.dart';
+import '../../core/player/player_search_flow.dart';
+import '../../core/player/player_suggestion_controller.dart';
 import '../../core/storage/local_player_store.dart';
+import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../../core/widgets/player_search_bar.dart';
+import '../../navigation/shell_scaffold.dart';
+import '../notifications/notification_bell.dart';
+import 'widgets/home_dashboard_sections.dart';
+import 'widgets/player_suggestion_list.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.preferencesLoader, this.suggestionFetcher});
+
+  final Future<SharedPreferences> Function()? preferencesLoader;
+
+  /// 닉네임 자동완성 조회. 지정하지 않으면 자동완성을 비활성한다.
+  ///
+  /// 위젯 테스트가 네트워크를 타지 않도록 주입 지점을 남긴다.
+  final PlayerSuggestionFetcher? suggestionFetcher;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -15,29 +32,80 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _nicknameController = TextEditingController();
   String _platform = 'steam';
+  late final Future<void> _storeReady;
   LocalPlayerStore? _store;
   List<StoredPlayer> _recentPlayers = const [];
   List<StoredPlayer> _favoritePlayers = const [];
   bool _loadingStore = true;
   bool _searching = false;
   String? _nicknameError;
+  bool? _wasActive;
+  PlayerSuggestionController? _suggestionController;
 
   @override
   void initState() {
     super.initState();
-    _loadStore();
+    _storeReady = _loadStore();
+
+    final fetcher = widget.suggestionFetcher;
+    if (fetcher != null) {
+      _suggestionController =
+          PlayerSuggestionController(
+              fetch: (query) => _fetchMergedSuggestions(fetcher, query),
+              onError: (error, stackTrace) {
+                AppObservability.logger.warning(
+                  '닉네임 자동완성 조회에 실패했습니다.',
+                  error: error,
+                  stackTrace: stackTrace,
+                  context: {
+                    'feature': 'home',
+                    'operation': 'fetch_suggestions',
+                  },
+                );
+              },
+            )
+            ..onChanged = () {
+              if (mounted) setState(() {});
+            };
+    }
   }
 
   @override
   void dispose() {
+    _suggestionController?.dispose();
     _nicknameController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isActive = ShellTabScope.maybeOf(context)?.currentIndex == 0;
+    if (isActive && _wasActive == false) {
+      _refreshPlayers();
+    }
+    _wasActive = isActive;
+  }
+
   Future<void> _loadStore() async {
-    final prefs = await SharedPreferences.getInstance();
-    _store = LocalPlayerStore(prefs);
-    await _refreshPlayers();
+    try {
+      final prefs =
+          await (widget.preferencesLoader?.call() ??
+              SharedPreferences.getInstance());
+      _store = LocalPlayerStore(prefs);
+      await _refreshPlayers();
+    } catch (error, stackTrace) {
+      AppObservability.logger.warning(
+        '홈 플레이어 저장소를 불러오지 못했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'home', 'operation': 'load_player_store'},
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingStore = false);
+      }
+    }
   }
 
   Future<void> _refreshPlayers() async {
@@ -49,244 +117,214 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _recentPlayers = recent;
       _favoritePlayers = favorites;
-      _loadingStore = false;
     });
+  }
+
+  /// 서버 후보와 로컬 기록을 합친다.
+  ///
+  /// 서버 `/api/pubg/suggest`는 색인된 닉네임만 돌려주므로 결과가 비는 경우가
+  /// 잦다. 최근 검색과 즐겨찾기에서 일치하는 항목을 앞에 붙여 목록이
+  /// 아예 뜨지 않는 상황을 줄인다.
+  Future<List<PlayerSuggestion>> _fetchMergedSuggestions(
+    PlayerSuggestionFetcher fetcher,
+    String query,
+  ) async {
+    final local = _localSuggestions(query);
+    try {
+      final remote = await fetcher(query);
+      final seen = <String>{};
+      final merged = <PlayerSuggestion>[];
+      for (final suggestion in [...local, ...remote]) {
+        final key =
+            '${suggestion.platform}:${suggestion.nickname.toLowerCase()}';
+        if (seen.add(key)) merged.add(suggestion);
+      }
+      return merged;
+    } catch (error) {
+      // 서버 조회가 실패해도 로컬 기록만으로 후보를 제공한다.
+      if (local.isEmpty) rethrow;
+      return local;
+    }
+  }
+
+  /// 최근 검색과 즐겨찾기에서 질의로 시작하거나 포함하는 항목을 찾는다.
+  List<PlayerSuggestion> _localSuggestions(String query) {
+    final lower = query.trim().toLowerCase();
+    if (lower.isEmpty) return const [];
+
+    final seen = <String>{};
+    final matched = <PlayerSuggestion>[];
+    for (final player in [..._favoritePlayers, ..._recentPlayers]) {
+      if (!player.nickname.toLowerCase().contains(lower)) continue;
+      if (!seen.add(player.id)) continue;
+      matched.add(
+        PlayerSuggestion(nickname: player.nickname, platform: player.platform),
+      );
+    }
+    return matched;
+  }
+
+  /// 입력 변화를 받아 검증 문구를 지우고 자동완성을 갱신한다.
+  void _onNicknameChanged() {
+    _suggestionController?.onQueryChanged(_nicknameController.text);
+    if (_nicknameError == null) return;
+    setState(() => _nicknameError = null);
   }
 
   Future<void> _search({String? nickname, String? platform}) async {
     if (_searching) return;
 
-    final resolvedNickname = (nickname ?? _nicknameController.text).trim();
-    final resolvedPlatform = platform ?? _platform;
-    if (resolvedNickname.isEmpty) {
+    // 검색을 실행하면 후보 목록을 닫는다.
+    _suggestionController?.clear();
+
+    final cleanNickname = (nickname ?? _nicknameController.text).trim();
+    final selectedPlatform = normalizePlayerPlatform(platform ?? _platform);
+    if (cleanNickname.isEmpty) {
+      if (!mounted) return;
       setState(() {
         _nicknameError = '닉네임을 입력해 주세요.';
       });
       return;
     }
+    final requestUri = GoRouter.of(context).routeInformationProvider.value.uri;
 
     setState(() {
       _searching = true;
       _nicknameError = null;
     });
 
-    await _store?.addRecentSearch(resolvedNickname, platform: resolvedPlatform);
-    await _refreshPlayers();
-    if (!mounted) return;
+    try {
+      await _storeReady;
+      final destination = await preparePlayerSearch(
+        store: _store,
+        nickname: cleanNickname,
+        platform: selectedPlatform,
+      );
+      if (!mounted) return;
+      if (destination == null) return;
 
-    setState(() {
-      _searching = false;
-    });
+      try {
+        await _refreshPlayers();
+      } catch (error, stackTrace) {
+        AppObservability.logger.warning(
+          '홈 최근 플레이어 목록을 새로고침하지 못했습니다.',
+          error: error,
+          stackTrace: stackTrace,
+          context: {'feature': 'home', 'operation': 'refresh_player_list'},
+        );
+      }
+      if (!mounted) return;
+      if (!isPlayerSearchNavigationCurrent(
+        requestUri: requestUri,
+        currentUri: GoRouter.of(context).routeInformationProvider.value.uri,
+      )) {
+        return;
+      }
 
-    context.go(
-      Uri(
-        path: '/stats',
-        queryParameters: {
-          'nickname': resolvedNickname,
-          'platform': resolvedPlatform,
-        },
-      ).toString(),
-    );
+      context.go(destination.location);
+    } catch (error, stackTrace) {
+      AppObservability.logger.error(
+        '홈 플레이어 검색 중 오류가 발생했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'home', 'operation': 'search_player'},
+      );
+      if (!mounted) return;
+      setState(() => _nicknameError = '검색 중 오류가 발생했습니다.');
+    } finally {
+      if (mounted) {
+        setState(() => _searching = false);
+      }
+    }
   }
 
   Future<void> _toggleFavorite(StoredPlayer player) async {
-    await _store?.toggleFavorite(player.nickname, platform: player.platform);
-    await _refreshPlayers();
-  }
+    try {
+      await _storeReady;
+      final store = _store;
+      if (store == null) return;
 
-  Future<void> _clearRecentSearches() async {
-    await _store?.clearRecentSearches();
-    await _refreshPlayers();
+      await store.toggleFavorite(player.nickname, platform: player.platform);
+      await _refreshPlayers();
+    } catch (error, stackTrace) {
+      AppObservability.logger.warning(
+        '홈 즐겨찾기를 변경하지 못했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'home', 'operation': 'toggle_favorite'},
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const BgmsBrandHeader(
-          title: 'BGMS',
-          subtitle: 'PUBG 전적과 최근 매치를 빠르게 확인하세요.',
-        ),
-        const SizedBox(height: 24),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _nicknameController,
-                  textInputAction: TextInputAction.search,
-                  enabled: !_searching,
-                  onChanged: (_) {
-                    if (_nicknameError == null) return;
-                    setState(() => _nicknameError = null);
-                  },
-                  onSubmitted: (_) => _search(),
-                  decoration: InputDecoration(
-                    labelText: '닉네임 검색',
-                    hintText: 'KangHeeSung_',
-                    errorText: _nicknameError,
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: IconButton(
-                      onPressed: _searching ? null : _search,
-                      icon: _searching
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.arrow_forward),
-                      tooltip: '검색',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'steam', label: Text('Steam')),
-                      ButtonSegment(value: 'kakao', label: Text('Kakao')),
-                    ],
-                    selected: {_platform},
-                    onSelectionChanged: (selection) {
-                      setState(() => _platform = selection.first);
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _searching ? null : _search,
-                    icon: _searching
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.search),
-                    label: Text(_searching ? '검색 중...' : '전적 검색'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        _PlayerSection(
-          title: '최근 검색',
-          icon: Icons.history,
-          players: _recentPlayers,
-          favorites: _favoritePlayers,
-          loading: _loadingStore,
-          emptyText: '검색한 닉네임이 여기에 저장됩니다.',
-          trailing: _recentPlayers.isEmpty
-              ? null
-              : TextButton.icon(
-                  onPressed: _clearRecentSearches,
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  label: const Text('삭제'),
-                ),
-          onTap: (player) =>
-              _search(nickname: player.nickname, platform: player.platform),
-          onFavoriteTap: _toggleFavorite,
-        ),
-        const SizedBox(height: 12),
-        _PlayerSection(
-          title: '즐겨찾기',
-          icon: Icons.star_outline,
-          players: _favoritePlayers,
-          favorites: _favoritePlayers,
-          loading: _loadingStore,
-          emptyText: '자주 보는 플레이어를 별표로 추가하세요.',
-          onTap: (player) =>
-              _search(nickname: player.nickname, platform: player.platform),
-          onFavoriteTap: _toggleFavorite,
-        ),
-      ],
-    );
-  }
-}
+    final latestPlayer = _recentPlayers.isEmpty ? null : _recentPlayers.first;
+    final remainingRecent = _recentPlayers.skip(1).toList();
 
-class _PlayerSection extends StatelessWidget {
-  const _PlayerSection({
-    required this.title,
-    required this.icon,
-    required this.players,
-    required this.favorites,
-    required this.loading,
-    required this.emptyText,
-    required this.onTap,
-    required this.onFavoriteTap,
-    this.trailing,
-  });
-
-  final String title;
-  final IconData icon;
-  final List<StoredPlayer> players;
-  final List<StoredPlayer> favorites;
-  final bool loading;
-  final String emptyText;
-  final Widget? trailing;
-  final ValueChanged<StoredPlayer> onTap;
-  final ValueChanged<StoredPlayer> onFavoriteTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    // 셸이 Scaffold를 제공하지만, 홈을 단독으로 띄우는 경우에도
+    // TextField와 InkWell이 요구하는 Material 기반을 보장한다.
+    return Material(
+      color: BgmsColors.bgBase,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Icon(icon, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                ?trailing,
-              ],
+            const BgmsBrandHeader(title: 'BGMS', trailing: NotificationBell()),
+            const SizedBox(height: 14),
+            PlayerSearchBar(
+              controller: _nicknameController,
+              platform: _platform,
+              searching: _searching,
+              errorText: _nicknameError,
+              onPlatformChanged: (platform) {
+                setState(() => _platform = platform);
+              },
+              onSearch: _search,
+              onTextChanged: _onNicknameChanged,
             ),
-            const SizedBox(height: 12),
-            if (loading)
-              const LinearProgressIndicator()
-            else if (players.isEmpty)
-              Text(emptyText)
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: players.map((player) {
-                  final favorite = favorites.any(
-                    (item) => item.id == player.id,
-                  );
-                  return InputChip(
-                    avatar: Icon(
-                      favorite ? Icons.star : Icons.star_border,
-                      size: 18,
-                    ),
-                    label: Text('${player.nickname} · ${player.platform}'),
-                    onPressed: () => onTap(player),
-                    onDeleted: () => onFavoriteTap(player),
-                    deleteIcon: Icon(
-                      favorite ? Icons.star : Icons.star_border,
-                      size: 18,
-                    ),
-                    deleteButtonTooltipMessage: favorite
-                        ? '즐겨찾기 해제'
-                        : '즐겨찾기 추가',
-                  );
-                }).toList(),
+            if (_suggestionController != null)
+              PlayerSuggestionList(
+                suggestions: _suggestionController!.suggestions,
+                onSelected: (suggestion) => _search(
+                  nickname: suggestion.nickname,
+                  platform: suggestion.platform,
+                ),
               ),
+            if (latestPlayer != null) ...[
+              const SizedBox(height: 16),
+              ContinuePlayerCard(
+                player: latestPlayer,
+                isFavorite: _favoritePlayers.any(
+                  (player) => player.id == latestPlayer.id,
+                ),
+                onTap: () => _search(
+                  nickname: latestPlayer.nickname,
+                  platform: latestPlayer.platform,
+                ),
+                onFavoriteTap: () => _toggleFavorite(latestPlayer),
+              ),
+            ],
+            const SizedBox(height: 20),
+            FavoritePlayersSection(
+              players: _favoritePlayers,
+              loading: _loadingStore,
+              onTap: (player) =>
+                  _search(nickname: player.nickname, platform: player.platform),
+            ),
+            const SizedBox(height: 20),
+            CrateSimBanner(onTap: () => context.push('/crates')),
+            if (_loadingStore || remainingRecent.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              RecentActivitySection(
+                players: remainingRecent,
+                loading: _loadingStore,
+                onTap: (player) => _search(
+                  nickname: player.nickname,
+                  platform: player.platform,
+                ),
+              ),
+            ],
           ],
         ),
       ),

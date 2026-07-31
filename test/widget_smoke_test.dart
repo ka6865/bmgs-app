@@ -713,7 +713,7 @@ class FakeMapsRepository extends Fake implements MapsRepository {
   }
 
   @override
-  Future<Map<String, List<String>>> fetchMapSettingsFromSupabase() async {
+  Future<Map<String, List<String>>> fetchMapCategorySettings() async {
     return {};
   }
 

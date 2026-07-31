@@ -11,13 +11,20 @@ class MapsRepository {
 
   final BgmsApiClient _client;
 
-  /// 맵별로 노출할 마커 카테고리. 웹 `lib/map_config.ts`의 MAP_CATEGORIES와 같다.
+  /// 맵별로 노출할 마커 카테고리의 오프라인 폴백값.
   ///
-  /// 서버 `/api/admin/settings`는 공지 설정만 주고 맵 카테고리를 내려주지 않아,
-  /// 이 값이 없으면 API가 준 모든 레이어가 그대로 노출된다.
-  /// 웹과 동일한 화면을 유지하려고 기본값을 앱에 둔다.
+  /// 정본은 서버 `/api/maps/settings`이고 [fetchMapCategorySettings]가 우선 사용한다.
+  /// 이 값은 서버 조회가 실패했을 때만 쓰이며, 없으면 마커 API가 준
+  /// 모든 레이어가 그대로 노출되어 웹과 화면이 달라진다.
   static const defaultMapCategories = <String, List<String>>{
-    'Erangel': ['Garage', 'Esports', 'EsportsBoat', 'Glider', 'SecretRoom'],
+    'Erangel': [
+      'Garage',
+      'Esports',
+      'EsportsBoat',
+      'Glider',
+      'SecretRoom',
+      'GasPump',
+    ],
     'Miramar': [
       'GoldenMirado',
       'EsportsMirado',
@@ -26,7 +33,15 @@ class MapsRepository {
       'Glider',
       'SecretRoom',
     ],
-    'Taego': ['Garage', 'Porter', 'Boat', 'SecretRoom'],
+    'Taego': [
+      'Garage',
+      'Porter',
+      'Boat',
+      'SecretRoom',
+      'Esports',
+      'Glider',
+      'GasPump',
+    ],
     'Deston': ['Garage', 'PoliceCar', 'Boat', 'Glider'],
     'Vikendi': [
       'Garage',
@@ -36,7 +51,7 @@ class MapsRepository {
       'SecretRoom',
       'BearCave',
     ],
-    'Rondo': ['Garage', 'Esports', 'Boat', 'Glider', 'SecretRoom', 'GasPump'],
+    'Rondo': ['Garage', 'Esports', 'Glider', 'GasPump', 'SecretRoom'],
   };
 
   List<BgmsMap> get availableMaps => const [
@@ -95,7 +110,18 @@ class MapsRepository {
     }
   }
 
-  Future<Map<String, List<String>>> fetchMapSettingsFromSupabase() async {
+  /// 맵별 마커 카테고리를 가져온다.
+  ///
+  /// 서버 `/api/maps/settings`가 웹과 동일한 정본을 내려주므로 이를 우선 쓴다.
+  /// 실패하면 Supabase 테이블을 시도하고, 그것도 없으면 내장 기본값을 쓴다.
+  Future<Map<String, List<String>>> fetchMapCategorySettings() async {
+    try {
+      final categories = await _client.fetchMapCategories();
+      if (categories.isNotEmpty) return categories;
+    } catch (_) {
+      // 서버 조회 실패는 아래 경로로 넘긴다.
+    }
+
     try {
       final response = await Supabase.instance.client
           .from('map_settings')

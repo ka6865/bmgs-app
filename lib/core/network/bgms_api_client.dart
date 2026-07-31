@@ -108,6 +108,10 @@ class BgmsApiClient {
     return Uri.parse('$_baseUrl/api/admin/settings');
   }
 
+  Uri buildMapSettingsUri() {
+    return Uri.parse('$_baseUrl/api/maps/settings');
+  }
+
   Uri buildBoardPostsUri({
     int limit = 20,
     String? cursor,
@@ -192,7 +196,11 @@ class BgmsApiClient {
     try {
       final response = await _dio.postUri<String>(
         buildAiSummaryUri(),
-        data: {'matchIds': matchIds, 'nickname': nickname, 'platform': platform},
+        data: {
+          'matchIds': matchIds,
+          'nickname': nickname,
+          'platform': platform,
+        },
         options: Options(
           responseType: ResponseType.plain,
           headers: headers,
@@ -234,6 +242,24 @@ class BgmsApiClient {
       return Map<String, dynamic>.from(data['settings'] as Map? ?? {});
     }
     return {};
+  }
+
+  /// 맵별 마커 카테고리 설정. 서버가 웹과 동일한 정본을 내려준다.
+  Future<Map<String, List<String>>> fetchMapCategories() async {
+    final data = await _getJson(buildMapSettingsUri());
+    final raw = data['mapCategories'];
+    if (raw is! Map) return const {};
+
+    final result = <String, List<String>>{};
+    raw.forEach((key, value) {
+      if (value is! List) return;
+      final layers = value
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+      if (layers.isNotEmpty) result[key.toString()] = layers;
+    });
+    return result;
   }
 
   Future<Map<String, dynamic>> fetchBoardPosts({
@@ -285,9 +311,7 @@ class BgmsApiClient {
   /// 로그인 사용자의 계정과 서버 데이터를 삭제한다.
   ///
   /// 서버는 웹 쿠키 세션과 모바일 Bearer 토큰을 모두 허용한다.
-  Future<Map<String, dynamic>> deleteAccount({
-    required String accessToken,
-  }) {
+  Future<Map<String, dynamic>> deleteAccount({required String accessToken}) {
     return _postJson(buildDeleteAccountUri(), accessToken: accessToken);
   }
 

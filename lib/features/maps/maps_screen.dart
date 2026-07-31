@@ -35,7 +35,7 @@ class _MapsScreenState extends State<MapsScreen> {
   }
 
   Future<MapMarkerLayer> _loadMarkers() {
-    _repository.fetchMapSettingsFromSupabase().then((settings) {
+    _repository.fetchMapCategorySettings().then((settings) {
       if (mounted) {
         setState(() {
           _adminSettings = settings;

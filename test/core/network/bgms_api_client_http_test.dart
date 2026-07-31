@@ -77,13 +77,14 @@ void main() {
   test('AI 요약은 authTokenProvider의 토큰으로 호출한다', () async {
     adapter.stub('/api/pubg/ai-summary', '{"advice":"근거리 교전을 줄이세요"}');
 
-    final summary = await buildClient(
-      authTokenProvider: () async => 'token-abc',
-    ).fetchAiSummary(
-      matchIds: const ['m1'],
-      nickname: 'tester',
-      platform: 'steam',
-    );
+    final summary =
+        await buildClient(
+          authTokenProvider: () async => 'token-abc',
+        ).fetchAiSummary(
+          matchIds: const ['m1'],
+          nickname: 'tester',
+          platform: 'steam',
+        );
 
     expect(summary, contains('근거리 교전'));
     expect(adapter.requestedPaths.single, contains('/api/pubg/ai-summary'));
@@ -128,5 +129,31 @@ void main() {
     expect(suggestions.map((s) => s.nickname), ['alpha', 'beta', 'gamma']);
     // platform이 없거나 문자열 항목이면 steam으로 채운다.
     expect(suggestions.map((s) => s.platform), ['kakao', 'steam', 'steam']);
+  });
+
+  test('맵 카테고리 설정을 파싱한다', () async {
+    adapter.stub('/api/maps/settings', {
+      'mapCategories': {
+        'Erangel': ['Garage', 'Esports', 'SecretRoom'],
+        'Taego': ['Garage', ' Porter ', ''],
+        'Broken': 'not-a-list',
+        'Empty': <String>[],
+      },
+    });
+
+    final categories = await buildClient().fetchMapCategories();
+
+    expect(categories['Erangel'], ['Garage', 'Esports', 'SecretRoom']);
+    // 공백은 정리하고 빈 항목은 제외한다.
+    expect(categories['Taego'], ['Garage', 'Porter']);
+    // 배열이 아니거나 비어 있으면 키를 만들지 않는다.
+    expect(categories.containsKey('Broken'), isFalse);
+    expect(categories.containsKey('Empty'), isFalse);
+  });
+
+  test('mapCategories가 없으면 빈 맵을 준다', () async {
+    adapter.stub('/api/maps/settings', {'success': true});
+
+    expect(await buildClient().fetchMapCategories(), isEmpty);
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bgms_mobile_app/features/stats/stats_detail_screen.dart';
+import 'package:bgms_mobile_app/features/stats/widgets/match_card.dart';
 import 'package:bgms_mobile_app/features/stats/match_detail_screen.dart';
 import 'package:bgms_mobile_app/features/stats/match_detail_models.dart';
 import 'package:bgms_mobile_app/features/stats/match_detail_repository.dart';
@@ -294,12 +295,7 @@ void main() {
     // 리본 문구 대신 순위와 트로피 아이콘으로 1등을 표시한다.
     expect(find.text('#1'), findsOneWidget);
     final winnerCard = find
-        .ancestor(
-          of: find.text('#1'),
-          matching: find.byWidgetPredicate(
-            (w) => w.runtimeType.toString() == '_MatchCard',
-          ),
-        )
+        .ancestor(of: find.text('#1'), matching: find.byType(MatchCard))
         .first;
     expect(
       find.descendant(
@@ -483,9 +479,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    final matchCards = find.byWidgetPredicate(
-      (w) => w.runtimeType.toString() == '_MatchCard',
-    );
+    final matchCards = find.byType(MatchCard);
     expect(matchCards, findsNWidgets(3));
 
     // 맵별 그라디언트는 제거했고, 서버가 준 맵 이름을 그대로 표시한다.

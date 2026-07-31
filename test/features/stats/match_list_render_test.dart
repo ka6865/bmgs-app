@@ -1,6 +1,7 @@
 import 'package:bgms_mobile_app/features/stats/player_stats_models.dart';
 import 'package:bgms_mobile_app/features/stats/player_stats_repository.dart';
 import 'package:bgms_mobile_app/features/stats/stats_detail_screen.dart';
+import 'package:bgms_mobile_app/features/stats/widgets/match_card.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,9 +107,7 @@ void main() {
     expect(find.widgetWithText(ChoiceChip, '전체'), findsNothing);
 
     // 매치 카드가 실제로 트리에 존재해야 한다.
-    final cards = find.byWidgetPredicate(
-      (w) => w.runtimeType.toString() == '_MatchCard',
-    );
+    final cards = find.byType(MatchCard);
     expect(cards, findsNWidgets(4));
   });
 
@@ -123,14 +122,41 @@ void main() {
 
     expect(find.text('5경기'), findsOneWidget);
 
-    final cards = find.byWidgetPredicate(
-      (w) => w.runtimeType.toString() == '_MatchCard',
-    );
+    final cards = find.byType(MatchCard);
     expect(cards, findsNWidgets(5));
 
     // 상단 지표용 모드 칩(솔로/듀오/스쿼드) 3개만 있고,
     // 매치 리스트를 좁히는 '전체' 칩은 없다.
     expect(find.byType(ChoiceChip), findsNWidgets(3));
     expect(find.widgetWithText(ChoiceChip, '전체'), findsNothing);
+  });
+
+  testWidgets('전체 보기 버튼으로 전체 매치 화면을 연다', (tester) async {
+    await pump(
+      tester,
+      _SingleModeRepository(
+        modes: const ['squad', 'duo-fpp', 'solo', 'squad-fpp', 'duo', 'solo'],
+      ),
+    );
+
+    // 미리보기는 5건까지만 노출하고 나머지는 전체 보기로 넘긴다.
+    expect(find.byType(MatchCard), findsNWidgets(5));
+
+    final button = find.textContaining('전체 보기');
+    expect(button, findsOneWidget);
+    // 버튼이 화면 아래에 있어 스크롤로 노출한 뒤 누른다.
+    await tester.scrollUntilVisible(
+      button,
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+
+    // 전체 매치 화면으로 이동해 6건과 모드 필터가 보인다.
+    expect(find.text('전체 매치'), findsOneWidget);
+    expect(find.byType(MatchCard), findsNWidgets(6));
+    expect(find.widgetWithText(ChoiceChip, '전체'), findsOneWidget);
   });
 }

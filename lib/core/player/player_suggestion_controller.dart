@@ -21,12 +21,18 @@ class PlayerSuggestionController {
     this.minQueryLength = 2,
     this.maxResults = 8,
     this.onError,
+    this.retryCount = 1,
+    this.retryDelay = const Duration(milliseconds: 400),
   });
 
   final PlayerSuggestionFetcher _fetch;
 
   /// 조회 실패 처리. 자동완성은 보조 기능이므로 화면을 막지 않는다.
   final PlayerSuggestionErrorHandler? onError;
+
+  /// 일시적 서버 오류에 대한 추가 시도 횟수.
+  final int retryCount;
+  final Duration retryDelay;
 
   /// 입력이 멈춘 뒤 요청까지 기다리는 시간.
   final Duration debounce;
@@ -73,16 +79,38 @@ class PlayerSuggestionController {
 
   Future<void> _run(String query) async {
     _update(_suggestions, loading: true);
-    try {
-      final result = await _fetch(query);
-      // 사용자가 그 사이 다른 질의로 넘어갔으면 버린다.
-      if (_disposed || query != _lastQuery) return;
-      _update(result.take(maxResults).toList(growable: false), loading: false);
-    } catch (error, stackTrace) {
-      if (_disposed || query != _lastQuery) return;
-      onError?.call(error, stackTrace);
-      _update(const [], loading: false);
+    // 서버가 일시적으로 5xx를 낼 수 있어 재시도 여유를 한 번 둔다.
+    for (var attempt = 0; attempt <= retryCount; attempt++) {
+      try {
+        final result = await _fetch(query);
+        // 사용자가 그 사이 다른 질의로 넘어갔으면 버린다.
+        if (_disposed || query != _lastQuery) return;
+        _update(
+          result.take(maxResults).toList(growable: false),
+          loading: false,
+        );
+        return;
+      } catch (error, stackTrace) {
+        if (_disposed || query != _lastQuery) return;
+        if (attempt < retryCount && _isRetryable(error)) {
+          await Future<void>.delayed(retryDelay);
+          if (_disposed || query != _lastQuery) return;
+          continue;
+        }
+        onError?.call(error, stackTrace);
+        _update(const [], loading: false);
+        return;
+      }
     }
+  }
+
+  /// 재시도할 가치가 있는 오류인지 판단한다.
+  ///
+  /// 네트워크, 타임아웃, 서버 오류만 다시 시도한다.
+  /// 404나 잘못된 요청은 재시도해도 결과가 같다.
+  static bool _isRetryable(Object error) {
+    if (error is ApiException) return error.isRetryable;
+    return false;
   }
 
   void _update(List<PlayerSuggestion> next, {required bool loading}) {

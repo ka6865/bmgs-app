@@ -103,7 +103,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'kang');
-    await tester.pump(const Duration(milliseconds: 400));
+    // 디바운스 300ms + 재시도 지연 400ms를 함께 넘긴다.
+    await tester.pump(const Duration(milliseconds: 900));
     await tester.pumpAndSettle();
 
     // 자동완성은 보조 기능이므로 에러 화면으로 전환되지 않는다.
@@ -154,7 +155,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'kang');
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 900));
     await tester.pumpAndSettle();
 
     expect(find.text('kangFavorite'), findsWidgets);

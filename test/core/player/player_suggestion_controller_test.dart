@@ -74,6 +74,8 @@ void main() {
         message: '네트워크 오류',
       ),
       debounce: Duration.zero,
+      // 재시도 지연을 없애 결과를 즉시 확인한다.
+      retryDelay: Duration.zero,
     );
     addTearDown(controller.dispose);
 
@@ -116,6 +118,52 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 80));
 
     expect(callCount, 0);
+    expect(controller.suggestions, isEmpty);
+  });
+
+  test('일시적 서버 오류는 한 번 재시도한다', () async {
+    var attempts = 0;
+    final controller = PlayerSuggestionController(
+      fetch: (query) async {
+        attempts++;
+        // 첫 시도만 5xx로 실패시킨다.
+        if (attempts == 1) {
+          throw const ApiException(kind: ApiErrorKind.server, message: '서버 오류');
+        }
+        return [_suggestion('recovered')];
+      },
+      debounce: Duration.zero,
+      retryDelay: Duration.zero,
+    );
+    addTearDown(controller.dispose);
+
+    controller.onQueryChanged('kang');
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+
+    expect(attempts, 2);
+    expect(controller.suggestions.single.nickname, 'recovered');
+  });
+
+  test('재시도해도 결과가 같은 오류는 즉시 포기한다', () async {
+    var attempts = 0;
+    final controller = PlayerSuggestionController(
+      fetch: (query) async {
+        attempts++;
+        throw const ApiException(
+          kind: ApiErrorKind.notFound,
+          message: '찾을 수 없음',
+        );
+      },
+      debounce: Duration.zero,
+      retryDelay: Duration.zero,
+    );
+    addTearDown(controller.dispose);
+
+    controller.onQueryChanged('kang');
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+
+    // notFound는 재시도 대상이 아니다.
+    expect(attempts, 1);
     expect(controller.suggestions, isEmpty);
   });
 }

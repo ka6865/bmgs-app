@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../core/theme/bgms_theme.dart';
 import 'map_models.dart';
 import 'maps_screen.dart'; // 기존 타일모자이크 및 마커 사용을 위해
 import 'map_view_helpers.dart'; // Matrix4ScaleExtension 사용을 위해
@@ -57,10 +59,10 @@ class _MapFullscreenViewState extends State<MapFullscreenView> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white, size: 28),
+          icon: const Icon(Icons.close, color: BgmsColors.textPrimary, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('${widget.map.name} 정밀 지도', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text('${widget.map.name} 정밀 지도', style: const TextStyle(fontWeight: FontWeight.bold, color: BgmsColors.textPrimary)),
       ),
       body: Center(
         child: InteractiveViewer(

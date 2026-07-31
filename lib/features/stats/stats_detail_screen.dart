@@ -436,7 +436,7 @@ class _PlayerShortcutPanel extends StatelessWidget {
             if (loading)
               const LinearProgressIndicator()
             else if (players.isEmpty)
-              Text(emptyText, style: const TextStyle(color: Colors.white60))
+              Text(emptyText, style: const TextStyle(color: BgmsColors.textSecondary))
             else
               Wrap(
                 spacing: 8,
@@ -531,7 +531,7 @@ class _StatsContentState extends State<_StatsContent> {
                   const Text(
                     '성향 분석',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: BgmsColors.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -625,7 +625,7 @@ class _StatsContentState extends State<_StatsContent> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.black : Colors.white70,
+            color: isSelected ? Colors.black : BgmsColors.textSecondary,
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
@@ -660,7 +660,7 @@ class _StatsContentState extends State<_StatsContent> {
               selectedColor: BgmsColors.accent,
               backgroundColor: BgmsColors.surface,
               labelStyle: TextStyle(
-                color: isSelected ? Colors.black : Colors.white70,
+                color: isSelected ? Colors.black : BgmsColors.textSecondary,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
               shape: RoundedRectangleBorder(
@@ -767,7 +767,7 @@ class _TierInfoPanel extends StatelessWidget {
                       Text(
                         tierName,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: BgmsColors.textPrimary,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
@@ -776,7 +776,7 @@ class _TierInfoPanel extends StatelessWidget {
                       Text(
                         '현재 RP: $rp  (최고 RP: $bestRp)',
                         style: const TextStyle(
-                          color: Colors.white54,
+                          color: BgmsColors.textMuted,
                           fontSize: 12,
                         ),
                       ),
@@ -788,7 +788,7 @@ class _TierInfoPanel extends StatelessWidget {
             const SizedBox(height: 12),
             LinearProgressIndicator(
               value: progress,
-              backgroundColor: Colors.white10,
+              backgroundColor: BgmsColors.border,
               color: tierColor,
               minHeight: 6,
               borderRadius: BorderRadius.circular(3),
@@ -905,7 +905,7 @@ class _MetricsGrid extends StatelessWidget {
                     Icon(
                       metric.icon,
                       size: 18,
-                      color: index == 0 ? BgmsColors.accent : Colors.white70,
+                      color: index == 0 ? BgmsColors.accent : BgmsColors.textSecondary,
                     ),
                     const SizedBox(height: 4),
                     FittedBox(
@@ -927,7 +927,7 @@ class _MetricsGrid extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 10,
-                        color: Colors.white60,
+                        color: BgmsColors.textSecondary,
                       ),
                     ),
                   ],
@@ -963,14 +963,14 @@ class _EmptyStatsPanel extends StatelessWidget {
             const Icon(
               Icons.warning_amber_rounded,
               size: 48,
-              color: Colors.white30,
+              color: BgmsColors.textMuted,
             ),
             const SizedBox(height: 16),
             const Text(
               '해당 모드 플레이 기록 없음',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: BgmsColors.textPrimary,
                 fontSize: 15,
               ),
             ),
@@ -978,7 +978,7 @@ class _EmptyStatsPanel extends StatelessWidget {
             Text(
               '현재 시즌의 $queueLabel ($modeLabel) 플레이 기록이 아직 없습니다.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white54, fontSize: 13),
+              style: const TextStyle(color: BgmsColors.textMuted, fontSize: 13),
             ),
           ],
         ),
@@ -1011,21 +1011,21 @@ class _MatchSummaryPanel extends StatelessWidget {
               '최근 매치 리스트',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
+                color: BgmsColors.textPrimary,
               ),
             ),
             if (bundle.summaryFallback) ...[
               const SizedBox(height: 8),
               const Text(
                 '일부 매치는 상세 분석 캐시가 없어 모드 정보만 표시합니다.',
-                style: TextStyle(color: Colors.white30, fontSize: 11),
+                style: TextStyle(color: BgmsColors.textMuted, fontSize: 11),
               ),
             ],
             const SizedBox(height: 12),
             if (matches.isEmpty)
               const Text(
                 '최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.',
-                style: TextStyle(color: Colors.white60),
+                style: TextStyle(color: BgmsColors.textSecondary),
               )
             else
               ...matches.map(
@@ -1127,7 +1127,7 @@ class _MatchCard extends StatelessWidget {
                     child: Icon(
                       Icons.map_outlined,
                       size: 130,
-                      color: isChicken ? Colors.amber : Colors.white,
+                      color: isChicken ? Colors.amber : BgmsColors.textPrimary,
                     ),
                   ),
                 ),
@@ -1147,7 +1147,7 @@ class _MatchCard extends StatelessWidget {
                             child: Text(
                               '${match.mapName} · ${match.gameMode.toUpperCase()}',
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: BgmsColors.textPrimary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                                 letterSpacing: 0.5,
@@ -1158,7 +1158,7 @@ class _MatchCard extends StatelessWidget {
                           Text(
                             _formatElapsedTime(match.createdAt),
                             style: const TextStyle(
-                              color: Colors.white54,
+                              color: BgmsColors.textMuted,
                               fontSize: 12,
                             ),
                           ),
@@ -1186,7 +1186,7 @@ class _MatchCard extends StatelessWidget {
                                 style: TextStyle(
                                   color: isChicken
                                       ? Colors.black
-                                      : Colors.white,
+                                      : BgmsColors.textPrimary,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
                                 ),
@@ -1212,7 +1212,7 @@ class _MatchCard extends StatelessWidget {
                           const Spacer(),
                           const Icon(
                             Icons.chevron_right,
-                            color: Colors.white30,
+                            color: BgmsColors.textMuted,
                           ),
                         ],
                       ),
@@ -1261,7 +1261,7 @@ class _MatchCard extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            color: Colors.white54,
+            color: BgmsColors.textMuted,
             fontSize: 10,
             fontWeight: FontWeight.bold,
           ),
@@ -1391,20 +1391,20 @@ class _StatePanel extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(icon, size: 48, color: Colors.white30),
+            Icon(icon, size: 48, color: BgmsColors.textMuted),
             const SizedBox(height: 16),
             Text(
               title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: BgmsColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               body,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60, fontSize: 13),
+              style: const TextStyle(color: BgmsColors.textSecondary, fontSize: 13),
             ),
           ],
         ),
@@ -1597,7 +1597,7 @@ class _ProfileHeader extends StatelessWidget {
                       Text(
                         profile.platform.toUpperCase(),
                         style: const TextStyle(
-                          color: Colors.white54,
+                          color: BgmsColors.textMuted,
                           fontSize: 13,
                         ),
                       ),
@@ -1619,14 +1619,14 @@ class _ProfileHeader extends StatelessWidget {
                     Icon(
                       Icons.calendar_month_outlined,
                       size: 18,
-                      color: Colors.white70,
+                      color: BgmsColors.textSecondary,
                     ),
                     SizedBox(width: 6),
                     Text(
                       '조회 시즌',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.white70,
+                        color: BgmsColors.textSecondary,
                       ),
                     ),
                   ],

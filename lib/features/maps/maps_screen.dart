@@ -511,7 +511,7 @@ class MapTileMosaic extends StatelessWidget {
             ),
             child: const Text(
               'tile z2',
-              style: TextStyle(fontSize: 11, color: Colors.white70),
+              style: TextStyle(fontSize: 11, color: BgmsColors.textSecondary),
             ),
           ),
         ),

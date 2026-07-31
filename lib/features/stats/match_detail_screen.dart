@@ -70,7 +70,7 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
             backgroundColor: BgmsColors.bgBase,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+              icon: const Icon(Icons.arrow_back_ios_new, color: BgmsColors.textPrimary),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
@@ -228,7 +228,7 @@ class _MetadataCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '${detail.mapName} · ${detail.gameMode}',
-              style: const TextStyle(color: Colors.white70),
+              style: const TextStyle(color: BgmsColors.textSecondary),
             ),
             const SizedBox(height: 12),
             Text(
@@ -353,7 +353,7 @@ class _BenchmarkScoreCard extends StatelessWidget {
               children: [
                 const Text(
                   '상위권 벤치마크 점수',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: BgmsColors.textPrimary),
                 ),
                 Text(
                   '${benchmark.tier} 등급',
@@ -394,13 +394,13 @@ class _BenchmarkScoreCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
+                color: BgmsColors.textPrimary.withValues(alpha: 0.03),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('전술 매치 종합 점수', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const Text('전술 매치 종합 점수', style: TextStyle(color: BgmsColors.textSecondary, fontSize: 12)),
                   const SizedBox(height: 4),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -410,7 +410,7 @@ class _BenchmarkScoreCard extends StatelessWidget {
                         benchmark.score.toStringAsFixed(1),
                         style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: BgmsColors.accent),
                       ),
-                      const Text(' / 100 점', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                      const Text(' / 100 점', style: TextStyle(color: BgmsColors.textMuted, fontSize: 13)),
                       if (benchmark.impactGrade != null) ...[
                         const Spacer(),
                         Container(
@@ -436,12 +436,12 @@ class _BenchmarkScoreCard extends StatelessWidget {
                       children: benchmark.impactReasons.map((reason) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
+                          color: BgmsColors.textPrimary.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           reason,
-                          style: const TextStyle(color: Colors.white54, fontSize: 11),
+                          style: const TextStyle(color: BgmsColors.textMuted, fontSize: 11),
                         ),
                       )).toList(),
                     ),
@@ -472,11 +472,11 @@ class _BenchmarkMetricIndicator extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        Text(label, style: const TextStyle(color: BgmsColors.textSecondary, fontSize: 12)),
         const SizedBox(height: 6),
         LinearProgressIndicator(
           value: score / 100,
-          backgroundColor: Colors.white10,
+          backgroundColor: BgmsColors.border,
           color: color,
           minHeight: 6,
           borderRadius: BorderRadius.circular(3),
@@ -516,7 +516,7 @@ class _TacticalPositioningCard extends StatelessWidget {
           children: [
             const Text(
               '교전 포지셔닝 및 고립 지수',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: BgmsColors.textPrimary),
             ),
             const SizedBox(height: 16),
             Row(
@@ -581,7 +581,7 @@ class _TacticalPositioningCard extends StatelessWidget {
                           ? '교전 중 대열을 이탈해 혼자 고립되는 경향이 발견되었습니다. 팀원과의 거리를 유지해 백업을 확보하세요.'
                           : '팀과의 안정적인 대열 유지를 유지하며 안전하게 교전을 진행했습니다.',
                       style: TextStyle(
-                        color: isHighlyIsolated ? Colors.redAccent : Colors.white70,
+                        color: isHighlyIsolated ? Colors.redAccent : BgmsColors.textSecondary,
                         fontSize: 12,
                       ),
                     ),
@@ -622,7 +622,7 @@ class _TeamBackupCard extends StatelessWidget {
           children: [
             const Text(
               '팀 백업 및 소생 기여도',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: BgmsColors.textPrimary),
             ),
             const SizedBox(height: 16),
             Row(
@@ -633,7 +633,7 @@ class _TeamBackupCard extends StatelessWidget {
                     value: hasTradeLatency ? '${backupSec.toStringAsFixed(2)}초' : 'N/A',
                     valueColor: hasTradeLatency
                         ? (backupSec < 10.0 ? Colors.greenAccent : Colors.amberAccent)
-                        : Colors.white30,
+                        : BgmsColors.textMuted,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -665,11 +665,11 @@ class _TeamBackupCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             if (hasTradeLatency) ...[
-              const Text('백업 반응 속도 평가', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const Text('백업 반응 속도 평가', style: TextStyle(color: BgmsColors.textSecondary, fontSize: 12)),
               const SizedBox(height: 6),
               LinearProgressIndicator(
                 value: (20.0 - backupSec).clamp(0.0, 20.0) / 20.0,
-                backgroundColor: Colors.white10,
+                backgroundColor: BgmsColors.border,
                 color: backupSec < 8 ? Colors.greenAccent : (backupSec < 15 ? Colors.amberAccent : Colors.redAccent),
                 minHeight: 4,
                 borderRadius: BorderRadius.circular(2),
@@ -677,9 +677,9 @@ class _TeamBackupCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 backupSec < 8
-                    ? '⚡ 초광속 백업! 아군이 쓰러지자마자 적을 처리했습니다.'
+                    ? '초광속 백업. 아군이 쓰러지자마자 적을 처리했습니다.'
                     : (backupSec < 15 ? '안정적인 대응 속도로 아군 교전을 지원했습니다.' : '백업 템포가 약간 느립니다. 팀원이 싸우는 위치에 더 빠르게 개입하세요.'),
-                style: const TextStyle(color: Colors.white54, fontSize: 11),
+                style: const TextStyle(color: BgmsColors.textMuted, fontSize: 11),
               ),
             ],
           ],
@@ -720,11 +720,14 @@ class _SpecialCombatCard extends StatelessWidget {
           children: [
             const Text(
               '특수 전투 지표 및 1:1 결정력',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: BgmsColors.textPrimary),
             ),
             if (hasVehicleStats) ...[
               const SizedBox(height: 16),
-              const Text('🚗 차량 교전 성과', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+              const _SubsectionLabel(
+                icon: Icons.directions_car_filled_outlined,
+                text: '차량 교전 성과',
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -745,7 +748,10 @@ class _SpecialCombatCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 16),
-            const Text('🔥 교전 컨트롤 및 결투 승률', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+            const _SubsectionLabel(
+              icon: Icons.local_fire_department_outlined,
+              text: '교전 컨트롤 및 결투 승률',
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -753,7 +759,7 @@ class _SpecialCombatCard extends StatelessWidget {
                   child: _MiniDataBox(
                     label: '1대1 결투 승률',
                     value: '${duel.duelWinRate.toStringAsFixed(0)}%',
-                    valueColor: duel.duelWinRate >= 60 ? Colors.greenAccent : (duel.duelWinRate >= 45 ? Colors.white : Colors.redAccent),
+                    valueColor: duel.duelWinRate >= 60 ? Colors.greenAccent : (duel.duelWinRate >= 45 ? BgmsColors.textPrimary : Colors.redAccent),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -772,7 +778,7 @@ class _SpecialCombatCard extends StatelessWidget {
                   child: _MiniDataBox(
                     label: '교전 위기 극복(클러치)',
                     value: pressure.isClutched ? '클러치 성공!' : '없음',
-                    valueColor: pressure.isClutched ? BgmsColors.accent : Colors.white30,
+                    valueColor: pressure.isClutched ? BgmsColors.accent : BgmsColors.textMuted,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -794,6 +800,33 @@ class _SpecialCombatCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // 공통 소형 데이터 박스 위젯
 // ---------------------------------------------------------------------------
+/// 카드 안 소제목. 아이콘과 라벨을 한 줄로 둔다.
+class _SubsectionLabel extends StatelessWidget {
+  const _SubsectionLabel({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: BgmsColors.textSecondary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: BgmsColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _MiniDataBox extends StatelessWidget {
   const _MiniDataBox({
     required this.label,
@@ -810,16 +843,16 @@ class _MiniDataBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.02),
+        color: BgmsColors.textPrimary.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.04), width: 0.5),
+        border: Border.all(color: BgmsColors.textPrimary.withValues(alpha: 0.04), width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: Colors.white54),
+            style: const TextStyle(fontSize: 10, color: BgmsColors.textMuted),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -829,7 +862,7 @@ class _MiniDataBox extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: valueColor ?? Colors.white,
+              color: valueColor ?? BgmsColors.textPrimary,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

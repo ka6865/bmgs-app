@@ -1,15 +1,19 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/network/api_exception.dart';
+import '../../core/network/bgms_api_client.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import '../../navigation/shell_scaffold.dart';
+import '../notifications/notification_settings_card.dart';
 
 class MyScreen extends StatefulWidget {
   const MyScreen({super.key});
@@ -146,10 +150,9 @@ class _MyScreenState extends State<MyScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const _InfoCard(
-                  title: '앱 설정',
-                  body: '알림, 동기화 설정은 서버 인증 연결 후 활성화됩니다.',
-                ),
+                const NotificationSettingsCard(),
+                const SizedBox(height: 12),
+                const _PolicyCard(),
               ],
             );
           },
@@ -408,16 +411,9 @@ class _SupabaseAuthCardState extends State<_SupabaseAuthCard> {
     });
 
     try {
-      final baseUrl = AppConfig.local.apiBaseUrl.replaceFirst(
-        RegExp(r'/$'),
-        '',
-      );
-      await Dio().post<void>(
-        '$baseUrl/api/auth/delete-account',
-        options: Options(
-          headers: {'Authorization': 'Bearer ${session.accessToken}'},
-        ),
-      );
+      await BgmsApiClient(
+        baseUrl: AppConfig.local.apiBaseUrl,
+      ).deleteAccount(accessToken: session.accessToken);
       await _supabase.auth.signOut();
       if (!mounted) return;
       setState(() {
@@ -426,21 +422,12 @@ class _SupabaseAuthCardState extends State<_SupabaseAuthCard> {
         _activityStats = null;
       });
       widget.onAuthChanged();
-    } on DioException catch (error) {
-      final data = error.response?.data;
-      final message = data is Map && data['error'] != null
-          ? data['error'].toString()
-          : '회원탈퇴 API 실패: ${error.message ?? '알 수 없는 오류'}';
-      if (!mounted) return;
-      setState(() {
-        _deleting = false;
-        _errorMessage = message;
-      });
     } catch (error) {
+      final message = ApiException.from(error).message;
       if (!mounted) return;
       setState(() {
         _deleting = false;
-        _errorMessage = '회원탈퇴 중 오류가 발생했습니다: $error';
+        _errorMessage = '회원탈퇴에 실패했습니다. $message';
       });
     }
   }
@@ -1085,6 +1072,133 @@ class _InfoCard extends StatelessWidget {
             Text(body),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 약관 및 정보 (스토어 심사 필수 항목)
+// ---------------------------------------------------------------------------
+
+class _PolicyCard extends StatelessWidget {
+  const _PolicyCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final config = AppConfig.local;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '약관 및 정보',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            _PolicyLinkTile(
+              icon: Icons.description_outlined,
+              label: '이용약관',
+              url: config.termsUrl,
+            ),
+            const Divider(height: 8),
+            _PolicyLinkTile(
+              icon: Icons.privacy_tip_outlined,
+              label: '개인정보처리방침',
+              url: config.privacyUrl,
+            ),
+            const Divider(height: 8),
+            _PolicyLinkTile(
+              icon: Icons.public,
+              label: 'BGMS 웹사이트',
+              url: config.normalizedBaseUrl,
+            ),
+            const Divider(height: 8),
+            const _AppVersionTile(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PolicyLinkTile extends StatelessWidget {
+  const _PolicyLinkTile({
+    required this.icon,
+    required this.label,
+    required this.url,
+  });
+
+  final IconData icon;
+  final String label;
+  final String url;
+
+  Future<void> _open(BuildContext context) async {
+    final uri = Uri.tryParse(url);
+    var launched = false;
+    if (uri != null) {
+      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('링크를 열 수 없습니다: $url')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, size: 20),
+      title: Text(label),
+      trailing: const Icon(Icons.open_in_new, size: 18),
+      onTap: () => _open(context),
+    );
+  }
+}
+
+class _AppVersionTile extends StatefulWidget {
+  const _AppVersionTile();
+
+  @override
+  State<_AppVersionTile> createState() => _AppVersionTileState();
+}
+
+class _AppVersionTileState extends State<_AppVersionTile> {
+  String? _version;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _version = '${info.version} (${info.buildNumber})');
+    } on Exception {
+      if (!mounted) return;
+      setState(() => _version = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.smartphone, size: 20),
+      title: const Text('앱 버전'),
+      trailing: Text(
+        _version ?? '확인 중',
+        style: Theme.of(context).textTheme.bodySmall,
       ),
     );
   }

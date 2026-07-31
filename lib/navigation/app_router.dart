@@ -7,6 +7,7 @@ import '../features/board/board_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/maps/maps_screen.dart';
 import '../features/my/my_screen.dart';
+import '../features/notifications/notifications_screen.dart';
 import '../features/rankings/rankings_screen.dart';
 import '../features/stats/match_detail_screen.dart';
 import '../features/stats/match_detail_repository.dart';
@@ -29,6 +30,11 @@ GoRouter createAppRouter({
   return GoRouter(
     initialLocation: '/',
     routes: [
+      // 알림 센터는 확인 후 벗어나는 화면이므로 하단 탭 셸 밖에 둔다.
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return ShellScaffold(navigationShell: navigationShell);

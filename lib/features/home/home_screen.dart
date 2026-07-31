@@ -7,6 +7,7 @@ import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import '../../navigation/shell_scaffold.dart';
+import '../notifications/notification_bell.dart';
 import 'widgets/home_dashboard_sections.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -177,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const BgmsBrandHeader(title: 'BGMS'),
+          const BgmsBrandHeader(title: 'BGMS', trailing: NotificationBell()),
           const SizedBox(height: 16),
           Card(
             child: Padding(

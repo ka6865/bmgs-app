@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/network/api_exception.dart';
 import '../../core/observability/app_logger.dart';
 import '../../core/player/player_search_flow.dart';
 import '../../core/player/player_suggestion_controller.dart';
@@ -50,7 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (fetcher != null) {
       _suggestionController =
           PlayerSuggestionController(
-              fetch: fetcher,
+              fetch: (query) => _fetchMergedSuggestions(fetcher, query),
               onError: (error, stackTrace) {
                 AppObservability.logger.warning(
                   '닉네임 자동완성 조회에 실패했습니다.',
@@ -117,6 +118,50 @@ class _HomeScreenState extends State<HomeScreen> {
       _recentPlayers = recent;
       _favoritePlayers = favorites;
     });
+  }
+
+  /// 서버 후보와 로컬 기록을 합친다.
+  ///
+  /// 서버 `/api/pubg/suggest`는 색인된 닉네임만 돌려주므로 결과가 비는 경우가
+  /// 잦다. 최근 검색과 즐겨찾기에서 일치하는 항목을 앞에 붙여 목록이
+  /// 아예 뜨지 않는 상황을 줄인다.
+  Future<List<PlayerSuggestion>> _fetchMergedSuggestions(
+    PlayerSuggestionFetcher fetcher,
+    String query,
+  ) async {
+    final local = _localSuggestions(query);
+    try {
+      final remote = await fetcher(query);
+      final seen = <String>{};
+      final merged = <PlayerSuggestion>[];
+      for (final suggestion in [...local, ...remote]) {
+        final key =
+            '${suggestion.platform}:${suggestion.nickname.toLowerCase()}';
+        if (seen.add(key)) merged.add(suggestion);
+      }
+      return merged;
+    } catch (error) {
+      // 서버 조회가 실패해도 로컬 기록만으로 후보를 제공한다.
+      if (local.isEmpty) rethrow;
+      return local;
+    }
+  }
+
+  /// 최근 검색과 즐겨찾기에서 질의로 시작하거나 포함하는 항목을 찾는다.
+  List<PlayerSuggestion> _localSuggestions(String query) {
+    final lower = query.trim().toLowerCase();
+    if (lower.isEmpty) return const [];
+
+    final seen = <String>{};
+    final matched = <PlayerSuggestion>[];
+    for (final player in [..._favoritePlayers, ..._recentPlayers]) {
+      if (!player.nickname.toLowerCase().contains(lower)) continue;
+      if (!seen.add(player.id)) continue;
+      matched.add(
+        PlayerSuggestion(nickname: player.nickname, platform: player.platform),
+      );
+    }
+    return matched;
   }
 
   /// 입력 변화를 받아 검증 문구를 지우고 자동완성을 갱신한다.

@@ -123,4 +123,40 @@ void main() {
 
     expect(find.byIcon(Icons.person_search), findsNothing);
   });
+
+  testWidgets('서버 후보가 비어도 최근 검색에서 후보를 만든다', (tester) async {
+    // 실제 서버 /api/pubg/suggest가 빈 배열을 주는 상황을 재현한다.
+    SharedPreferences.setMockInitialValues({
+      'bgms_recent_searches': ['kakao\tkangLocalPlayer'],
+    });
+    final router = _createRouter(fetcher: (query) async => const []);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'kang');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('kangLocalPlayer'), findsWidgets);
+  });
+
+  testWidgets('서버 조회가 실패해도 로컬 후보는 유지된다', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'bgms_favorite_players': ['steam\tkangFavorite'],
+    });
+    final router = _createRouter(
+      fetcher: (query) async => throw const ApiException(
+        kind: ApiErrorKind.network,
+        message: '네트워크 오류',
+      ),
+    );
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'kang');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('kangFavorite'), findsWidgets);
+  });
 }

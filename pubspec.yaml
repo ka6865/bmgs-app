@@ -69,6 +69,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # iOS 무선 디버깅에서 LLDB 부착 대기로 앱이 스플래시에 멈추는 문제를 피한다.
+  config:
+    enable-lldb-debugging: false
+
   # 지도 이미지는 서버 타일 API(/tiles/{map}/{z}/{x}/{y}.jpg)에서 받으므로
   # 앱 번들에는 브랜딩 에셋만 포함한다.
   assets:

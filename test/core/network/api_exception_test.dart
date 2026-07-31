@@ -49,15 +49,11 @@ void main() {
 
   test('타임아웃과 연결 오류를 구분한다', () {
     expect(
-      ApiException.from(
-        _dioError(type: DioExceptionType.receiveTimeout),
-      ).kind,
+      ApiException.from(_dioError(type: DioExceptionType.receiveTimeout)).kind,
       ApiErrorKind.timeout,
     );
     expect(
-      ApiException.from(
-        _dioError(type: DioExceptionType.connectionError),
-      ).kind,
+      ApiException.from(_dioError(type: DioExceptionType.connectionError)).kind,
       ApiErrorKind.network,
     );
     expect(
@@ -93,10 +89,7 @@ void main() {
   });
 
   test('이미 정규화된 예외는 그대로 통과한다', () {
-    const original = ApiException(
-      kind: ApiErrorKind.parse,
-      message: '파싱 실패',
-    );
+    const original = ApiException(kind: ApiErrorKind.parse, message: '파싱 실패');
     expect(ApiException.from(original), same(original));
   });
 

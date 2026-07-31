@@ -68,8 +68,24 @@ class _MyScreenState extends State<MyScreen> {
   }
 
   Future<void> _clearRecent(_MyScreenStateData state) async {
+    // 삭제 전 목록을 보관해 되돌리기를 제공한다.
+    final removed = state.recentPlayers;
     await state.store.clearRecentSearches();
     _refresh();
+    if (!mounted || removed.isEmpty) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('최근 검색 ${removed.length}건을 삭제했습니다.'),
+        action: SnackBarAction(
+          label: '되돌리기',
+          onPressed: () async {
+            await state.store.restoreRecentPlayers(removed);
+            _refresh();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _removeFavorite(
@@ -81,6 +97,23 @@ class _MyScreenState extends State<MyScreen> {
       platform: player.platform,
     );
     _refresh();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${player.nickname} 님을 즐겨찾기에서 해제했습니다.'),
+        action: SnackBarAction(
+          label: '되돌리기',
+          onPressed: () async {
+            await state.store.toggleFavorite(
+              player.nickname,
+              platform: player.platform,
+            );
+            _refresh();
+          },
+        ),
+      ),
+    );
   }
 
   @override

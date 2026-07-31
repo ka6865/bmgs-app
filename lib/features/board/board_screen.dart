@@ -112,15 +112,31 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          TextField(
-            controller: _searchController,
-            textInputAction: TextInputAction.search,
-            decoration: const InputDecoration(
-              isDense: true,
-              hintText: '제목이나 내용 검색',
-              prefixIcon: Icon(Icons.search, size: 20),
-            ),
-            onSubmitted: (_) => _load(reset: true),
+          // 지우기 버튼만 입력값에 반응하도록 해서 화면 전체 재빌드를 피한다.
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _searchController,
+            builder: (context, value, child) {
+              return TextField(
+                controller: _searchController,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: '제목이나 내용 검색',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: value.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          tooltip: '검색어 지우기',
+                          onPressed: () {
+                            _searchController.clear();
+                            _load(reset: true);
+                          },
+                        ),
+                ),
+                onSubmitted: (_) => _load(reset: true),
+              );
+            },
           ),
           const SizedBox(height: 12),
           SingleChildScrollView(

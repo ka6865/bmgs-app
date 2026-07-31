@@ -35,19 +35,34 @@ class HomeSearchBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: TextField(
-            controller: controller,
-            textInputAction: TextInputAction.search,
-            enabled: !searching,
-            onChanged: (_) => onTextChanged(),
-            onSubmitted: (_) => onSearch(),
-            decoration: InputDecoration(
-              isDense: true,
-              labelText: 'PUBG 플레이어 검색',
-              hintText: 'KangHeeSung_',
-              errorText: errorText,
-              prefixIcon: const Icon(Icons.search, size: 20),
-            ),
+          child: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, child) {
+              return TextField(
+                controller: controller,
+                textInputAction: TextInputAction.search,
+                enabled: !searching,
+                onChanged: (_) => onTextChanged(),
+                onSubmitted: (_) => onSearch(),
+                decoration: InputDecoration(
+                  isDense: true,
+                  labelText: 'PUBG 플레이어 검색',
+                  hintText: 'KangHeeSung_',
+                  errorText: errorText,
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: value.text.isEmpty || searching
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          tooltip: '입력 지우기',
+                          onPressed: () {
+                            controller.clear();
+                            onTextChanged();
+                          },
+                        ),
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(width: 8),

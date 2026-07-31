@@ -243,6 +243,27 @@ void main() {
     expect(find.text('PUBG 플레이어 검색'), findsOneWidget);
   });
 
+  testWidgets('home search clear button appears with input and resets it', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    // 입력이 비어 있으면 지우기 버튼을 노출하지 않는다.
+    expect(find.byTooltip('입력 지우기'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'typoNickname');
+    await tester.pump();
+    expect(find.byTooltip('입력 지우기'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('입력 지우기'));
+    await tester.pump();
+
+    expect(find.text('typoNickname'), findsNothing);
+    expect(find.byTooltip('입력 지우기'), findsNothing);
+  });
+
   testWidgets('home quick action opens rankings', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const BgmsApp());
@@ -420,6 +441,32 @@ void main() {
     // 전적 화면으로 이동해 저장된 플랫폼(kakao)이 유지되는지 확인한다.
     expect(find.text('전적'), findsWidgets);
     expect(find.text('myTabPlayer'), findsWidgets);
+    expect(find.text('최근 검색이 없습니다.'), findsNothing);
+  });
+
+  testWidgets('my tab clear recent offers undo and restores the list', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'bgms_recent_searches': ['steam\tundoPlayer'],
+    });
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.person));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('전체 삭제'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('최근 검색이 없습니다.'), findsOneWidget);
+    expect(find.text('되돌리기'), findsOneWidget);
+
+    await tester.tap(find.text('되돌리기'));
+    await tester.pumpAndSettle();
+
+    // 되돌리기로 삭제한 항목이 복구된다.
+    expect(find.text('undoPlayer'), findsOneWidget);
     expect(find.text('최근 검색이 없습니다.'), findsNothing);
   });
 

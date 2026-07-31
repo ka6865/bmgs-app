@@ -49,6 +49,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   bool _searching = false;
   String? _searchError;
   bool? _wasActive;
+  bool _isFavorite = false;
 
   String get _normalizedPlatform => normalizePlayerPlatform(widget.platform);
 
@@ -113,10 +114,45 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     final store = _store;
     if (store == null) return;
     final recent = await store.getRecentPlayers();
+    final nickname = widget.nickname?.trim() ?? '';
+    final favorite = nickname.isEmpty
+        ? false
+        : await store.isFavorite(nickname, platform: _normalizedPlatform);
     if (!mounted) return;
     setState(() {
       _recentPlayers = recent;
+      _isFavorite = favorite;
     });
+  }
+
+  /// 지금 보고 있는 플레이어의 즐겨찾기를 토글한다.
+  ///
+  /// 홈으로 돌아가지 않고 전적 화면에서 바로 등록할 수 있게 한다.
+  Future<void> _toggleFavorite() async {
+    final nickname = widget.nickname?.trim() ?? '';
+    if (nickname.isEmpty) return;
+    try {
+      await _storeReady;
+      final store = _store;
+      if (store == null) return;
+
+      await store.toggleFavorite(nickname, platform: _normalizedPlatform);
+      await _refreshPlayers();
+      if (!mounted) return;
+      // _refreshPlayers 이후 _isFavorite은 이미 새 상태다.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isFavorite ? '즐겨찾기에 추가했습니다.' : '즐겨찾기에서 해제했습니다.'),
+        ),
+      );
+    } catch (error, stackTrace) {
+      AppObservability.logger.warning(
+        '전적 즐겨찾기를 변경하지 못했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'stats', 'operation': 'toggle_favorite'},
+      );
+    }
   }
 
   void _startFetch({bool refresh = false}) {
@@ -223,10 +259,25 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
           subtitle: nickname.isEmpty ? null : nickname,
           trailing: nickname.isEmpty
               ? null
-              : IconButton(
-                  onPressed: _retry,
-                  icon: const Icon(Icons.refresh, color: BgmsColors.accent),
-                  tooltip: '새로고침',
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      onPressed: _toggleFavorite,
+                      icon: Icon(
+                        _isFavorite ? Icons.star : Icons.star_border,
+                        color: _isFavorite
+                            ? BgmsColors.accent
+                            : BgmsColors.textSecondary,
+                      ),
+                      tooltip: _isFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가',
+                    ),
+                    IconButton(
+                      onPressed: _retry,
+                      icon: const Icon(Icons.refresh, color: BgmsColors.accent),
+                      tooltip: '새로고침',
+                    ),
+                  ],
                 ),
         ),
         const SizedBox(height: 16),

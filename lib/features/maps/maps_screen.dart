@@ -52,23 +52,41 @@ class _MapsScreenState extends State<MapsScreen> {
       if (mounted) {
         setState(() {
           if (layer.markers.isNotEmpty) {
+            // 웹과 동일한 카테고리만 켠다.
+            // 마커 API는 허용 목록 밖의 레이어도 함께 주기 때문에,
+            // 전부 켜면 칩이 숨겨진 레이어가 지도에 그대로 그려진다.
             final available = layer.markers.map((m) => m.layer).toSet();
+            final allowed = _repository
+                .filterActiveLayers(
+                  _selectedMap.id,
+                  available.toList(),
+                  _adminSettings,
+                )
+                .toSet();
             _layers.clear();
-            _layers.addAll(available);
+            _layers.addAll(allowed.isEmpty ? available : allowed);
           } else {
             _layers.clear();
-            _layers.addAll(const [
-              'Garage',
-              'SecretRoom',
-              'Esports',
-              'HotDrop',
-            ]);
+            _layers.addAll(const ['Garage', 'SecretRoom', 'Esports']);
           }
         });
       }
     });
 
     return future;
+  }
+
+  /// 당겨서 새로고침. 새 future를 직접 기다려 인디케이터 시점을 맞춘다.
+  Future<void> _refresh() async {
+    final future = _loadMarkers();
+    setState(() {
+      _markerFuture = future;
+    });
+    try {
+      await future;
+    } catch (_) {
+      // 실패는 FutureBuilder가 fallback 레이어로 표시한다.
+    }
   }
 
   void _toggleCategoryLabel(String labelName, List<String> availableLayers) {
@@ -118,63 +136,66 @@ class _MapsScreenState extends State<MapsScreen> {
             allowedLayers.map((l) => getCategoryLabel(l)).toSet().toList()
               ..sort();
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            const ScreenHeader(title: '전술 지도'),
-            const SizedBox(height: BgmsSpacing.lg),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final map in _repository.availableMaps)
-                    Padding(
-                      padding: const EdgeInsets.only(right: BgmsSpacing.sm),
-                      child: ChoiceChip(
-                        label: Text(map.name),
-                        selected: map.id == _selectedMap.id,
-                        showCheckmark: false,
-                        onSelected: (selected) {
-                          if (!selected || map.id == _selectedMap.id) return;
-                          setState(() {
-                            _selectedMap = _repository.resolveMap(map.id);
-                            _markerFuture = _loadMarkers();
-                          });
-                        },
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              const ScreenHeader(title: '전술 지도'),
+              const SizedBox(height: BgmsSpacing.lg),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final map in _repository.availableMaps)
+                      Padding(
+                        padding: const EdgeInsets.only(right: BgmsSpacing.sm),
+                        child: ChoiceChip(
+                          label: Text(map.name),
+                          selected: map.id == _selectedMap.id,
+                          showCheckmark: false,
+                          onSelected: (selected) {
+                            if (!selected || map.id == _selectedMap.id) return;
+                            setState(() {
+                              _selectedMap = _repository.resolveMap(map.id);
+                              _markerFuture = _loadMarkers();
+                            });
+                          },
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: BgmsSpacing.lg),
-            Wrap(
-              spacing: BgmsSpacing.sm,
-              runSpacing: BgmsSpacing.sm,
-              children: uniqueKoreanLabels.map((koreanLabel) {
-                final relatedLayers = allowedLayers
-                    .where((l) => getCategoryLabel(l) == koreanLabel)
-                    .toList();
-                final isSelected = relatedLayers.any(
-                  (l) => _layers.contains(l),
-                );
+              const SizedBox(height: BgmsSpacing.lg),
+              Wrap(
+                spacing: BgmsSpacing.sm,
+                runSpacing: BgmsSpacing.sm,
+                children: uniqueKoreanLabels.map((koreanLabel) {
+                  final relatedLayers = allowedLayers
+                      .where((l) => getCategoryLabel(l) == koreanLabel)
+                      .toList();
+                  final isSelected = relatedLayers.any(
+                    (l) => _layers.contains(l),
+                  );
 
-                return FilterChip(
-                  label: Text(koreanLabel),
-                  selected: isSelected,
-                  showCheckmark: false,
-                  onSelected: (_) =>
-                      _toggleCategoryLabel(koreanLabel, allowedLayers),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: BgmsSpacing.lg),
-            _MapPanel(
-              map: _selectedMap,
-              layer: layer,
-              activeLayers: _layers,
-              loading: loading,
-            ),
-          ],
+                  return FilterChip(
+                    label: Text(koreanLabel),
+                    selected: isSelected,
+                    showCheckmark: false,
+                    onSelected: (_) =>
+                        _toggleCategoryLabel(koreanLabel, allowedLayers),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: BgmsSpacing.lg),
+              _MapPanel(
+                map: _selectedMap,
+                layer: layer,
+                activeLayers: _layers,
+                loading: loading,
+              ),
+            ],
+          ),
         );
       },
     );

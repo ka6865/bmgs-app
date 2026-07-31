@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/app_panels.dart';
@@ -159,24 +160,29 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                       ),
                       const SizedBox(height: 8),
                     ],
-                    TextField(
-                      controller: _commentController,
-                      decoration: const InputDecoration(
-                        labelText: '댓글',
-                        helperText: '사진 첨부는 앱에서 지원하지 않습니다.',
+                    // 입력 후 401을 받는 대신 로그인 필요를 먼저 알린다.
+                    if (!_repository.canWrite)
+                      _CommentLoginNotice(onLogin: () => context.go('/my'))
+                    else ...[
+                      TextField(
+                        controller: _commentController,
+                        decoration: const InputDecoration(
+                          labelText: '댓글',
+                          helperText: '사진 첨부는 앱에서 지원하지 않습니다.',
+                        ),
+                        minLines: 2,
+                        maxLines: 4,
+                        maxLength: 1000,
                       ),
-                      minLines: 2,
-                      maxLines: 4,
-                      maxLength: 1000,
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton.icon(
-                        onPressed: _commentSubmitting ? null : _submitComment,
-                        icon: const Icon(Icons.send),
-                        label: Text(_commentSubmitting ? '등록 중...' : '댓글 등록'),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.icon(
+                          onPressed: _commentSubmitting ? null : _submitComment,
+                          icon: const Icon(Icons.send),
+                          label: Text(_commentSubmitting ? '등록 중...' : '댓글 등록'),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -229,4 +235,41 @@ class _CommentTile extends StatelessWidget {
 String _shortDate(String value) {
   if (value.length >= 10) return value.substring(0, 10);
   return value;
+}
+
+/// 댓글을 쓰려면 로그인이 필요하다는 안내.
+///
+/// 입력을 받아놓고 401로 실패시키지 않도록 입력창 대신 노출한다.
+class _CommentLoginNotice extends StatelessWidget {
+  const _CommentLoginNotice({required this.onLogin});
+
+  final VoidCallback onLogin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: BgmsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: BgmsColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_outline, size: 18, color: BgmsColors.textMuted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '댓글은 로그인 후 작성할 수 있습니다.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: BgmsColors.textSecondary),
+            ),
+          ),
+          TextButton(onPressed: onLogin, child: const Text('로그인')),
+        ],
+      ),
+    );
+  }
 }

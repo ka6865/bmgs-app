@@ -83,6 +83,21 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   Future<void> _openWriteDialog() async {
+    // 글을 다 쓴 뒤 401을 받는 대신, 로그인 여부를 먼저 알린다.
+    if (!_repository.canWrite) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('글쓰기는 로그인 후 이용할 수 있습니다.'),
+          action: SnackBarAction(
+            label: '로그인',
+            onPressed: () => context.go('/my'),
+          ),
+        ),
+      );
+      return;
+    }
+
     final createdId = await showDialog<int>(
       context: context,
       builder: (context) => const _BoardWriteDialog(),

@@ -1,11 +1,7 @@
 enum MapMarkerSource { api, fallback }
 
 class BgmsMap {
-  const BgmsMap({
-    required this.id,
-    required this.name,
-    required this.tilePath,
-  });
+  const BgmsMap({required this.id, required this.name, required this.tilePath});
 
   final String id;
   final String name;

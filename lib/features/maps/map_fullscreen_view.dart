@@ -24,7 +24,8 @@ class MapFullscreenView extends StatefulWidget {
 }
 
 class _MapFullscreenViewState extends State<MapFullscreenView> {
-  final TransformationController _transformationController = TransformationController();
+  final TransformationController _transformationController =
+      TransformationController();
   final ValueNotifier<double> _zoomScaleNotifier = ValueNotifier<double>(1.0);
 
   @override
@@ -51,7 +52,9 @@ class _MapFullscreenViewState extends State<MapFullscreenView> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleMarkers = widget.markers.where((m) => widget.activeLayers.contains(m.layer)).toList();
+    final visibleMarkers = widget.markers
+        .where((m) => widget.activeLayers.contains(m.layer))
+        .toList();
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -59,11 +62,21 @@ class _MapFullscreenViewState extends State<MapFullscreenView> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: BgmsColors.textPrimary, size: 28),
+          icon: const Icon(
+            Icons.close,
+            color: BgmsColors.textPrimary,
+            size: 28,
+          ),
           tooltip: '정밀 지도 닫기',
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('${widget.map.name} 정밀 지도', style: const TextStyle(fontWeight: FontWeight.bold, color: BgmsColors.textPrimary)),
+        title: Text(
+          '${widget.map.name} 정밀 지도',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: BgmsColors.textPrimary,
+          ),
+        ),
       ),
       body: Center(
         child: InteractiveViewer(

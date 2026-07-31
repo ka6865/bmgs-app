@@ -45,7 +45,9 @@ class AiCoachingRepository {
       if (isCostLimit) {
         return AiCoachingSummary.costRestricted();
       }
-      return AiCoachingSummary.unavailable('AI 요약을 불러오지 못했습니다. ${apiError.message}');
+      return AiCoachingSummary.unavailable(
+        'AI 요약을 불러오지 못했습니다. ${apiError.message}',
+      );
     }
   }
 

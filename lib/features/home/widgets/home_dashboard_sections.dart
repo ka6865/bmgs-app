@@ -98,6 +98,88 @@ class ContinuePlayerCard extends StatelessWidget {
   }
 }
 
+/// 상자깡 시뮬 진입 배너.
+///
+/// 웹에서 가장 많이 쓰이는 컨텐츠라 홈에서 바로 눈에 들어오게 둔다.
+class CrateSimBanner extends StatelessWidget {
+  const CrateSimBanner({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkSurface(
+      borderRadius: 10,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: BgmsColors.accent.withValues(alpha: 0.35)),
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            BgmsColors.accent.withValues(alpha: 0.14),
+            BgmsColors.elevated,
+          ],
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: BgmsColors.accent.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.inventory_2,
+                  size: 20,
+                  color: BgmsColors.accent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '상자깡 시뮬',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '공식 확률로 결과만 미리 확인',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: BgmsColors.textSecondary,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: BgmsColors.textMuted,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 닉네임 첫 글자를 쓰는 단색 아바타. 서버가 프로필 이미지를 주지 않아 대체 표현이다.
 class _PlayerAvatar extends StatelessWidget {
   const _PlayerAvatar({required this.nickname, this.size = 32});

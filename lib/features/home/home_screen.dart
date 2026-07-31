@@ -312,6 +312,8 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: (player) =>
                   _search(nickname: player.nickname, platform: player.platform),
             ),
+            const SizedBox(height: 20),
+            CrateSimBanner(onTap: () => context.push('/crates')),
             if (_loadingStore || remainingRecent.isNotEmpty) ...[
               const SizedBox(height: 20),
               RecentActivitySection(

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/board/board_detail_screen.dart';
 import '../features/board/board_screen.dart';
+import '../features/crates/crates_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/maps/maps_screen.dart';
 import '../features/my/my_screen.dart';
@@ -45,6 +46,11 @@ GoRouter createAppRouter({
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsScreen(),
+      ),
+      // 상자깡 시뮬은 몰입해서 쓰는 화면이라 탭 전환 없이 전체를 쓴다.
+      GoRoute(
+        path: '/crates',
+        builder: (context, state) => const CratesScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

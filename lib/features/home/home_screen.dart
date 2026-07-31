@@ -230,6 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onRankingsTap: () => context.go('/rankings'),
               onMapsTap: () => context.go('/maps'),
               onBoardTap: () => context.go('/board'),
+              onNotificationsTap: () => context.push('/notifications'),
             ),
             if (_loadingStore || remainingRecent.isNotEmpty) ...[
               const SizedBox(height: 20),

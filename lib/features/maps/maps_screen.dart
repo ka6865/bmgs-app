@@ -118,12 +118,9 @@ class _MapsScreenState extends State<MapsScreen> {
               ..sort();
 
         return ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            const BgmsBrandHeader(
-              title: '지도',
-              subtitle: '맵별 차량, 비밀방, 글라이더, 보트 등 전술 마커 분포를 확인합니다.',
-            ),
+            const ScreenHeader(title: '전술 지도'),
             const SizedBox(height: BgmsSpacing.lg),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -281,16 +278,16 @@ class _MapPanelState extends State<_MapPanel> {
                 const SizedBox(height: BgmsSpacing.md),
                 Text(
                   marker.label,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: BgmsSpacing.sm),
                 Text(
                   '위치 좌표: (X: ${(marker.x * 100).toStringAsFixed(1)}%, Y: ${(marker.y * 100).toStringAsFixed(1)}%)',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: BgmsColors.textMuted,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: BgmsColors.textMuted),
                 ),
                 const SizedBox(height: BgmsSpacing.md),
                 Text(

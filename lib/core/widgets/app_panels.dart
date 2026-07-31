@@ -228,9 +228,9 @@ class LoadingCard extends StatelessWidget {
             if (label != null) ...[
               Text(
                 label,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: BgmsColors.textSecondary),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: BgmsColors.textSecondary,
+                ),
               ),
               const SizedBox(height: BgmsSpacing.md),
             ],

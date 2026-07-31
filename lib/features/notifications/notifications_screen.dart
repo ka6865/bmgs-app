@@ -28,9 +28,7 @@ class NotificationsScreen extends ConsumerWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    created > 0
-                        ? '새 알림 $created건을 확인했습니다.'
-                        : '변경된 전적이 없습니다.',
+                    created > 0 ? '새 알림 $created건을 확인했습니다.' : '변경된 전적이 없습니다.',
                   ),
                 ),
               );
@@ -110,22 +108,27 @@ class _NotificationList extends ConsumerWidget {
 
     final controller = ref.read(notificationControllerProvider);
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(BgmsSpacing.lg),
-      itemCount: notifications.length,
-      separatorBuilder: (context, index) =>
-          const SizedBox(height: BgmsSpacing.sm),
-      itemBuilder: (context, index) {
-        final notification = notifications[index];
-        return _NotificationTile(
-          notification: notification,
-          onTap: () async {
-            await controller.markAsRead(notification.id);
-            if (!context.mounted) return;
-            context.go(notification.destination);
-          },
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        await controller.refreshNow();
       },
+      child: ListView.separated(
+        padding: const EdgeInsets.all(BgmsSpacing.lg),
+        itemCount: notifications.length,
+        separatorBuilder: (context, index) =>
+            const SizedBox(height: BgmsSpacing.sm),
+        itemBuilder: (context, index) {
+          final notification = notifications[index];
+          return _NotificationTile(
+            notification: notification,
+            onTap: () async {
+              await controller.markAsRead(notification.id);
+              if (!context.mounted) return;
+              context.go(notification.destination);
+            },
+          );
+        },
+      ),
     );
   }
 }

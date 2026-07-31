@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/config/app_config.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/bgms_api_client.dart';
+import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import '../../navigation/shell_scaffold.dart';
@@ -57,6 +58,15 @@ class _MyScreenState extends State<MyScreen> {
     });
   }
 
+  /// 목록에서 선택한 플레이어의 전적 화면으로 이동한다.
+  void _openStats(StoredPlayer player) {
+    final destination = PlayerSearchDestination(
+      nickname: player.nickname,
+      platform: normalizePlayerPlatform(player.platform),
+    );
+    context.go(destination.location);
+  }
+
   Future<void> _clearRecent(_MyScreenStateData state) async {
     await state.store.clearRecentSearches();
     _refresh();
@@ -76,12 +86,9 @@ class _MyScreenState extends State<MyScreen> {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        const BgmsBrandHeader(
-          title: '마이',
-          subtitle: '최근 검색, 즐겨찾기, 계정 연결 상태를 관리합니다.',
-        ),
+        const ScreenHeader(title: '내 정보'),
         const SizedBox(height: 16),
         // Supabase 초기화 여부에 따라 인증 섹션 분기
         if (!AppConfig.local.canInitializeSupabase)
@@ -130,6 +137,7 @@ class _MyScreenState extends State<MyScreen> {
                   title: '최근 검색',
                   emptyText: '최근 검색이 없습니다.',
                   players: state.recentPlayers,
+                  onPlayerTap: _openStats,
                   action: TextButton.icon(
                     onPressed: state.recentPlayers.isEmpty
                         ? null
@@ -143,6 +151,7 @@ class _MyScreenState extends State<MyScreen> {
                   title: '즐겨찾기',
                   emptyText: '즐겨찾기가 없습니다.',
                   players: state.favoritePlayers,
+                  onPlayerTap: _openStats,
                   trailingBuilder: (player) => IconButton(
                     tooltip: '즐겨찾기 해제',
                     onPressed: () => _removeFavorite(state, player),
@@ -1004,6 +1013,7 @@ class _PlayerListCard extends StatelessWidget {
     required this.players,
     this.action,
     this.trailingBuilder,
+    this.onPlayerTap,
   });
 
   final String title;
@@ -1011,6 +1021,9 @@ class _PlayerListCard extends StatelessWidget {
   final List<StoredPlayer> players;
   final Widget? action;
   final Widget Function(StoredPlayer player)? trailingBuilder;
+
+  /// 항목을 눌렀을 때 이동 동작. 홈과 동일하게 전적으로 진입시킨다.
+  final void Function(StoredPlayer player)? onPlayerTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1041,6 +1054,9 @@ class _PlayerListCard extends StatelessWidget {
                 (player) => ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.person_outline),
+                  onTap: onPlayerTap == null
+                      ? null
+                      : () => onPlayerTap!(player),
                   title: Text(
                     player.nickname,
                     maxLines: 1,

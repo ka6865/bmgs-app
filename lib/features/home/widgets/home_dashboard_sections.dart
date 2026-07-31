@@ -198,11 +198,13 @@ class HomeQuickActions extends StatelessWidget {
     required this.onRankingsTap,
     required this.onMapsTap,
     required this.onBoardTap,
+    required this.onNotificationsTap,
   });
 
   final VoidCallback onRankingsTap;
   final VoidCallback onMapsTap;
   final VoidCallback onBoardTap;
+  final VoidCallback onNotificationsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -232,6 +234,15 @@ class HomeQuickActions extends StatelessWidget {
               label: '게시판',
               icon: Icons.forum_outlined,
               onTap: onBoardTap,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 알림 센터는 하단 탭에 없으므로 홈에서 진입 경로를 제공한다.
+          Expanded(
+            child: _QuickAction(
+              label: '알림',
+              icon: Icons.notifications_outlined,
+              onTap: onNotificationsTap,
             ),
           ),
         ],
@@ -315,13 +326,19 @@ class _QuickAction extends StatelessWidget {
               children: [
                 Icon(icon, size: 20, color: BgmsColors.accent),
                 const SizedBox(height: 6),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: BgmsColors.textSecondary,
-                    letterSpacing: 0,
+                // 좁은 화면에서도 라벨이 잘리지 않도록 가로 폭에 맞춰 축소한다.
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: BgmsColors.textSecondary,
+                        letterSpacing: 0,
+                      ),
+                    ),
                   ),
                 ),
               ],

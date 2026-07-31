@@ -144,9 +144,8 @@ class _RankingsScreenState extends State<RankingsScreen> {
       child: ListView(
         padding: const EdgeInsets.all(BgmsSpacing.lg),
         children: [
-          BgmsBrandHeader(
+          ScreenHeader(
             title: '랭킹',
-            subtitle: '주간 딜량, 킬, 티어 기준 상위 플레이어입니다.',
             trailing: IconButton(
               tooltip: '새로고침',
               onPressed: _reload,
@@ -338,7 +337,8 @@ class _RankingTile extends StatelessWidget {
     if (entry.value <= 0) return entry.label;
     return switch (tab) {
       'kills' => '${entry.value.toStringAsFixed(0)} 킬',
-      'tier' => entry.label.isNotEmpty ? entry.label : entry.value.toStringAsFixed(0),
+      'tier' =>
+        entry.label.isNotEmpty ? entry.label : entry.value.toStringAsFixed(0),
       _ => '${entry.value.toStringAsFixed(0)} 딜',
     };
   }

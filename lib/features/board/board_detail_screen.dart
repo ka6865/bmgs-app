@@ -82,7 +82,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
 
         final post = snapshot.data!;
         return ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
             Text(
               post.title,

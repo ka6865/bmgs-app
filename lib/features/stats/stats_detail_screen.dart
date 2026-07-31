@@ -209,12 +209,12 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   Widget build(BuildContext context) {
     final nickname = widget.nickname?.trim() ?? '';
 
-    return ListView(
-      padding: const EdgeInsets.all(20),
+    final content = ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        BgmsBrandHeader(
+        ScreenHeader(
           title: nickname.isEmpty ? '전적 분석' : '전적',
-          subtitle: nickname.isEmpty ? '분석할 플레이어를 선택하세요.' : nickname,
+          subtitle: nickname.isEmpty ? null : nickname,
           trailing: nickname.isEmpty
               ? null
               : IconButton(
@@ -280,6 +280,10 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
           ),
       ],
     );
+
+    // 검색 전에는 새로고침할 대상이 없으므로 결과 화면에서만 당겨서 새로고침을 붙인다.
+    if (nickname.isEmpty) return content;
+    return RefreshIndicator(onRefresh: () async => _retry(), child: content);
   }
 }
 

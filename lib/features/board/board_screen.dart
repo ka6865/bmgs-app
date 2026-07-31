@@ -25,6 +25,14 @@ class _BoardScreenState extends State<BoardScreen> {
   bool _loadingMore = false;
   String? _error;
 
+  /// 게시판 분류 키와 표시 라벨.
+  static const _categories = <MapEntry<String, String>>[
+    MapEntry('all', '전체'),
+    MapEntry('free', '자유'),
+    MapEntry('strategy', '공략'),
+    MapEntry('question', '질문'),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -87,49 +95,51 @@ class _BoardScreenState extends State<BoardScreen> {
     return RefreshIndicator(
       onRefresh: () => _load(reset: true),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          const BgmsBrandHeader(
-            title: '게시판',
-            subtitle: 'BGMS 커뮤니티 글을 확인하고 로그인 후 글과 댓글을 작성합니다.',
+          ScreenHeader(
+            title: '커뮤니티',
+            trailing: IconButton(
+              onPressed: _openWriteDialog,
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: '글쓰기',
+              style: IconButton.styleFrom(
+                backgroundColor: BgmsColors.accent,
+                foregroundColor: BgmsColors.bgBase,
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  textInputAction: TextInputAction.search,
-                  decoration: const InputDecoration(
-                    labelText: '검색',
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                  onSubmitted: (_) => _load(reset: true),
-                ),
-              ),
-              const SizedBox(width: 10),
-              FilledButton.icon(
-                onPressed: _openWriteDialog,
-                icon: const Icon(Icons.edit),
-                label: const Text('글쓰기'),
-              ),
-            ],
+          const SizedBox(height: 14),
+          TextField(
+            controller: _searchController,
+            textInputAction: TextInputAction.search,
+            decoration: const InputDecoration(
+              isDense: true,
+              hintText: '제목이나 내용 검색',
+              prefixIcon: Icon(Icons.search, size: 20),
+            ),
+            onSubmitted: (_) => _load(reset: true),
           ),
           const SizedBox(height: 12),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'all', label: Text('전체')),
-                ButtonSegment(value: 'free', label: Text('자유')),
-                ButtonSegment(value: 'strategy', label: Text('공략')),
-                ButtonSegment(value: 'question', label: Text('질문')),
+            child: Row(
+              children: [
+                for (final category in _categories)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(category.value),
+                      selected: _category == category.key,
+                      showCheckmark: false,
+                      onSelected: (selected) {
+                        if (!selected || _category == category.key) return;
+                        setState(() => _category = category.key);
+                        _load(reset: true);
+                      },
+                    ),
+                  ),
               ],
-              selected: {_category},
-              onSelectionChanged: (values) {
-                setState(() => _category = values.first);
-                _load(reset: true);
-              },
             ),
           ),
           const SizedBox(height: 16),

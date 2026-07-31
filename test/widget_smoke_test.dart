@@ -273,7 +273,32 @@ void main() {
     await tester.tap(find.text('게시판').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('BGMS 커뮤니티 글을 확인하고 로그인 후 글과 댓글을 작성합니다.'), findsOneWidget);
+    // 하단 탭에 '게시판'이 있으므로 화면 제목은 중복되지 않는 이름을 쓴다.
+    expect(find.text('커뮤니티'), findsOneWidget);
+    expect(find.byTooltip('글쓰기'), findsOneWidget);
+  });
+
+  testWidgets('home quick action opens the notification center', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    // 앞선 테스트가 남긴 라우터 위치와 무관하게 홈에서 시작한다.
+    await tester.tap(find.widgetWithText(NavigationDestination, '홈'));
+    await tester.pumpAndSettle();
+
+    // 알림 센터는 하단 탭에 없으므로 홈 빠른 메뉴가 유일한 진입 경로다.
+    await tester.tap(find.text('알림').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('모두 읽음'), findsOneWidget);
+
+    // push로 열린 화면이므로 닫아서 다음 테스트에 셸 상태를 남기지 않는다.
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('빠른 메뉴'), findsOneWidget);
   });
 
   testWidgets('stats tab shows analysis workspace without home duplicates', (
@@ -370,10 +395,32 @@ void main() {
     await tester.tap(find.byIcon(Icons.person));
     await tester.pumpAndSettle();
 
-    expect(find.text('마이'), findsWidgets);
+    // 하단 탭 라벨이 '마이'이므로 화면 제목은 '내 정보'로 구분한다.
+    expect(find.text('내 정보'), findsOneWidget);
     expect(find.text('로그인 준비 상태'), findsOneWidget);
     expect(find.text('최근 검색이 없습니다.'), findsOneWidget);
     expect(find.text('즐겨찾기가 없습니다.'), findsOneWidget);
+  });
+
+  testWidgets('my tab player row opens stats with stored platform', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'bgms_recent_searches': ['kakao\tmyTabPlayer'],
+    });
+    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.person));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('myTabPlayer'));
+    await tester.pumpAndSettle();
+
+    // 전적 화면으로 이동해 저장된 플랫폼(kakao)이 유지되는지 확인한다.
+    expect(find.text('전적'), findsWidgets);
+    expect(find.text('myTabPlayer'), findsWidgets);
+    expect(find.text('최근 검색이 없습니다.'), findsNothing);
   });
 
   testWidgets('my tab exposes terms, privacy policy and app version', (

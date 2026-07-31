@@ -58,35 +58,25 @@ class ScreenHeader extends StatelessWidget {
   }
 }
 
+/// 브랜드 로고 헤더. 홈 상단에서만 쓴다.
+///
+/// 다른 화면은 하단 탭에 이름이 있으므로 [ScreenHeader]를 쓴다.
 class BgmsBrandHeader extends StatelessWidget {
   const BgmsBrandHeader({
     super.key,
     required this.title,
     this.subtitle,
     this.trailing,
-    this.filled = true,
   });
 
   final String title;
   final String? subtitle;
   final Widget? trailing;
 
-  /// 배경 박스를 그릴지 여부. 홈처럼 상단을 가볍게 두는 화면은 false로 쓴다.
-  final bool filled;
-
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: filled
-          ? const EdgeInsets.all(16)
-          : const EdgeInsets.symmetric(vertical: 4),
-      decoration: filled
-          ? BoxDecoration(
-              color: BgmsColors.elevated,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: BgmsColors.border),
-            )
-          : null,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           Expanded(

@@ -187,7 +187,6 @@ class _HomeScreenState extends State<HomeScreen> {
             const BgmsBrandHeader(
               title: 'BGMS',
               trailing: NotificationBell(),
-              filled: false,
             ),
             const SizedBox(height: 14),
             HomeSearchBar(

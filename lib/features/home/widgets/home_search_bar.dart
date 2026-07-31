@@ -1,0 +1,184 @@
+import 'package:flutter/material.dart';
+
+import '../../../core/theme/bgms_theme.dart';
+
+/// 홈 상단의 한 줄 검색 바.
+///
+/// 전적 탭에는 플랫폼 선택과 분석 버튼을 갖춘 전체 검색 허브가 따로 있다.
+/// 홈에서는 진입 동선만 담당하므로 입력 한 줄과 플랫폼 토글로 압축한다.
+class HomeSearchBar extends StatelessWidget {
+  const HomeSearchBar({
+    super.key,
+    required this.controller,
+    required this.platform,
+    required this.searching,
+    required this.onPlatformChanged,
+    required this.onSearch,
+    required this.onTextChanged,
+    this.errorText,
+  });
+
+  final TextEditingController controller;
+  final String platform;
+  final bool searching;
+  final String? errorText;
+  final ValueChanged<String> onPlatformChanged;
+  final VoidCallback onSearch;
+  final VoidCallback onTextChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: TextField(
+            controller: controller,
+            textInputAction: TextInputAction.search,
+            enabled: !searching,
+            onChanged: (_) => onTextChanged(),
+            onSubmitted: (_) => onSearch(),
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: 'PUBG 플레이어 검색',
+              hintText: 'KangHeeSung_',
+              errorText: errorText,
+              prefixIcon: const Icon(Icons.search, size: 20),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _PlatformToggle(
+          platform: platform,
+          enabled: !searching,
+          onChanged: onPlatformChanged,
+        ),
+        const SizedBox(width: 8),
+        _SearchButton(searching: searching, onSearch: onSearch),
+      ],
+    );
+  }
+}
+
+/// 스팀과 카카오를 번갈아 선택하는 소형 토글.
+class _PlatformToggle extends StatelessWidget {
+  const _PlatformToggle({
+    required this.platform,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String platform;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: BgmsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: BgmsColors.border),
+      ),
+      child: Row(
+        children: [
+          _PlatformChip(
+            label: 'Steam',
+            value: 'steam',
+            selected: platform == 'steam',
+            enabled: enabled,
+            onChanged: onChanged,
+          ),
+          _PlatformChip(
+            label: 'Kakao',
+            value: 'kakao',
+            selected: platform == 'kakao',
+            enabled: enabled,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlatformChip extends StatelessWidget {
+  const _PlatformChip({
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final bool selected;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: InkWell(
+        onTap: enabled ? () => onChanged(value) : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 44,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: selected ? BgmsColors.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: selected ? BgmsColors.bgBase : BgmsColors.textSecondary,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 검색 실행 버튼. 아이콘만 노출하므로 툴팁으로 용도를 설명한다.
+class _SearchButton extends StatelessWidget {
+  const _SearchButton({required this.searching, required this.onSearch});
+
+  final bool searching;
+  final VoidCallback onSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: '전적 검색',
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: FilledButton(
+          key: const Key('home_search_submit'),
+          onPressed: searching ? null : onSearch,
+          style: FilledButton.styleFrom(
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: searching
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.arrow_forward, size: 20),
+        ),
+      ),
+    );
+  }
+}

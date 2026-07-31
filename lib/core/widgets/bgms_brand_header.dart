@@ -8,21 +8,29 @@ class BgmsBrandHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.trailing,
+    this.filled = true,
   });
 
   final String title;
   final String? subtitle;
   final Widget? trailing;
 
+  /// 배경 박스를 그릴지 여부. 홈처럼 상단을 가볍게 두는 화면은 false로 쓴다.
+  final bool filled;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: BgmsColors.elevated,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: BgmsColors.border),
-      ),
+      padding: filled
+          ? const EdgeInsets.all(16)
+          : const EdgeInsets.symmetric(vertical: 4),
+      decoration: filled
+          ? BoxDecoration(
+              color: BgmsColors.elevated,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: BgmsColors.border),
+            )
+          : null,
       child: Row(
         children: [
           Expanded(

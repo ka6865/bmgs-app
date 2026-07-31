@@ -3,6 +3,37 @@ import 'package:flutter/material.dart';
 import '../../../core/storage/local_player_store.dart';
 import '../../../core/theme/bgms_theme.dart';
 
+/// 배경 장식과 잉크 효과를 함께 제공하는 래퍼.
+///
+/// Card 중첩을 피하면서도 InkWell이 요구하는 Material 조상을 보장한다.
+class _InkSurface extends StatelessWidget {
+  const _InkSurface({
+    required this.decoration,
+    required this.borderRadius,
+    required this.child,
+  });
+
+  final BoxDecoration decoration;
+  final double borderRadius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: decoration,
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(borderRadius),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      ),
+    );
+  }
+}
+
+/// 최근 검색한 플레이어를 강조해 다시 진입하도록 돕는 히어로 카드.
+///
+/// 홈에서 유일하게 강조 색을 크게 쓰는 요소다.
 class ContinuePlayerCard extends StatelessWidget {
   const ContinuePlayerCard({
     super.key,
@@ -19,16 +50,74 @@ class ContinuePlayerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final theme = Theme.of(context);
+
+    return _InkSurface(
+      borderRadius: 10,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: BgmsColors.accent.withValues(alpha: 0.45)),
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            BgmsColors.accent.withValues(alpha: 0.16),
+            BgmsColors.elevated,
+          ],
+        ),
+      ),
       child: InkWell(
+        key: const Key('home_continue_player'),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          height: 76,
-          child: _ContinuePlayerContent(
-            player: player,
-            isFavorite: isFavorite,
-            onFavoriteTap: onFavoriteTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              _PlayerAvatar(nickname: player.nickname, size: 44),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '이어서 보기',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: BgmsColors.accent,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${player.nickname} · ${player.platform}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onFavoriteTap,
+                icon: Icon(
+                  isFavorite ? Icons.star : Icons.star_border,
+                  size: 20,
+                ),
+                color: isFavorite
+                    ? BgmsColors.accent
+                    : BgmsColors.textSecondary,
+                tooltip: isFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가',
+                visualDensity: VisualDensity.compact,
+              ),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: BgmsColors.textMuted,
+              ),
+            ],
           ),
         ),
       ),
@@ -36,56 +125,34 @@ class ContinuePlayerCard extends StatelessWidget {
   }
 }
 
-class _ContinuePlayerContent extends StatelessWidget {
-  const _ContinuePlayerContent({
-    required this.player,
-    required this.isFavorite,
-    required this.onFavoriteTap,
-  });
+/// 닉네임 첫 글자를 쓰는 단색 아바타. 서버가 프로필 이미지를 주지 않아 대체 표현이다.
+class _PlayerAvatar extends StatelessWidget {
+  const _PlayerAvatar({required this.nickname, this.size = 32});
 
-  final StoredPlayer player;
-  final bool isFavorite;
-  final VoidCallback onFavoriteTap;
+  final String nickname;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          const Icon(Icons.play_circle_outline, color: BgmsColors.accent),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '이어서 보기',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: BgmsColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${player.nickname} · ${player.platform}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: onFavoriteTap,
-            icon: Icon(isFavorite ? Icons.star : Icons.star_border),
-            color: isFavorite ? BgmsColors.accent : null,
-            tooltip: isFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가',
-          ),
-          const Icon(Icons.chevron_right),
-        ],
+    final initial = nickname.trim().isEmpty
+        ? '?'
+        : nickname.trim().characters.first.toUpperCase();
+
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: BgmsColors.surface,
+        borderRadius: BorderRadius.circular(size / 3),
+        border: Border.all(color: BgmsColors.border),
+      ),
+      child: Text(
+        initial,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: BgmsColors.accent,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -106,25 +173,23 @@ class FavoritePlayersSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!loading && players.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '즐겨찾는 플레이어',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '즐겨찾기를 추가하면 빠르게 전적을 확인할 수 있습니다.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: BgmsColors.textSecondary),
-            ),
-          ],
+      return _DashboardSection(
+        title: '즐겨찾는 플레이어',
+        icon: Icons.star_outline,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          decoration: BoxDecoration(
+            color: BgmsColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: BgmsColors.border),
+          ),
+          child: Text(
+            '즐겨찾기를 추가하면 빠르게 전적을 확인할 수 있습니다.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: BgmsColors.textSecondary),
+          ),
         ),
       );
     }
@@ -134,18 +199,20 @@ class FavoritePlayersSection extends StatelessWidget {
       icon: Icons.star_outline,
       child: loading
           ? const LinearProgressIndicator()
-          : SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: players.take(5).map((player) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _FavoritePlayerButton(
-                      player: player,
-                      onTap: () => onTap(player),
-                    ),
+          : SizedBox(
+              height: 84,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.zero,
+                itemCount: players.take(5).length,
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final player = players[index];
+                  return _FavoritePlayerButton(
+                    player: player,
+                    onTap: () => onTap(player),
                   );
-                }).toList(),
+                },
               ),
             ),
     );
@@ -221,15 +288,31 @@ class RecentActivitySection extends StatelessWidget {
       icon: Icons.history,
       child: loading
           ? const LinearProgressIndicator()
-          : Column(
-              children: players.map((player) {
-                return _PlayerRow(player: player, onTap: () => onTap(player));
-              }).toList(),
+          : _InkSurface(
+              borderRadius: 8,
+              decoration: BoxDecoration(
+                color: BgmsColors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: BgmsColors.border),
+              ),
+              child: Column(
+                children: [
+                  for (var index = 0; index < players.length; index++)
+                    _PlayerRow(
+                      player: players[index],
+                      isLast: index == players.length - 1,
+                      onTap: () => onTap(players[index]),
+                    ),
+                ],
+              ),
             ),
     );
   }
 }
 
+/// 홈 섹션 공통 레이아웃.
+///
+/// 카드로 감싸지 않고 소제목 + 내용 밴드로 두어 카드 중첩을 만들지 않는다.
 class _DashboardSection extends StatelessWidget {
   const _DashboardSection({
     required this.title,
@@ -243,29 +326,28 @@ class _DashboardSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Icon(icon, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+            Icon(icon, size: 15, color: BgmsColors.textMuted),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: BgmsColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-            child,
           ],
         ),
-      ),
+        const SizedBox(height: 10),
+        child,
+      ],
     );
   }
 }
@@ -283,18 +365,37 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        height: 72,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: BgmsColors.accent),
-            const SizedBox(height: 6),
-            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ],
+    return Tooltip(
+      message: label,
+      child: _InkSurface(
+        borderRadius: 8,
+        decoration: BoxDecoration(
+          color: BgmsColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: BgmsColors.border),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: 64,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 20, color: BgmsColors.accent),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: BgmsColors.textSecondary,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -302,31 +403,78 @@ class _QuickAction extends StatelessWidget {
 }
 
 class _PlayerRow extends StatelessWidget {
-  const _PlayerRow({required this.player, required this.onTap});
+  const _PlayerRow({
+    required this.player,
+    required this.onTap,
+    this.isLast = false,
+  });
 
   final StoredPlayer player;
   final VoidCallback onTap;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        height: 48,
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          border: isLast
+              ? null
+              : const Border(bottom: BorderSide(color: BgmsColors.border)),
+        ),
         child: Row(
           children: [
-            const Icon(Icons.person_outline, size: 20),
-            const SizedBox(width: 12),
+            _PlayerAvatar(nickname: player.nickname, size: 30),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
-                '${player.nickname} · ${player.platform}',
+                player.nickname,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
-            const Icon(Icons.chevron_right, size: 20),
+            const SizedBox(width: 8),
+            _PlatformBadge(platform: player.platform),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: BgmsColors.textMuted,
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 플랫폼을 짧게 표기하는 배지.
+class _PlatformBadge extends StatelessWidget {
+  const _PlatformBadge({required this.platform});
+
+  final String platform;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: BgmsColors.surface,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: BgmsColors.border),
+      ),
+      child: Text(
+        platform,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: BgmsColors.textMuted,
+          letterSpacing: 0,
         ),
       ),
     );
@@ -341,24 +489,50 @@ class _FavoritePlayerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        width: 148,
-        height: 48,
-        child: Row(
-          children: [
-            const Icon(Icons.star, size: 18, color: BgmsColors.accent),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '${player.nickname} · ${player.platform}',
+    return _InkSurface(
+      borderRadius: 8,
+      decoration: BoxDecoration(
+        color: BgmsColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: BgmsColors.border),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 132,
+          height: 84,
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _PlayerAvatar(nickname: player.nickname, size: 26),
+                  const Spacer(),
+                  const Icon(Icons.star, size: 13, color: BgmsColors.accent),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                player.nickname,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
               ),
-            ),
-          ],
+              Text(
+                player.platform,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: BgmsColors.textMuted,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

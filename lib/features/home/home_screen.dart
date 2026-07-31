@@ -5,10 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/observability/app_logger.dart';
 import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
+import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import '../../navigation/shell_scaffold.dart';
 import '../notifications/notification_bell.dart';
 import 'widgets/home_dashboard_sections.dart';
+import 'widgets/home_search_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.preferencesLoader});
@@ -173,119 +175,75 @@ class _HomeScreenState extends State<HomeScreen> {
     final latestPlayer = _recentPlayers.isEmpty ? null : _recentPlayers.first;
     final remainingRecent = _recentPlayers.skip(1).toList();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const BgmsBrandHeader(title: 'BGMS', trailing: NotificationBell()),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _nicknameController,
-                    textInputAction: TextInputAction.search,
-                    enabled: !_searching,
-                    onChanged: (_) {
-                      if (_nicknameError == null) return;
-                      setState(() => _nicknameError = null);
-                    },
-                    onSubmitted: (_) => _search(),
-                    decoration: InputDecoration(
-                      labelText: 'PUBG 플레이어 검색',
-                      hintText: 'KangHeeSung_',
-                      errorText: _nicknameError,
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: IconButton(
-                        onPressed: _searching ? null : _search,
-                        icon: _searching
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.arrow_forward),
-                        tooltip: '검색',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(value: 'steam', label: Text('Steam')),
-                        ButtonSegment(value: 'kakao', label: Text('Kakao')),
-                      ],
-                      selected: {_platform},
-                      onSelectionChanged: _searching
-                          ? null
-                          : (selection) {
-                              setState(() => _platform = selection.first);
-                            },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _searching ? null : _search,
-                      icon: _searching
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.search),
-                      label: Text(_searching ? '검색 중...' : '전적 검색'),
-                    ),
-                  ),
-                ],
-              ),
+    // 셸이 Scaffold를 제공하지만, 홈을 단독으로 띄우는 경우에도
+    // TextField와 InkWell이 요구하는 Material 기반을 보장한다.
+    return Material(
+      color: BgmsColors.bgBase,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const BgmsBrandHeader(
+              title: 'BGMS',
+              trailing: NotificationBell(),
+              filled: false,
             ),
-          ),
-          if (latestPlayer != null) ...[
-            const SizedBox(height: 12),
-            ContinuePlayerCard(
-              player: latestPlayer,
-              isFavorite: _favoritePlayers.any(
-                (player) => player.id == latestPlayer.id,
-              ),
-              onTap: () => _search(
-                nickname: latestPlayer.nickname,
-                platform: latestPlayer.platform,
-              ),
-              onFavoriteTap: () => _toggleFavorite(latestPlayer),
+            const SizedBox(height: 14),
+            HomeSearchBar(
+              controller: _nicknameController,
+              platform: _platform,
+              searching: _searching,
+              errorText: _nicknameError,
+              onPlatformChanged: (platform) {
+                setState(() => _platform = platform);
+              },
+              onSearch: _search,
+              onTextChanged: () {
+                if (_nicknameError == null) return;
+                setState(() => _nicknameError = null);
+              },
             ),
-          ],
-          const SizedBox(height: 12),
-          FavoritePlayersSection(
-            players: _favoritePlayers,
-            loading: _loadingStore,
-            onTap: (player) =>
-                _search(nickname: player.nickname, platform: player.platform),
-          ),
-          const SizedBox(height: 12),
-          HomeQuickActions(
-            onRankingsTap: () => context.go('/rankings'),
-            onMapsTap: () => context.go('/maps'),
-            onBoardTap: () => context.go('/board'),
-          ),
-          if (_loadingStore || remainingRecent.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            RecentActivitySection(
-              players: remainingRecent,
+            if (latestPlayer != null) ...[
+              const SizedBox(height: 16),
+              ContinuePlayerCard(
+                player: latestPlayer,
+                isFavorite: _favoritePlayers.any(
+                  (player) => player.id == latestPlayer.id,
+                ),
+                onTap: () => _search(
+                  nickname: latestPlayer.nickname,
+                  platform: latestPlayer.platform,
+                ),
+                onFavoriteTap: () => _toggleFavorite(latestPlayer),
+              ),
+            ],
+            const SizedBox(height: 20),
+            FavoritePlayersSection(
+              players: _favoritePlayers,
               loading: _loadingStore,
               onTap: (player) =>
                   _search(nickname: player.nickname, platform: player.platform),
             ),
+            const SizedBox(height: 20),
+            HomeQuickActions(
+              onRankingsTap: () => context.go('/rankings'),
+              onMapsTap: () => context.go('/maps'),
+              onBoardTap: () => context.go('/board'),
+            ),
+            if (_loadingStore || remainingRecent.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              RecentActivitySection(
+                players: remainingRecent,
+                loading: _loadingStore,
+                onTap: (player) => _search(
+                  nickname: player.nickname,
+                  platform: player.platform,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

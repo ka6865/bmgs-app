@@ -76,7 +76,7 @@ void main() {
 
       await tester.tap(find.text('Kakao'));
       await tester.enterText(find.byType(TextField), 'firstLaunchPlayer');
-      await tester.tap(find.text('전적 검색'));
+      await tester.tap(find.byKey(const Key('home_search_submit')));
       await tester.pump();
 
       await tester.tap(find.text('Kakao'));
@@ -114,7 +114,7 @@ void main() {
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
 
       await tester.enterText(find.byType(TextField), 'homeDelayedPlayer');
-      await tester.tap(find.text('전적 검색'));
+      await tester.tap(find.byKey(const Key('home_search_submit')));
       await tester.pump();
 
       await tester.tap(find.byIcon(Icons.map).last);
@@ -138,10 +138,7 @@ void main() {
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
 
-    final continuePlayer = find.ancestor(
-      of: find.text('이어서 보기'),
-      matching: find.byType(InkWell),
-    );
+    final continuePlayer = find.byKey(const Key('home_continue_player'));
     expect(continuePlayer, findsOneWidget);
     await tester.tap(continuePlayer);
     await tester.pumpAndSettle();
@@ -169,7 +166,9 @@ void main() {
         await store.isFavorite('favoriteCandidate', platform: 'kakao'),
         isTrue,
       );
-      expect(find.text('favoriteCandidate · kakao'), findsNWidgets(2));
+      // 히어로 카드는 '닉네임 · 플랫폼' 한 줄, 즐겨찾기 타일은 닉네임과 플랫폼을 두 줄로 나눠 표시한다.
+      expect(find.text('favoriteCandidate · kakao'), findsOneWidget);
+      expect(find.text('favoriteCandidate'), findsOneWidget);
       expect(find.byTooltip('즐겨찾기 해제'), findsOneWidget);
 
       await tester.tap(find.byTooltip('즐겨찾기 해제'));
@@ -180,6 +179,7 @@ void main() {
         isFalse,
       );
       expect(find.text('favoriteCandidate · kakao'), findsOneWidget);
+      expect(find.text('favoriteCandidate'), findsNothing);
       expect(find.text('즐겨찾기를 추가하면 빠르게 전적을 확인할 수 있습니다.'), findsOneWidget);
     },
   );
@@ -236,7 +236,7 @@ void main() {
     await tester.pumpWidget(const BgmsApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('전적 검색'));
+    await tester.tap(find.byKey(const Key('home_search_submit')));
     await tester.pumpAndSettle();
 
     expect(find.text('닉네임을 입력해 주세요.'), findsOneWidget);
@@ -585,11 +585,7 @@ GoRouter _createStatsSearchRouter() {
 class FakeMapsRepository extends Fake implements MapsRepository {
   @override
   List<BgmsMap> get availableMaps => const [
-    BgmsMap(
-      id: 'Erangel',
-      name: 'Erangel',
-      tilePath: 'Erangel',
-    ),
+    BgmsMap(id: 'Erangel', name: 'Erangel', tilePath: 'Erangel'),
   ];
 
   @override

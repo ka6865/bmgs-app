@@ -351,10 +351,12 @@ class _BenchmarkScoreCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   '상위권 벤치마크 점수',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: BgmsColors.textPrimary),
-                ),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 Text(
                   '${benchmark.tier} 등급',
                   style: const TextStyle(color: BgmsColors.accent, fontWeight: FontWeight.bold),
@@ -514,10 +516,12 @@ class _TacticalPositioningCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '교전 포지셔닝 및 고립 지수',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: BgmsColors.textPrimary),
-            ),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -620,10 +624,12 @@ class _TeamBackupCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '팀 백업 및 소생 기여도',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: BgmsColors.textPrimary),
-            ),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -718,10 +724,12 @@ class _SpecialCombatCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '특수 전투 지표 및 1:1 결정력',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: BgmsColors.textPrimary),
-            ),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             if (hasVehicleStats) ...[
               const SizedBox(height: 16),
               const _SubsectionLabel(

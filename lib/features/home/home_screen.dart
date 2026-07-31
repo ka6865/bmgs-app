@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/observability/app_logger.dart';
 import '../../core/player/player_search_flow.dart';
+import '../../core/player/player_suggestion_controller.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/bgms_brand_header.dart';
@@ -11,11 +12,17 @@ import '../../navigation/shell_scaffold.dart';
 import '../notifications/notification_bell.dart';
 import 'widgets/home_dashboard_sections.dart';
 import 'widgets/home_search_bar.dart';
+import 'widgets/player_suggestion_list.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.preferencesLoader});
+  const HomeScreen({super.key, this.preferencesLoader, this.suggestionFetcher});
 
   final Future<SharedPreferences> Function()? preferencesLoader;
+
+  /// 닉네임 자동완성 조회. 지정하지 않으면 자동완성을 비활성한다.
+  ///
+  /// 위젯 테스트가 네트워크를 타지 않도록 주입 지점을 남긴다.
+  final PlayerSuggestionFetcher? suggestionFetcher;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -32,15 +39,39 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _searching = false;
   String? _nicknameError;
   bool? _wasActive;
+  PlayerSuggestionController? _suggestionController;
 
   @override
   void initState() {
     super.initState();
     _storeReady = _loadStore();
+
+    final fetcher = widget.suggestionFetcher;
+    if (fetcher != null) {
+      _suggestionController =
+          PlayerSuggestionController(
+              fetch: fetcher,
+              onError: (error, stackTrace) {
+                AppObservability.logger.warning(
+                  '닉네임 자동완성 조회에 실패했습니다.',
+                  error: error,
+                  stackTrace: stackTrace,
+                  context: {
+                    'feature': 'home',
+                    'operation': 'fetch_suggestions',
+                  },
+                );
+              },
+            )
+            ..onChanged = () {
+              if (mounted) setState(() {});
+            };
+    }
   }
 
   @override
   void dispose() {
+    _suggestionController?.dispose();
     _nicknameController.dispose();
     super.dispose();
   }
@@ -88,8 +119,18 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// 입력 변화를 받아 검증 문구를 지우고 자동완성을 갱신한다.
+  void _onNicknameChanged() {
+    _suggestionController?.onQueryChanged(_nicknameController.text);
+    if (_nicknameError == null) return;
+    setState(() => _nicknameError = null);
+  }
+
   Future<void> _search({String? nickname, String? platform}) async {
     if (_searching) return;
+
+    // 검색을 실행하면 후보 목록을 닫는다.
+    _suggestionController?.clear();
 
     final cleanNickname = (nickname ?? _nicknameController.text).trim();
     final selectedPlatform = normalizePlayerPlatform(platform ?? _platform);
@@ -184,10 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const BgmsBrandHeader(
-              title: 'BGMS',
-              trailing: NotificationBell(),
-            ),
+            const BgmsBrandHeader(title: 'BGMS', trailing: NotificationBell()),
             const SizedBox(height: 14),
             HomeSearchBar(
               controller: _nicknameController,
@@ -198,11 +236,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 setState(() => _platform = platform);
               },
               onSearch: _search,
-              onTextChanged: () {
-                if (_nicknameError == null) return;
-                setState(() => _nicknameError = null);
-              },
+              onTextChanged: _onNicknameChanged,
             ),
+            if (_suggestionController != null)
+              PlayerSuggestionList(
+                suggestions: _suggestionController!.suggestions,
+                onSelected: (suggestion) => _search(
+                  nickname: suggestion.nickname,
+                  platform: suggestion.platform,
+                ),
+              ),
             if (latestPlayer != null) ...[
               const SizedBox(height: 16),
               ContinuePlayerCard(

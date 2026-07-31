@@ -17,7 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   testWidgets('home renders compact dashboard in empty state', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     expect(find.text('PUBG 플레이어 검색'), findsOneWidget);
@@ -46,7 +46,7 @@ void main() {
         'steam\tfavorite5',
       ],
     });
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     expect(find.text('이어서 보기'), findsOneWidget);
@@ -156,7 +156,7 @@ void main() {
         'bgms_recent_searches': ['kakao\tfavoriteCandidate'],
       });
       final store = LocalPlayerStore(await SharedPreferences.getInstance());
-      await tester.pumpWidget(const BgmsApp());
+      await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byTooltip('즐겨찾기에 추가'));
@@ -212,7 +212,7 @@ void main() {
       'bgms_recent_searches': ['steam\tmanagedPlayer'],
       'bgms_favorite_players': ['steam\tmanagedPlayer'],
     });
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.person));
@@ -233,7 +233,7 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('home_search_submit')));
@@ -247,7 +247,7 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     // 입력이 비어 있으면 지우기 버튼을 노출하지 않는다.
@@ -266,7 +266,7 @@ void main() {
 
   testWidgets('home quick action opens rankings', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('랭킹').last);
@@ -277,7 +277,7 @@ void main() {
 
   testWidgets('home quick action opens maps', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('지도').last);
@@ -288,7 +288,7 @@ void main() {
 
   testWidgets('home quick action opens board', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('게시판').last);
@@ -303,7 +303,7 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     // 앞선 테스트가 남긴 라우터 위치와 무관하게 홈에서 시작한다.
@@ -329,7 +329,7 @@ void main() {
       'bgms_recent_searches': ['steam\tkangheesung_'],
       'bgms_favorite_players': ['kakao\tbgmsTester'],
     });
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('전적'));
@@ -383,7 +383,7 @@ void main() {
 
   testWidgets('rankings tab renders ranking controls', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.leaderboard));
@@ -396,7 +396,7 @@ void main() {
 
   testWidgets('maps tab renders map selectors and layers', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.map));
@@ -410,7 +410,7 @@ void main() {
 
   testWidgets('my tab renders empty local store state', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.person));
@@ -429,7 +429,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'bgms_recent_searches': ['kakao\tmyTabPlayer'],
     });
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.person));
@@ -450,7 +450,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'bgms_recent_searches': ['steam\tundoPlayer'],
     });
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.person));
@@ -474,7 +474,7 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const BgmsApp());
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.person));

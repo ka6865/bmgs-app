@@ -14,7 +14,10 @@ import '../features/stats/match_detail_repository.dart';
 import '../features/stats/player_stats_models.dart';
 import '../features/stats/player_stats_repository.dart';
 import '../features/stats/stats_detail_screen.dart';
+import '../core/config/app_config.dart';
+import '../core/network/bgms_api_client.dart';
 import '../core/player/player_search_flow.dart';
+import '../core/player/player_suggestion_controller.dart';
 import 'shell_scaffold.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -26,7 +29,15 @@ GoRouter createAppRouter({
   Future<SharedPreferences> Function()? statsPreferencesLoader,
   PlayerStatsRepository? statsRepository,
   MatchDetailRepository? matchDetailRepository,
+  PlayerSuggestionFetcher? suggestionFetcher,
+  bool enableSuggestions = true,
 }) {
+  // 위젯 테스트는 enableSuggestions를 false로 두어 네트워크를 타지 않게 한다.
+  final resolvedSuggestionFetcher = enableSuggestions
+      ? (suggestionFetcher ??
+            BgmsApiClient(baseUrl: AppConfig.local.apiBaseUrl).fetchSuggestions)
+      : null;
+
   return GoRouter(
     initialLocation: '/',
     routes: [
@@ -45,8 +56,10 @@ GoRouter createAppRouter({
             routes: [
               GoRoute(
                 path: '/',
-                builder: (context, state) =>
-                    HomeScreen(preferencesLoader: homePreferencesLoader),
+                builder: (context, state) => HomeScreen(
+                  preferencesLoader: homePreferencesLoader,
+                  suggestionFetcher: resolvedSuggestionFetcher,
+                ),
               ),
             ],
           ),

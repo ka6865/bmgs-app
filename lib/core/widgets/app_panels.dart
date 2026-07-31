@@ -3,6 +3,87 @@ import 'package:flutter/material.dart';
 import '../network/api_exception.dart';
 import '../theme/bgms_theme.dart';
 
+/// 배경 장식과 잉크 효과를 함께 제공하는 래퍼.
+///
+/// Card 중첩을 만들지 않으면서 InkWell이 요구하는 Material 조상을 보장한다.
+class InkSurface extends StatelessWidget {
+  const InkSurface({
+    super.key,
+    required this.decoration,
+    required this.child,
+    this.borderRadius = 8,
+  });
+
+  final BoxDecoration decoration;
+  final Widget child;
+  final double borderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: decoration,
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(borderRadius),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      ),
+    );
+  }
+}
+
+/// 카드로 감싸지 않는 섹션 레이아웃.
+///
+/// 카드 안에 카드를 두는 구조를 피하려고 소제목과 내용 밴드만 배치한다.
+/// 내부에 카드형 항목이 반복되는 섹션은 [SectionCard] 대신 이 위젯을 쓴다.
+class SectionBand extends StatelessWidget {
+  const SectionBand({
+    super.key,
+    required this.title,
+    required this.child,
+    this.icon,
+    this.action,
+  });
+
+  final String title;
+  final Widget child;
+  final IconData? icon;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = this.icon;
+    final action = this.action;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 15, color: BgmsColors.textMuted),
+              const SizedBox(width: BgmsSpacing.xs + 2),
+            ],
+            Expanded(
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: BgmsColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+            ?action,
+          ],
+        ),
+        const SizedBox(height: BgmsSpacing.sm + 2),
+        child,
+      ],
+    );
+  }
+}
+
 /// 제목, 액션, 본문 구조를 가진 공통 섹션 카드.
 class SectionCard extends StatelessWidget {
   const SectionCard({

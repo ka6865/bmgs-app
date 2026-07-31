@@ -436,7 +436,10 @@ class _PlayerShortcutPanel extends StatelessWidget {
             if (loading)
               const LinearProgressIndicator()
             else if (players.isEmpty)
-              Text(emptyText, style: const TextStyle(color: BgmsColors.textSecondary))
+              Text(
+                emptyText,
+                style: const TextStyle(color: BgmsColors.textSecondary),
+              )
             else
               Wrap(
                 spacing: 8,
@@ -517,41 +520,29 @@ class _StatsContentState extends State<_StatsContent> {
             _TierInfoPanel(stats: currentStats),
             const SizedBox(height: 12),
           ],
-          // 레이더 차트 카드
-          Card(
-            color: BgmsColors.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: BgmsColors.border),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  const Text(
-                    '성향 분석',
-                    style: TextStyle(
-                      color: BgmsColors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 220,
-                    child: RadarChartWidget(
-                      combat: _calculateCombatScore(currentStats),
-                      tactical: _calculateTacticalScore(currentStats),
-                      survival: _calculateSurvivalScore(currentStats),
-                      teamwork: _calculateTeamworkScore(currentStats),
-                      grit: currentStats.top10Rate,
-                    ),
-                  ),
-                ],
+          SectionBand(
+            title: '성향 분석',
+            icon: Icons.radar_outlined,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: BgmsColors.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: BgmsColors.border),
+              ),
+              child: SizedBox(
+                height: 220,
+                child: RadarChartWidget(
+                  combat: _calculateCombatScore(currentStats),
+                  tactical: _calculateTacticalScore(currentStats),
+                  survival: _calculateSurvivalScore(currentStats),
+                  teamwork: _calculateTeamworkScore(currentStats),
+                  grit: currentStats.top10Rate,
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
 
           // 6개 주요 메트릭 그리드
           _MetricsGrid(
@@ -666,9 +657,7 @@ class _StatsContentState extends State<_StatsContent> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
-                  color: isSelected
-                      ? BgmsColors.accent
-                      : BgmsColors.border,
+                  color: isSelected ? BgmsColors.accent : BgmsColors.border,
                 ),
               ),
             ),
@@ -876,36 +865,41 @@ class _MetricsGrid extends StatelessWidget {
       _Metric('헤드샷 비율', '${headshotRate.toStringAsFixed(1)}%', Icons.gps_fixed),
     ];
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossCount = constraints.maxWidth < 360 ? 2 : 3;
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: metrics.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossCount,
-            childAspectRatio: 1.25,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-          ),
-          itemBuilder: (context, index) {
-            final metric = metrics[index];
-            return Card(
-              color: BgmsColors.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(color: BgmsColors.border),
-              ),
-              child: Padding(
+    return SectionBand(
+      title: '주요 지표',
+      icon: Icons.insights_outlined,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final crossCount = constraints.maxWidth < 360 ? 2 : 3;
+          return GridView.builder(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: metrics.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossCount,
+              childAspectRatio: 1.25,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemBuilder: (context, index) {
+              final metric = metrics[index];
+              return Container(
                 padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: BgmsColors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: BgmsColors.border),
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
                       metric.icon,
                       size: 18,
-                      color: index == 0 ? BgmsColors.accent : BgmsColors.textSecondary,
+                      color: index == 0
+                          ? BgmsColors.accent
+                          : BgmsColors.textSecondary,
                     ),
                     const SizedBox(height: 4),
                     FittedBox(
@@ -932,11 +926,11 @@ class _MetricsGrid extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -996,43 +990,43 @@ class _MatchSummaryPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final matches = bundle.matches;
 
-    return Card(
-      color: BgmsColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: BgmsColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    // 매치 항목 자체가 카드이므로 섹션은 밴드로 두어 카드 중첩을 만들지 않는다.
+    return SectionBand(
+      title: '최근 매치 리스트',
+      icon: Icons.receipt_long_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (bundle.summaryFallback) ...[
             Text(
-              '최근 매치 리스트',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: BgmsColors.textPrimary,
-              ),
+              '일부 매치는 상세 분석 캐시가 없어 모드 정보만 표시합니다.',
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
             ),
-            if (bundle.summaryFallback) ...[
-              const SizedBox(height: 8),
-              const Text(
-                '일부 매치는 상세 분석 캐시가 없어 모드 정보만 표시합니다.',
-                style: TextStyle(color: BgmsColors.textMuted, fontSize: 11),
-              ),
-            ],
-            const SizedBox(height: 12),
-            if (matches.isEmpty)
-              const Text(
-                '최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.',
-                style: TextStyle(color: BgmsColors.textSecondary),
-              )
-            else
-              ...matches.map(
-                (match) => _MatchCard(match: match, profile: bundle.profile),
-              ),
+            const SizedBox(height: 10),
           ],
-        ),
+          if (matches.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              decoration: BoxDecoration(
+                color: BgmsColors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: BgmsColors.border),
+              ),
+              child: Text(
+                '최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: BgmsColors.textSecondary,
+                ),
+              ),
+            )
+          else
+            ...matches.map(
+              (match) => _MatchCard(match: match, profile: bundle.profile),
+            ),
+        ],
       ),
     );
   }
@@ -1404,7 +1398,10 @@ class _StatePanel extends StatelessWidget {
             Text(
               body,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: BgmsColors.textSecondary, fontSize: 13),
+              style: const TextStyle(
+                color: BgmsColors.textSecondary,
+                fontSize: 13,
+              ),
             ),
           ],
         ),
@@ -1455,9 +1452,9 @@ class _LoadingPanel extends StatelessWidget {
                 ),
                 Text(
                   platform.toUpperCase(),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: BgmsColors.textMuted,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: BgmsColors.textMuted),
                 ),
               ],
             ),
@@ -1507,17 +1504,17 @@ class _ErrorPanel extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               '전적을 불러오지 못했습니다',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: BgmsColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: BgmsColors.textSecondary),
             ),
             if (onRetry != null) ...[
               const SizedBox(height: 16),

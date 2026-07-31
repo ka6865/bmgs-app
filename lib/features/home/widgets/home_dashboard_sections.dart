@@ -2,34 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/storage/local_player_store.dart';
 import '../../../core/theme/bgms_theme.dart';
-
-/// 배경 장식과 잉크 효과를 함께 제공하는 래퍼.
-///
-/// Card 중첩을 피하면서도 InkWell이 요구하는 Material 조상을 보장한다.
-class _InkSurface extends StatelessWidget {
-  const _InkSurface({
-    required this.decoration,
-    required this.borderRadius,
-    required this.child,
-  });
-
-  final BoxDecoration decoration;
-  final double borderRadius;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: decoration,
-      child: Material(
-        type: MaterialType.transparency,
-        borderRadius: BorderRadius.circular(borderRadius),
-        clipBehavior: Clip.antiAlias,
-        child: child,
-      ),
-    );
-  }
-}
+import '../../../core/widgets/app_panels.dart';
 
 /// 최근 검색한 플레이어를 강조해 다시 진입하도록 돕는 히어로 카드.
 ///
@@ -52,7 +25,7 @@ class ContinuePlayerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return _InkSurface(
+    return InkSurface(
       borderRadius: 10,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
@@ -173,7 +146,7 @@ class FavoritePlayersSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!loading && players.isEmpty) {
-      return _DashboardSection(
+      return SectionBand(
         title: '즐겨찾는 플레이어',
         icon: Icons.star_outline,
         child: Container(
@@ -194,7 +167,7 @@ class FavoritePlayersSection extends StatelessWidget {
       );
     }
 
-    return _DashboardSection(
+    return SectionBand(
       title: '즐겨찾는 플레이어',
       icon: Icons.star_outline,
       child: loading
@@ -233,7 +206,7 @@ class HomeQuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _DashboardSection(
+    return SectionBand(
       title: '빠른 메뉴',
       icon: Icons.grid_view_outlined,
       child: Row(
@@ -283,12 +256,12 @@ class RecentActivitySection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!loading && players.isEmpty) return const SizedBox.shrink();
 
-    return _DashboardSection(
+    return SectionBand(
       title: '최근 활동',
       icon: Icons.history,
       child: loading
           ? const LinearProgressIndicator()
-          : _InkSurface(
+          : InkSurface(
               borderRadius: 8,
               decoration: BoxDecoration(
                 color: BgmsColors.surface,
@@ -310,48 +283,6 @@ class RecentActivitySection extends StatelessWidget {
   }
 }
 
-/// 홈 섹션 공통 레이아웃.
-///
-/// 카드로 감싸지 않고 소제목 + 내용 밴드로 두어 카드 중첩을 만들지 않는다.
-class _DashboardSection extends StatelessWidget {
-  const _DashboardSection({
-    required this.title,
-    required this.icon,
-    required this.child,
-  });
-
-  final String title;
-  final IconData icon;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 15, color: BgmsColors.textMuted),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                title,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: BgmsColors.textSecondary,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        child,
-      ],
-    );
-  }
-}
-
 class _QuickAction extends StatelessWidget {
   const _QuickAction({
     required this.label,
@@ -367,7 +298,7 @@ class _QuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: label,
-      child: _InkSurface(
+      child: InkSurface(
         borderRadius: 8,
         decoration: BoxDecoration(
           color: BgmsColors.surface,
@@ -489,7 +420,7 @@ class _FavoritePlayerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _InkSurface(
+    return InkSurface(
       borderRadius: 8,
       decoration: BoxDecoration(
         color: BgmsColors.surface,

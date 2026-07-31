@@ -1001,32 +1001,59 @@ class _EmptyStatsPanel extends StatelessWidget {
   }
 }
 
-class _MatchSummaryPanel extends StatelessWidget {
+class _MatchSummaryPanel extends StatefulWidget {
   const _MatchSummaryPanel({required this.bundle});
 
   final PlayerStatsBundle bundle;
 
   @override
+  State<_MatchSummaryPanel> createState() => _MatchSummaryPanelState();
+}
+
+class _MatchSummaryPanelState extends State<_MatchSummaryPanel> {
+  /// 매치 리스트 전용 모드 필터. 기본은 전체를 보여준다.
+  ///
+  /// 상단 큐/모드 선택은 시즌 지표용이므로, 리스트는 사용자가 따로 좁힌다.
+  String _modeFilter = 'all';
+
+  @override
   Widget build(BuildContext context) {
-    final matches = bundle.matches;
+    final all = widget.bundle.matches;
+    final modes = MatchModeFilters.availableModes(all);
+    final filtered = MatchModeFilters.apply(all, _modeFilter);
 
     // 매치 항목 자체가 카드이므로 섹션은 밴드로 두어 카드 중첩을 만들지 않는다.
     return SectionBand(
-      title: '최근 매치 리스트',
+      title: '최근 매치',
       icon: Icons.receipt_long_outlined,
+      action: Text(
+        '${filtered.length}경기',
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (bundle.summaryFallback) ...[
+          if (modes.length > 1) ...[
+            _MatchModeFilter(
+              modes: modes,
+              selected: _modeFilter,
+              labelBuilder: MatchModeFilters.label,
+              onChanged: (mode) => setState(() => _modeFilter = mode),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (widget.bundle.summaryFallback) ...[
             Text(
-              '일부 매치는 상세 분석 캐시가 없어 모드 정보만 표시합니다.',
+              '일부 매치는 서버 분석이 끝나지 않아 요약만 표시합니다.',
               style: Theme.of(
                 context,
               ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
             ),
             const SizedBox(height: 10),
           ],
-          if (matches.isEmpty)
+          if (filtered.isEmpty)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
@@ -1036,15 +1063,57 @@ class _MatchSummaryPanel extends StatelessWidget {
                 border: Border.all(color: BgmsColors.border),
               ),
               child: Text(
-                '최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.',
+                all.isEmpty
+                    ? '최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.'
+                    : '이 모드의 매치가 없습니다. 다른 모드를 선택해 보세요.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: BgmsColors.textSecondary,
                 ),
               ),
             )
           else
-            ...matches.map(
-              (match) => _MatchCard(match: match, profile: bundle.profile),
+            ...filtered.map(
+              (match) =>
+                  _MatchCard(match: match, profile: widget.bundle.profile),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 매치 리스트 상단의 모드 필터. '전체'가 기본 선택이다.
+class _MatchModeFilter extends StatelessWidget {
+  const _MatchModeFilter({
+    required this.modes,
+    required this.selected,
+    required this.labelBuilder,
+    required this.onChanged,
+  });
+
+  final List<String> modes;
+  final String selected;
+  final String Function(String mode) labelBuilder;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final mode in ['all', ...modes])
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(mode == 'all' ? '전체' : labelBuilder(mode)),
+                selected: selected == mode,
+                showCheckmark: false,
+                onSelected: (isSelected) {
+                  if (!isSelected || selected == mode) return;
+                  onChanged(mode);
+                },
+              ),
             ),
         ],
       ),
@@ -1059,48 +1128,54 @@ class _MatchCard extends StatelessWidget {
   final PlayerStatsProfile profile;
 
   String _formatElapsedTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime.toLocal());
+    final difference = DateTime.now().difference(dateTime.toLocal());
+    if (difference.inMinutes < 1) return '방금 전';
+    if (difference.inMinutes < 60) return '${difference.inMinutes}분 전';
+    if (difference.inHours < 24) return '${difference.inHours}시간 전';
+    return '${difference.inDays}일 전';
+  }
 
-    if (difference.inMinutes < 1) {
-      return '방금 전';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}분 전';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}시간 전';
-    } else {
-      return '${difference.inDays}일 전';
-    }
+  /// 순위 구간별 강조 색. 1등은 골드, 상위권은 강조색을 쓴다.
+  Color get _rankColor {
+    final rank = match.rank;
+    if (rank == null) return BgmsColors.textMuted;
+    if (rank == 1) return BgmsColors.accent;
+    if (rank <= 10) return BgmsColors.success;
+    return BgmsColors.textSecondary;
+  }
+
+  String get _modeLabel {
+    final mode = match.gameMode.toLowerCase();
+    final base = mode.contains('squad')
+        ? '스쿼드'
+        : mode.contains('duo')
+        ? '듀오'
+        : mode.contains('solo')
+        ? '솔로'
+        : match.gameMode;
+    return mode.contains('fpp') ? '$base 1인칭' : base;
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isChicken = match.rank == 1;
 
-    // 맵 그라데이션 획득
-    final mapGradient = _getMapGradient(match.mapName);
-
-    // 치킨 하이라이트 보완 그라데이션
-    final finalGradient = isChicken
-        ? LinearGradient(
-            colors: [
-              Colors.amber.withValues(alpha: 0.08),
-              BgmsColors.surface.withValues(alpha: 0.95),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          )
-        : mapGradient;
-
-    final border = Border.all(
-      color: isChicken ? Colors.amber : BgmsColors.border,
-      width: isChicken ? 1.5 : 0.8,
-    );
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.transparent,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkSurface(
+        borderRadius: 10,
+        decoration: BoxDecoration(
+          color: isChicken
+              ? BgmsColors.accent.withValues(alpha: 0.08)
+              : BgmsColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isChicken
+                ? BgmsColors.accent.withValues(alpha: 0.45)
+                : BgmsColors.border,
+          ),
+        ),
         child: InkWell(
           onTap: () {
             context.push(
@@ -1112,153 +1187,89 @@ class _MatchCard extends StatelessWidget {
               },
             );
           },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: finalGradient,
-              borderRadius: BorderRadius.circular(12),
-              border: border,
-              boxShadow: isChicken
-                  ? [
-                      BoxShadow(
-                        color: Colors.amber.withValues(alpha: 0.15),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
               children: [
-                // 맵 전경의 기하학적 백그라운드 연출 (우측에 은은하게 위치)
-                Positioned(
-                  right: -20,
-                  bottom: -20,
-                  top: -20,
-                  child: Opacity(
-                    opacity: 0.08,
-                    child: Icon(
-                      Icons.map_outlined,
-                      size: 130,
-                      color: isChicken ? Colors.amber : BgmsColors.textPrimary,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
-                  ),
+                _RankBlock(rank: match.rank, color: _rankColor),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 상단 윙 & 태그 라인
                       Row(
                         children: [
-                          // 맵 종류 & 모드
                           Expanded(
                             child: Text(
-                              '${match.mapName} · ${match.gameMode.toUpperCase()}',
-                              style: const TextStyle(
-                                color: BgmsColors.textPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                letterSpacing: 0.5,
+                              match.mapName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _formatElapsedTime(match.createdAt),
-                            style: const TextStyle(
-                              color: BgmsColors.textMuted,
-                              fontSize: 12,
+                          if (isChicken) ...[
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.emoji_events,
+                              size: 14,
+                              color: BgmsColors.accent,
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          // 티어 뱃지 노출
-                          if (match.tier != null) ...[
-                            _buildTierBadge(match.tierName),
-                            const SizedBox(width: 8),
                           ],
-                          // 순위 정보
-                          if (match.rank != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _modeLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: BgmsColors.textMuted,
+                                letterSpacing: 0,
                               ),
-                              decoration: BoxDecoration(
-                                color: isChicken
-                                    ? Colors.amber
-                                    : BgmsColors.border,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
+                            ),
+                          ),
+                          if (match.tier != null) ...[
+                            _DotSeparator(),
+                            Flexible(
                               child: Text(
-                                '#${match.rank}',
-                                style: TextStyle(
-                                  color: isChicken
-                                      ? Colors.black
-                                      : BgmsColors.textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                                match.tierName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: _getTierColor(match.tierName),
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0,
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // 중단 지표 라인
-                      Row(
-                        children: [
-                          _buildMetricColumn(
-                            'KILLS',
-                            '${match.kills}',
-                            Colors.redAccent,
-                          ),
-                          const SizedBox(width: 24),
-                          _buildMetricColumn(
-                            'DAMAGE',
-                            match.damage.toStringAsFixed(0),
-                            Colors.amber,
-                          ),
-                          const Spacer(),
-                          const Icon(
-                            Icons.chevron_right,
-                            color: BgmsColors.textMuted,
+                          ],
+                          _DotSeparator(),
+                          Text(
+                            _formatElapsedTime(match.createdAt),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: BgmsColors.textMuted,
+                              letterSpacing: 0,
+                            ),
                           ),
                         ],
                       ),
-                      // 하단 우승(치킨) 리본 라벨 추가
-                      if (isChicken) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 4,
-                            horizontal: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Colors.amber, Colors.orangeAccent],
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            'WINNER WINNER CHICKEN DINNER',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
+                ),
+                const SizedBox(width: 10),
+                _MatchStat(label: '킬', value: '${match.kills}'),
+                const SizedBox(width: 14),
+                _MatchStat(label: '딜량', value: match.damage.toStringAsFixed(0)),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: BgmsColors.textMuted,
                 ),
               ],
             ),
@@ -1267,117 +1278,90 @@ class _MatchCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildMetricColumn(String label, String value, Color color) {
+/// 매치 순위를 좌측에 고정 폭으로 표시한다.
+///
+/// 폭을 고정해 매치마다 본문 시작 위치가 흔들리지 않게 한다.
+class _RankBlock extends StatelessWidget {
+  const _RankBlock({required this.rank, required this.color});
+
+  final int? rank;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 38,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            rank == null ? '-' : '#$rank',
+            maxLines: 1,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Text(
+            '순위',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: BgmsColors.textMuted,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 매치 카드 우측의 소형 지표.
+class _MatchStat extends StatelessWidget {
+  const _MatchStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
-          label,
-          style: const TextStyle(
-            color: BgmsColors.textMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
           value,
-          style: TextStyle(
-            color: color,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
+          maxLines: 1,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: BgmsColors.textMuted,
+            letterSpacing: 0,
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildTierBadge(String tierName) {
-    final Color tierColor = _getTierColor(tierName);
+/// 메타 정보 사이의 가운뎃점 구분자.
+class _DotSeparator extends StatelessWidget {
+  const _DotSeparator();
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: tierColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: tierColor.withValues(alpha: 0.3), width: 0.8),
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
       child: Text(
-        tierName,
-        style: TextStyle(
-          color: tierColor,
-          fontWeight: FontWeight.bold,
-          fontSize: 10,
-        ),
+        '·',
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
       ),
-    );
-  }
-
-  Gradient _getMapGradient(String mapName) {
-    final name = mapName.toLowerCase();
-    if (name.contains('erangel')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF1b3c33).withValues(alpha: 0.8),
-          const Color(0xFF0F2027).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else if (name.contains('miramar') || name.contains('desert')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF5A442E).withValues(alpha: 0.8),
-          const Color(0xFF14110F).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else if (name.contains('sanhok')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF132e18).withValues(alpha: 0.8),
-          const Color(0xFF08120a).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else if (name.contains('vikendi')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF243B55).withValues(alpha: 0.8),
-          const Color(0xFF141E30).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else if (name.contains('deston')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF373B44).withValues(alpha: 0.8),
-          const Color(0xFF1D2026).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    } else if (name.contains('taego')) {
-      return LinearGradient(
-        colors: [
-          const Color(0xFF4B2329).withValues(alpha: 0.8),
-          const Color(0xFF180A0C).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-    }
-    return LinearGradient(
-      colors: [
-        const Color(0xFF1e293b).withValues(alpha: 0.8),
-        const Color(0xFF0f172a).withValues(alpha: 0.9),
-      ],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
     );
   }
 }

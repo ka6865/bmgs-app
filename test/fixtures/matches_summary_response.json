@@ -1,0 +1,86 @@
+{
+  "summaries": {
+    "07d78d1f-706c-4186-bcb5-7789c3bb187b": {
+      "matchId": "07d78d1f-706c-4186-bcb5-7789c3bb187b",
+      "stats": {
+        "winPlace": 1,
+        "kills": 13,
+        "assists": 5,
+        "damageDealt": 1161.2477,
+        "timeSurvived": 1219,
+        "DBNOs": 7,
+        "headshotKills": 3,
+        "longestKill": 216.7032,
+        "heals": 7,
+        "boosts": 8,
+        "deathType": "alive",
+        "walkDistance": 2213.6692,
+        "rideDistance": 8958.97,
+        "swimDistance": 0,
+        "revives": 0,
+        "name": "TGLTN",
+        "playerId": "account.82bad0072f31455d8d9f8d834da2f2f3",
+        "killPlace": 1,
+        "roadKills": 0,
+        "teamKills": 0,
+        "killStreaks": 3,
+        "vehicleDestroys": 1,
+        "weaponsAcquired": 17,
+        "processedDamageDealt": 1025
+      },
+      "mapName": "론도",
+      "mapId": "erangel",
+      "createdAt": "2026-07-21T16:48:02Z",
+      "gameMode": "squad",
+      "matchType": "competitive",
+      "totalTeams": 17,
+      "totalPlayers": 63,
+      "totalTeamKills": 0,
+      "totalTeamDamage": 0,
+      "teamImpact": {
+        "killImpact": 228,
+        "damageImpact": 137,
+        "teamKillShare": 38,
+        "totalTeamKills": 34,
+        "teamDamageShare": 29,
+        "totalTeamDamage": 4001.0764099999997
+      },
+      "badges": [
+        {
+          "id": "slayer",
+          "desc": "한 매치에서 5킬 이상 달성",
+          "name": "슬레이어"
+        }
+      ],
+      "initiative_rate": 76.47058823529412,
+      "initiativeSampleCount": 17,
+      "deathPhase": 5,
+      "edgePlay": 8,
+      "bluezoneWaste": 10.005500078201294,
+      "v": 72,
+      "isValidBenchmark": true,
+      "matchInfo": {
+        "date": "2026-07-21T16:48:02Z",
+        "mode": "squad",
+        "tier": "S",
+        "mapId": "erangel",
+        "rankPct": 0.015873015873015872,
+        "duration": 1219
+      },
+      "leadShotKills": 0,
+      "leadShotKnocks": 0,
+      "ridingShotKills": 0,
+      "ridingShotKnocks": 0,
+      "roadKills": 0,
+      "roadKnocks": 1,
+      "isSummary": true,
+      "summarySource": "processed_match_telemetry"
+    }
+  },
+  "missingMatchIds": [
+    "51010a2a-5934-42f3-964e-fad937c845a0",
+    "d0f3f994-bb2a-4a62-9c4d-c05c6ebe5a2d",
+    "22e1b281-1f88-4e2b-9428-2f3457e1a0b0",
+    "3e4360a1-c216-4ba9-81b1-88f65097acb0"
+  ]
+}

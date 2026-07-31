@@ -11,37 +11,41 @@ class MapsRepository {
 
   final BgmsApiClient _client;
 
+  /// 맵별로 노출할 마커 카테고리. 웹 `lib/map_config.ts`의 MAP_CATEGORIES와 같다.
+  ///
+  /// 서버 `/api/admin/settings`는 공지 설정만 주고 맵 카테고리를 내려주지 않아,
+  /// 이 값이 없으면 API가 준 모든 레이어가 그대로 노출된다.
+  /// 웹과 동일한 화면을 유지하려고 기본값을 앱에 둔다.
+  static const defaultMapCategories = <String, List<String>>{
+    'Erangel': ['Garage', 'Esports', 'EsportsBoat', 'Glider', 'SecretRoom'],
+    'Miramar': [
+      'GoldenMirado',
+      'EsportsMirado',
+      'EsportsPickup',
+      'EsportsBoat',
+      'Glider',
+      'SecretRoom',
+    ],
+    'Taego': ['Garage', 'Porter', 'Boat', 'SecretRoom'],
+    'Deston': ['Garage', 'PoliceCar', 'Boat', 'Glider'],
+    'Vikendi': [
+      'Garage',
+      'Snowmobile',
+      'Esports',
+      'Boat',
+      'SecretRoom',
+      'BearCave',
+    ],
+    'Rondo': ['Garage', 'Esports', 'Boat', 'Glider', 'SecretRoom', 'GasPump'],
+  };
+
   List<BgmsMap> get availableMaps => const [
-    BgmsMap(
-      id: 'Erangel',
-      name: '에란겔',
-      tilePath: 'Erangel',
-    ),
-    BgmsMap(
-      id: 'Miramar',
-      name: '미라마',
-      tilePath: 'Miramar',
-    ),
-    BgmsMap(
-      id: 'Taego',
-      name: '태이고',
-      tilePath: 'Taego',
-    ),
-    BgmsMap(
-      id: 'Rondo',
-      name: '론도',
-      tilePath: 'Rondo',
-    ),
-    BgmsMap(
-      id: 'Vikendi',
-      name: '비켄디',
-      tilePath: 'Vikendi',
-    ),
-    BgmsMap(
-      id: 'Deston',
-      name: '데스턴',
-      tilePath: 'Deston',
-    ),
+    BgmsMap(id: 'Erangel', name: '에란겔', tilePath: 'Erangel'),
+    BgmsMap(id: 'Miramar', name: '미라마', tilePath: 'Miramar'),
+    BgmsMap(id: 'Taego', name: '태이고', tilePath: 'Taego'),
+    BgmsMap(id: 'Rondo', name: '론도', tilePath: 'Rondo'),
+    BgmsMap(id: 'Vikendi', name: '비켄디', tilePath: 'Vikendi'),
+    BgmsMap(id: 'Deston', name: '데스턴', tilePath: 'Deston'),
   ];
 
   BgmsMap resolveMap(String? mapId) {
@@ -115,17 +119,16 @@ class MapsRepository {
     List<String> availableLayers,
     Map<String, List<String>> settings,
   ) {
-    if (settings.isEmpty) {
-      return availableLayers;
-    }
-    final matchedKey = settings.keys.firstWhere(
+    // 서버 설정이 없으면 웹과 동일한 기본 카테고리를 쓴다.
+    final effective = settings.isEmpty ? defaultMapCategories : settings;
+    final matchedKey = effective.keys.firstWhere(
       (k) => k.toLowerCase() == mapId.toLowerCase(),
       orElse: () => '',
     );
     if (matchedKey.isEmpty) {
       return availableLayers;
     }
-    final allowed = settings[matchedKey];
+    final allowed = effective[matchedKey];
     if (allowed == null) {
       return availableLayers;
     }

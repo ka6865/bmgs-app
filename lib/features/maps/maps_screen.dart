@@ -21,7 +21,8 @@ class MapsScreen extends StatefulWidget {
 class _MapsScreenState extends State<MapsScreen> {
   late final MapsRepository _repository;
   late BgmsMap _selectedMap;
-  final Set<String> _layers = {'Garage', 'SecretRoom', 'HotDrop'};
+  // 기본 선택 레이어. HotDrop은 마커 API가 내려주지 않으므로 제외한다.
+  final Set<String> _layers = {'Garage', 'SecretRoom'};
   late Future<MapMarkerLayer> _markerFuture;
   Map<String, List<String>> _adminSettings = {};
 
@@ -104,7 +105,7 @@ class _MapsScreenState extends State<MapsScreen> {
 
         final layersToShow = availableLayers.isNotEmpty
             ? availableLayers
-            : const ['Garage', 'SecretRoom', 'Esports', 'HotDrop'];
+            : const ['Garage', 'SecretRoom', 'Esports'];
 
         final allowedLayers = _repository.filterActiveLayers(
           _selectedMap.id,

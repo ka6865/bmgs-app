@@ -1,3 +1,15 @@
+/// `division.bro.official.pc-2018-42` 형태의 시즌 ID를 `시즌 42`로 표기한다.
+///
+/// 웹의 `Season ${id.split('-').pop()}` 규칙과 같은 번호를 사용한다.
+/// 번호를 해석할 수 없으면 원본 ID를 그대로 보여준다.
+String seasonLabel(String seasonId) {
+  final trimmed = seasonId.trim();
+  if (trimmed.isEmpty) return '기본 시즌';
+  final number = int.tryParse(trimmed.split('-').last);
+  if (number == null) return trimmed;
+  return '시즌 $number';
+}
+
 class GameModeStats {
   const GameModeStats({
     required this.roundsPlayed,
@@ -32,10 +44,12 @@ class GameModeStats {
   final double longestKill;
 
   double get kd => losses > 0 ? kills / losses : kills.toDouble();
-  double get kda => losses > 0 ? (kills + assists) / losses : (kills + assists).toDouble();
+  double get kda =>
+      losses > 0 ? (kills + assists) / losses : (kills + assists).toDouble();
   double get adr => roundsPlayed > 0 ? damageDealt / roundsPlayed : 0.0;
   double get winRate => roundsPlayed > 0 ? (wins / roundsPlayed) * 100.0 : 0.0;
-  double get top10Rate => roundsPlayed > 0 ? (top10s / roundsPlayed) * 100.0 : 0.0;
+  double get top10Rate =>
+      roundsPlayed > 0 ? (top10s / roundsPlayed) * 100.0 : 0.0;
 
   String get currentTierName {
     if (currentTier == null) return 'Unranked';
@@ -45,18 +59,33 @@ class GameModeStats {
   }
 
   static GameModeStats fromJson(Map<String, dynamic> json) {
+    final roundsPlayed = _asInt(json['roundsPlayed']);
+
+    // 경쟁전(ranked) 응답은 top10s/timeSurvived 대신 top10Ratio(0~1)와
+    // avgSurvivalTime(라운드당 초)을 내려준다. 일반전과 동일한 지표로 환산한다.
+    final top10s = json['top10s'] != null
+        ? _asInt(json['top10s'])
+        : (_asDouble(json['top10Ratio']) * roundsPlayed).round();
+    final timeSurvived = json['timeSurvived'] != null
+        ? _asDouble(json['timeSurvived'])
+        : _asDouble(json['avgSurvivalTime']) * roundsPlayed;
+
     return GameModeStats(
-      roundsPlayed: _asInt(json['roundsPlayed']),
+      roundsPlayed: roundsPlayed,
       wins: _asInt(json['wins']),
-      top10s: _asInt(json['top10s']),
+      top10s: top10s,
       losses: _asInt(json['losses'] ?? json['deaths']),
       kills: _asInt(json['kills']),
       assists: _asInt(json['assists']),
       damageDealt: _asDouble(json['damageDealt']),
-      timeSurvived: _asDouble(json['timeSurvived']),
-      currentTier: json['currentTier'] is Map ? Map<String, dynamic>.from(json['currentTier']) : null,
+      timeSurvived: timeSurvived,
+      currentTier: json['currentTier'] is Map
+          ? Map<String, dynamic>.from(json['currentTier'])
+          : null,
       currentRankPoint: _asInt(json['currentRankPoint'] ?? json['rankPoints']),
-      bestTier: json['bestTier'] is Map ? Map<String, dynamic>.from(json['bestTier']) : null,
+      bestTier: json['bestTier'] is Map
+          ? Map<String, dynamic>.from(json['bestTier'])
+          : null,
       bestRankPoint: _asInt(json['bestRankPoint'] ?? json['bestRankPoints']),
       headshotKills: _asInt(json['headshotKills']),
       longestKill: _asDouble(json['longestKill']),
@@ -119,7 +148,9 @@ class PlayerStatsProfile {
           for (final mode in const ['squad', 'duo', 'solo']) {
             final mStats = queueStats[mode];
             if (mStats is Map) {
-              modeMap[mode] = GameModeStats.fromJson(Map<String, dynamic>.from(mStats));
+              modeMap[mode] = GameModeStats.fromJson(
+                Map<String, dynamic>.from(mStats),
+              );
             }
           }
           if (modeMap.isNotEmpty) {
@@ -149,11 +180,19 @@ class PlayerStatsProfile {
       }
     }
 
-    final rawSeasons = json['seasonsList'] as List? ?? const [];
-    final List<String> parsedSeasons = rawSeasons
-        .map((e) => e.toString())
-        .where((e) => e.isNotEmpty)
-        .toList();
+    // 서버는 `seasons: [{id, name}]` 형태로 내려준다.
+    // 과거 문자열 배열(`seasonsList`)도 계속 지원한다.
+    final rawSeasons = json['seasons'] ?? json['seasonsList'];
+    final List<String> parsedSeasons = rawSeasons is List
+        ? rawSeasons
+              .map(
+                (season) => season is Map
+                    ? (season['id']?.toString() ?? '')
+                    : season.toString(),
+              )
+              .where((id) => id.isNotEmpty)
+              .toList()
+        : const <String>[];
 
     return PlayerStatsProfile(
       nickname: json['nickname']?.toString() ?? '',
@@ -281,13 +320,14 @@ class MatchSummary {
         player?['rank'],
         player?['winPlace'],
         stats?['rank'],
+        stats?['winPlace'],
       ]),
       isFallback: false,
-      tier: json['tier'] is Map 
-          ? Map<String, dynamic>.from(json['tier']) 
-          : (json['currentTier'] is Map 
-              ? Map<String, dynamic>.from(json['currentTier']) 
-              : null),
+      tier: json['tier'] is Map
+          ? Map<String, dynamic>.from(json['tier'])
+          : (json['currentTier'] is Map
+                ? Map<String, dynamic>.from(json['currentTier'])
+                : null),
       createdAt: DateTime.tryParse(dateStr) ?? DateTime.now(),
       headshotKills: _firstNum([
         json['headshotKills'],
@@ -343,4 +383,46 @@ class PlayerStatsBundle {
   final PlayerStatsProfile profile;
   final List<MatchSummary> matches;
   final bool summaryFallback;
+}
+
+/// 매치 리스트 모드 필터 유틸.
+///
+/// 서버가 주는 `squad-fpp`, `duo-fpp` 같은 값을 같은 그룹으로 묶는다.
+class MatchModeFilters {
+  const MatchModeFilters._();
+
+  /// 필터 칩 노출 순서.
+  static const order = ['solo', 'duo', 'squad'];
+
+  /// 모드 문자열을 solo/duo/squad로 정규화한다. 알 수 없으면 null이다.
+  static String? normalize(String gameMode) {
+    final lower = gameMode.toLowerCase();
+    if (lower.contains('squad')) return 'squad';
+    if (lower.contains('duo')) return 'duo';
+    if (lower.contains('solo')) return 'solo';
+    return null;
+  }
+
+  static String label(String mode) => switch (mode) {
+    'solo' => '솔로',
+    'duo' => '듀오',
+    'squad' => '스쿼드',
+    _ => mode,
+  };
+
+  /// 목록에 실제로 존재하는 모드만 [order] 순서로 돌려준다.
+  static List<String> availableModes(List<MatchSummary> matches) {
+    final modes = <String>{};
+    for (final match in matches) {
+      final mode = normalize(match.gameMode);
+      if (mode != null) modes.add(mode);
+    }
+    return order.where(modes.contains).toList();
+  }
+
+  /// 선택된 모드로 매치를 좁힌다. `all`이면 전체를 그대로 준다.
+  static List<MatchSummary> apply(List<MatchSummary> matches, String mode) {
+    if (mode == 'all') return matches;
+    return matches.where((match) => normalize(match.gameMode) == mode).toList();
+  }
 }

@@ -245,9 +245,10 @@ void main() {
     // 1. 큐 세그먼트 필터 및 모드 칩 렌더링 확인
     expect(find.text('경쟁전'), findsOneWidget);
     expect(find.text('일반전'), findsOneWidget);
-    expect(find.text('스쿼드'), findsOneWidget);
-    expect(find.text('듀오'), findsOneWidget);
-    expect(find.text('솔로'), findsOneWidget);
+    // 매치 리스트에도 같은 라벨의 모드 필터가 있으므로 존재만 확인한다.
+    expect(find.text('스쿼드'), findsWidgets);
+    expect(find.text('듀오'), findsWidgets);
+    expect(find.text('솔로'), findsWidgets);
 
     // 2. 경쟁전 기본 선택 상태에서 티어 정보 (Gold III) 및 랭크포인트 진척도 바 노출 확인
     expect(find.text('Gold III'), findsOneWidget);
@@ -289,9 +290,24 @@ void main() {
     // 로딩 대기
     await tester.pumpAndSettle();
 
-    // 1. 우승(치킨) 카드 하이라이트 검증
-    // rank == 1 일 때 'WINNER WINNER CHICKEN DINNER' 리본/텍스트가 표시되어야 함
-    expect(find.text('WINNER WINNER CHICKEN DINNER'), findsOneWidget);
+    // 1. 우승 카드 하이라이트 검증
+    // 리본 문구 대신 순위와 트로피 아이콘으로 1등을 표시한다.
+    expect(find.text('#1'), findsOneWidget);
+    final winnerCard = find
+        .ancestor(
+          of: find.text('#1'),
+          matching: find.byWidgetPredicate(
+            (w) => w.runtimeType.toString() == '_MatchCard',
+          ),
+        )
+        .first;
+    expect(
+      find.descendant(
+        of: winnerCard,
+        matching: find.byIcon(Icons.emoji_events),
+      ),
+      findsOneWidget,
+    );
 
     // 2. 매치 티어 뱃지 검증
     // match-1 에는 Diamond I 이 부여되었으므로, Diamond I 텍스트가 화면에 존재해야 함
@@ -448,7 +464,7 @@ void main() {
     expect(mockRepo.lastRefresh, isTrue);
   });
 
-  testWidgets('StatsDetailScreen - Miramar 맵코드 대소문자 믹스 매칭 및 그라데이션 검증', (
+  testWidgets('StatsDetailScreen - Miramar 맵코드 대소문자 믹스 매칭 검증', (
     WidgetTester tester,
   ) async {
     final mockRepo = MockMiramarMapNameStatsRepository();
@@ -472,23 +488,9 @@ void main() {
     );
     expect(matchCards, findsNWidgets(3));
 
-    for (int i = 0; i < 3; i++) {
-      final inkWellFinder = find.descendant(
-        of: matchCards.at(i),
-        matching: find.byType(InkWell),
-      );
-      final containerFinder = find
-          .descendant(of: inkWellFinder, matching: find.byType(Container))
-          .first;
-      final container = tester.widget<Container>(containerFinder);
-      final decoration = container.decoration as BoxDecoration?;
-      final gradient = decoration?.gradient as LinearGradient?;
-      expect(gradient, isNotNull);
-      expect(
-        gradient!.colors.first,
-        equals(const Color(0xFF5A442E).withValues(alpha: 0.8)),
-      );
-    }
+    // 맵별 그라디언트는 제거했고, 서버가 준 맵 이름을 그대로 표시한다.
+    // 화면에 보이는 카드만 검증한다(나머지는 스크롤 밖).
+    expect(find.text('Desert_Main'), findsWidgets);
   });
 }
 

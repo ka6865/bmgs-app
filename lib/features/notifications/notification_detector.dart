@@ -2,6 +2,9 @@ import 'notification_models.dart';
 import 'notification_settings.dart';
 
 /// 티어 등급 순서. 낮은 인덱스가 낮은 등급이다.
+///
+/// Crystal은 Diamond보다 높고 Master보다 낮다.
+/// 랭크 에셋(`/assets/rank/Crystal-1.webp` 등)에 실제로 존재하는 등급이다.
 const _tierOrder = <String>[
   'Unranked',
   'Bronze',
@@ -9,6 +12,7 @@ const _tierOrder = <String>[
   'Gold',
   'Platinum',
   'Diamond',
+  'Crystal',
   'Master',
   'Survivor',
 ];

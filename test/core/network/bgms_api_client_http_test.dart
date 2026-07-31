@@ -113,10 +113,10 @@ void main() {
     );
   });
 
-  test('suggest 응답에서 닉네임만 추출한다', () async {
+  test('suggest 응답에서 닉네임과 플랫폼을 추출한다', () async {
     adapter.stub('/api/pubg/suggest', {
       'suggestions': [
-        {'nickname': 'alpha'},
+        {'nickname': 'alpha', 'platform': 'kakao'},
         {'name': 'beta'},
         'gamma',
         {'nickname': '  '},
@@ -125,6 +125,8 @@ void main() {
 
     final suggestions = await buildClient().fetchSuggestions('a');
 
-    expect(suggestions, ['alpha', 'beta', 'gamma']);
+    expect(suggestions.map((s) => s.nickname), ['alpha', 'beta', 'gamma']);
+    // platform이 없거나 문자열 항목이면 steam으로 채운다.
+    expect(suggestions.map((s) => s.platform), ['kakao', 'steam', 'steam']);
   });
 }

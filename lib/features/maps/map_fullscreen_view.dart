@@ -60,6 +60,7 @@ class _MapFullscreenViewState extends State<MapFullscreenView> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: BgmsColors.textPrimary, size: 28),
+          tooltip: '정밀 지도 닫기',
           onPressed: () => Navigator.pop(context),
         ),
         title: Text('${widget.map.name} 정밀 지도', style: const TextStyle(fontWeight: FontWeight.bold, color: BgmsColors.textPrimary)),

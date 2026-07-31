@@ -16,16 +16,62 @@ enum ApiErrorKind {
   unknown,
 }
 
+/// 서버가 제안하는 유사 플레이어. `/api/pubg/player` 404 응답과
+/// `/api/pubg/suggest` 응답이 같은 형태로 내려준다.
+class PlayerSuggestion {
+  const PlayerSuggestion({required this.nickname, required this.platform});
+
+  final String nickname;
+  final String platform;
+
+  /// 응답 항목은 객체 또는 문자열일 수 있다. 해석 불가하면 null을 준다.
+  static PlayerSuggestion? tryParse(Object? item) {
+    if (item is Map) {
+      final nickname = (item['nickname'] ?? item['name'] ?? '')
+          .toString()
+          .trim();
+      if (nickname.isEmpty) return null;
+      final platform = (item['platform'] ?? 'steam').toString().trim();
+      return PlayerSuggestion(
+        nickname: nickname,
+        platform: platform.toLowerCase() == 'kakao' ? 'kakao' : 'steam',
+      );
+    }
+    if (item is String) {
+      final nickname = item.trim();
+      if (nickname.isEmpty) return null;
+      return PlayerSuggestion(nickname: nickname, platform: 'steam');
+    }
+    return null;
+  }
+
+  static List<PlayerSuggestion> parseList(Object? raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map(PlayerSuggestion.tryParse)
+        .whereType<PlayerSuggestion>()
+        .toList(growable: false);
+  }
+}
+
 class ApiException implements Exception {
   const ApiException({
     required this.kind,
     required this.message,
     this.statusCode,
+    this.diagnostic,
+    this.suggestions = const [],
   });
 
   final ApiErrorKind kind;
   final String message;
   final int? statusCode;
+
+  /// 로그 전용 원인 문자열. 화면에는 노출하지 않는다.
+  final String? diagnostic;
+
+  /// 서버가 404와 함께 내려주는 유사 닉네임 후보. 검색 오타 복구에 쓴다.
+  final List<PlayerSuggestion> suggestions;
 
   bool get isRetryable =>
       kind == ApiErrorKind.network ||
@@ -53,13 +99,15 @@ class ApiException implements Exception {
     }
     return ApiException(
       kind: ApiErrorKind.unknown,
-      message: '알 수 없는 오류가 발생했습니다. ($error)',
+      message: '알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+      diagnostic: error.toString(),
     );
   }
 
   factory ApiException._fromDio(DioException error) {
     final status = error.response?.statusCode;
     final serverMessage = _serverMessage(error.response?.data);
+    final responseData = error.response?.data;
 
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
@@ -108,6 +156,9 @@ class ApiException implements Exception {
         kind: ApiErrorKind.notFound,
         message: serverMessage ?? '요청한 데이터를 찾을 수 없습니다.',
         statusCode: status,
+        suggestions: responseData is Map
+            ? PlayerSuggestion.parseList(responseData['suggestions'])
+            : const [],
       );
     }
     if (status == 429) {

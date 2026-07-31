@@ -65,7 +65,11 @@ class PlayerStatsRepository {
 }
 
 class PlayerStatsException implements Exception {
-  const PlayerStatsException(this.message, {this.isRetryable = true});
+  const PlayerStatsException(
+    this.message, {
+    this.isRetryable = true,
+    this.suggestions = const [],
+  });
 
   /// 정규화된 API 에러를 전적 화면 문구로 옮긴다.
   factory PlayerStatsException.from(ApiException error) {
@@ -74,11 +78,18 @@ class PlayerStatsException implements Exception {
       ApiErrorKind.rateLimited => 'PUBG API 호출 한도가 일시적으로 초과되었습니다. 잠시 후 다시 시도해 주세요.',
       _ => error.message,
     };
-    return PlayerStatsException(message, isRetryable: error.isRetryable);
+    return PlayerStatsException(
+      message,
+      isRetryable: error.isRetryable,
+      suggestions: error.suggestions,
+    );
   }
 
   final String message;
   final bool isRetryable;
+
+  /// 닉네임을 찾지 못했을 때 서버가 제안하는 유사 플레이어 목록.
+  final List<PlayerSuggestion> suggestions;
 
   @override
   String toString() => message;

@@ -74,6 +74,7 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                 Icons.arrow_back_ios_new,
                 color: BgmsColors.textPrimary,
               ),
+              tooltip: '뒤로',
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),

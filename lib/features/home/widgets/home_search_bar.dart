@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/bgms_theme.dart';
 
+/// 검색 바 컨트롤 높이. 접근성 최소 터치 영역(48)을 만족시킨다.
+const double _controlHeight = 48;
+
 /// 홈 상단의 한 줄 검색 바.
 ///
 /// 전적 탭에는 플랫폼 선택과 분석 버튼을 갖춘 전체 검색 허브가 따로 있다.
@@ -75,7 +78,7 @@ class _PlatformToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 44,
+      height: _controlHeight,
       decoration: BoxDecoration(
         color: BgmsColors.surface,
         borderRadius: BorderRadius.circular(8),
@@ -123,11 +126,12 @@ class _PlatformChip extends StatelessWidget {
     return Semantics(
       selected: selected,
       button: true,
+      label: '$label 플랫폼',
       child: InkWell(
         onTap: enabled ? () => onChanged(value) : null,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          height: 44,
+          height: _controlHeight,
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
@@ -159,8 +163,8 @@ class _SearchButton extends StatelessWidget {
     return Tooltip(
       message: '전적 검색',
       child: SizedBox(
-        width: 44,
-        height: 44,
+        width: _controlHeight,
+        height: _controlHeight,
         child: FilledButton(
           key: const Key('home_search_submit'),
           onPressed: searching ? null : onSearch,

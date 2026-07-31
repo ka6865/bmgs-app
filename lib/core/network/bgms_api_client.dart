@@ -170,19 +170,9 @@ class BgmsApiClient {
   }
 
   /// 닉네임 자동완성. 실패해도 화면을 막지 않도록 빈 목록을 허용한다.
-  Future<List<String>> fetchSuggestions(String query) async {
+  Future<List<PlayerSuggestion>> fetchSuggestions(String query) async {
     final json = await _getJson(buildSuggestUri(query));
-    final raw = json['suggestions'];
-    if (raw is! List) return const [];
-    return raw
-        .map((item) {
-          if (item is Map) {
-            return (item['nickname'] ?? item['name'] ?? '').toString();
-          }
-          return item.toString();
-        })
-        .where((value) => value.trim().isNotEmpty)
-        .toList(growable: false);
+    return PlayerSuggestion.parseList(json['suggestions']);
   }
 
   Future<String> fetchAiSummary({

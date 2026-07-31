@@ -79,6 +79,27 @@ void main() {
     expect(demoted.single.title, '티어가 내려갔습니다');
   });
 
+  test('Crystal은 Diamond보다 높고 Master보다 낮은 등급으로 판정한다', () {
+    // 랭크 에셋에 Crystal-1~5가 실제로 존재하는 등급이다.
+    final toCrystal = _detect(
+      previous: _snapshot(tierName: 'Diamond 1'),
+      current: _snapshot(tierName: 'Crystal 5'),
+    );
+    expect(toCrystal.single.title, '티어가 올랐습니다');
+
+    final toMaster = _detect(
+      previous: _snapshot(tierName: 'Crystal 1'),
+      current: _snapshot(tierName: 'Master'),
+    );
+    expect(toMaster.single.title, '티어가 올랐습니다');
+
+    final downToDiamond = _detect(
+      previous: _snapshot(tierName: 'Crystal 5'),
+      current: _snapshot(tierName: 'Diamond 1'),
+    );
+    expect(downToDiamond.single.title, '티어가 내려갔습니다');
+  });
+
   test('같은 등급에서는 서브티어 숫자가 작아질 때 승급으로 본다', () {
     final promoted = _detect(
       previous: _snapshot(tierName: 'Gold 4'),

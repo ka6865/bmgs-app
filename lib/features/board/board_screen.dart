@@ -62,6 +62,7 @@ class _BoardScreenState extends State<BoardScreen> {
         cursor: reset ? null : _cursor,
         query: _searchController.text,
       );
+      if (!mounted) return;
       setState(() {
         if (reset) _posts.clear();
         _posts.addAll(page.items);
@@ -69,6 +70,7 @@ class _BoardScreenState extends State<BoardScreen> {
         _hasMore = page.hasMore;
       });
     } on BoardException catch (error) {
+      if (!mounted) return;
       setState(() => _error = error.message);
     } finally {
       if (mounted) {
@@ -176,6 +178,7 @@ class _BoardScreenState extends State<BoardScreen> {
 class _PostTile extends StatelessWidget {
   const _PostTile({required this.post});
 
+
   final BoardPostSummary post;
 
   @override
@@ -198,7 +201,12 @@ class _PostTile extends StatelessWidget {
                     width: 72,
                     height: 72,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    // 실패해도 72px 자리를 유지해 목록 행 높이가 흔들리지 않게 한다.
+                    errorBuilder: (_, _, _) => const _ThumbnailPlaceholder(),
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const _ThumbnailPlaceholder();
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -382,4 +390,30 @@ class _BoardWriteDialogState extends State<_BoardWriteDialog> {
 String _shortDate(String value) {
   if (value.length >= 10) return value.substring(0, 10);
   return value;
+}
+
+/// 게시글 썸네일 자리를 지키는 대체 박스.
+///
+/// 로딩 중과 실패 상황 모두 같은 크기를 차지해 목록 행 높이가 변하지 않는다.
+class _ThumbnailPlaceholder extends StatelessWidget {
+  const _ThumbnailPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 72,
+      height: 72,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: BgmsColors.surface,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: BgmsColors.border),
+      ),
+      child: const Icon(
+        Icons.image_outlined,
+        size: 20,
+        color: BgmsColors.textMuted,
+      ),
+    );
+  }
 }

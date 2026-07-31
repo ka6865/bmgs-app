@@ -100,6 +100,44 @@ void main() {
     expect(ApiException.from(original), same(original));
   });
 
+  test('404 응답의 유사 닉네임 제안을 파싱한다', () {
+    final error = ApiException.from(
+      _dioError(
+        statusCode: 404,
+        data: {
+          'error': '닉네임을 찾을 수 없습니다.',
+          'suggestions': [
+            {'nickname': 'kangHee', 'platform': 'kakao'},
+            {'nickname': 'kangHeeSung', 'platform': 'steam'},
+            {'nickname': '   '},
+          ],
+        },
+      ),
+    );
+
+    expect(error.kind, ApiErrorKind.notFound);
+    expect(error.suggestions.map((s) => s.nickname), [
+      'kangHee',
+      'kangHeeSung',
+    ]);
+    expect(error.suggestions.first.platform, 'kakao');
+  });
+
+  test('제안이 없는 404는 빈 목록을 준다', () {
+    final error = ApiException.from(
+      _dioError(statusCode: 404, data: {'error': '없음'}),
+    );
+    expect(error.suggestions, isEmpty);
+  });
+
+  test('알 수 없는 예외는 원시 문자열을 화면 메시지로 노출하지 않는다', () {
+    final error = ApiException.from(StateError('내부 구현 세부 정보'));
+
+    expect(error.kind, ApiErrorKind.unknown);
+    expect(error.message, isNot(contains('내부 구현 세부 정보')));
+    expect(error.diagnostic, contains('내부 구현 세부 정보'));
+  });
+
   test('파싱 오류는 parse 종류로 분류한다', () {
     expect(
       ApiException.from(const FormatException('bad json')).kind,

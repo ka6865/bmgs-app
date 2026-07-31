@@ -86,6 +86,20 @@ class _RankingsScreenState extends State<RankingsScreen> {
     });
   }
 
+  /// 당겨서 새로고침용. 새로 만든 future를 직접 기다려
+  /// 인디케이터가 완료 시점에 맞춰 사라지게 한다.
+  Future<void> _refresh() async {
+    final future = _loadBoard();
+    setState(() {
+      _boardFuture = future;
+    });
+    try {
+      await future;
+    } catch (_) {
+      // 실패는 FutureBuilder의 ErrorPanel이 표시한다.
+    }
+  }
+
   void _resetFilters() {
     setState(() {
       _mode = 'all';
@@ -137,12 +151,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
     ];
 
     return RefreshIndicator(
-      onRefresh: () async {
-        _reload();
-        await _boardFuture;
-      },
+      onRefresh: _refresh,
       child: ListView(
-        padding: const EdgeInsets.all(BgmsSpacing.lg),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           ScreenHeader(
             title: '랭킹',

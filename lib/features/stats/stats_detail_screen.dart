@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/network/api_exception.dart';
 import '../../core/observability/app_logger.dart';
 import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
@@ -255,9 +256,23 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
                 final error = snapshot.error;
                 final canRetry =
                     error is! PlayerStatsException || error.isRetryable;
+                // 레포지토리가 모든 예외를 PlayerStatsException으로 감싸지만,
+                // 예기치 못한 예외가 올라와도 원시 문자열을 노출하지 않는다.
+                final message = error is PlayerStatsException
+                    ? error.message
+                    : ApiException.from(error ?? '').message;
                 return _ErrorPanel(
-                  message: error.toString(),
+                  message: message,
                   onRetry: canRetry ? _retry : null,
+                  suggestions: error is PlayerStatsException
+                      ? error.suggestions
+                      : const [],
+                  onSuggestionTap: (PlayerSuggestion suggestion) => context.go(
+                    PlayerSearchDestination(
+                      nickname: suggestion.nickname,
+                      platform: suggestion.platform,
+                    ).location,
+                  ),
                 );
               }
               final bundle = snapshot.data;
@@ -696,15 +711,13 @@ class _StatsContentState extends State<_StatsContent> {
   }
 }
 
+/// 티어 색상은 웹 TIER_STYLE과 대응하는 공용 토큰을 쓴다.
+///
+/// 화면마다 색이 갈리지 않도록 [BgmsColors.tierColor]로 위임한다.
 Color _getTierColor(String tierName) {
-  if (tierName.contains('Bronze')) return const Color(0xFFCD7F32);
-  if (tierName.contains('Silver')) return const Color(0xFFC0C0C0);
-  if (tierName.contains('Gold')) return const Color(0xFFFFD700);
-  if (tierName.contains('Platinum')) return const Color(0xFFE5E4E2);
-  if (tierName.contains('Diamond')) return const Color(0xFFB9F2FF);
-  if (tierName.contains('Master')) return const Color(0xFFFF007F);
-  if (tierName.contains('Grandmaster')) return const Color(0xFFFF3F3F);
-  return BgmsColors.accent;
+  if (tierName.isEmpty || tierName == '일반전') return BgmsColors.accent;
+  final color = BgmsColors.tierColor(tierName);
+  return color == BgmsColors.textMuted ? BgmsColors.accent : color;
 }
 
 IconData _getTierIcon(String tierName) {
@@ -712,11 +725,14 @@ IconData _getTierIcon(String tierName) {
     return Icons.shield;
   }
   if (tierName.contains('Gold')) return Icons.emoji_events;
-  if (tierName.contains('Platinum') || tierName.contains('Diamond')) {
+  if (tierName.contains('Platinum') ||
+      tierName.contains('Diamond') ||
+      tierName.contains('Crystal')) {
     return Icons.diamond;
   }
-  if (tierName.contains('Master')) return Icons.military_tech;
-  if (tierName.contains('Grandmaster')) return Icons.local_fire_department;
+  if (tierName.contains('Master') || tierName.contains('Survivor')) {
+    return Icons.military_tech;
+  }
   return Icons.stars;
 }
 
@@ -1486,14 +1502,24 @@ class _LoadingPanel extends StatelessWidget {
 }
 
 class _ErrorPanel extends StatelessWidget {
-  const _ErrorPanel({required this.message, this.onRetry});
+  const _ErrorPanel({
+    required this.message,
+    this.onRetry,
+    this.suggestions = const [],
+    this.onSuggestionTap,
+  });
 
   final String message;
   final VoidCallback? onRetry;
 
+  /// 닉네임을 찾지 못했을 때 서버가 제안한 유사 플레이어.
+  final List<PlayerSuggestion> suggestions;
+  final void Function(PlayerSuggestion suggestion)? onSuggestionTap;
+
   @override
   Widget build(BuildContext context) {
     final onRetry = this.onRetry;
+    final onSuggestionTap = this.onSuggestionTap;
     return Card(
       color: BgmsColors.surface,
       shape: RoundedRectangleBorder(
@@ -1520,6 +1546,32 @@ class _ErrorPanel extends StatelessWidget {
                 context,
               ).textTheme.bodyMedium?.copyWith(color: BgmsColors.textSecondary),
             ),
+            if (suggestions.isNotEmpty && onSuggestionTap != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                '혹시 이 플레이어를 찾으셨나요?',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: BgmsColors.textSecondary,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final suggestion in suggestions.take(6))
+                    ActionChip(
+                      avatar: const Icon(Icons.person_search, size: 16),
+                      label: Text(
+                        '${suggestion.nickname} · ${suggestion.platform}',
+                      ),
+                      onPressed: () => onSuggestionTap(suggestion),
+                    ),
+                ],
+              ),
+            ],
             if (onRetry != null) ...[
               const SizedBox(height: 16),
               FilledButton.icon(

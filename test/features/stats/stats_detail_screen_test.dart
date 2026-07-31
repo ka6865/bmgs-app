@@ -209,7 +209,7 @@ void main() {
       await tester.pump();
 
       await tester.enterText(find.byType(TextField), 'statsDelayedPlayer');
-      await tester.tap(find.text('분석 시작'));
+      await tester.tap(find.byKey(const Key('player_search_submit')));
       await tester.pump();
 
       await tester.tap(find.byIcon(Icons.map).last);

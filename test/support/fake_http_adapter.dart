@@ -56,7 +56,9 @@ class FakeHttpAdapter implements HttpClientAdapter {
       status,
       headers: {
         Headers.contentTypeHeader: [
-          body is String ? Headers.textPlainContentType : Headers.jsonContentType,
+          body is String
+              ? Headers.textPlainContentType
+              : Headers.jsonContentType,
         ],
       },
     );

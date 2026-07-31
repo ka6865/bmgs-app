@@ -9,6 +9,7 @@ import '../../core/storage/local_player_store.dart';
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/app_panels.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../../core/widgets/player_search_bar.dart';
 import '../../navigation/shell_scaffold.dart';
 import 'ai_coaching_card.dart';
 import 'player_stats_models.dart';
@@ -212,7 +213,9 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   Widget build(BuildContext context) {
     final nickname = widget.nickname?.trim() ?? '';
 
-    final content = ListView(
+    // 셸이 Scaffold를 제공하지만, 전적 화면을 단독으로 띄우는 경우에도
+    // TextField와 InkWell이 요구하는 Material 기반을 보장한다.
+    final list = ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         ScreenHeader(
@@ -298,6 +301,8 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
       ],
     );
 
+    final content = Material(color: BgmsColors.bgBase, child: list);
+
     // 검색 전에는 새로고침할 대상이 없으므로 결과 화면에서만 당겨서 새로고침을 붙인다.
     if (nickname.isEmpty) return content;
     return RefreshIndicator(onRefresh: () async => _retry(), child: content);
@@ -332,72 +337,15 @@ class _StatsSearchHub extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '전적 검색',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  textInputAction: TextInputAction.search,
-                  enabled: !searching,
-                  onChanged: (_) => onTextChanged(),
-                  onSubmitted: (_) => onSearch(),
-                  decoration: InputDecoration(
-                    labelText: '닉네임',
-                    hintText: 'PUBG 닉네임을 입력하세요',
-                    errorText: errorText,
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: IconButton(
-                      onPressed: searching ? null : () => onSearch(),
-                      icon: searching
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.arrow_forward),
-                      tooltip: '검색',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'steam', label: Text('Steam')),
-                      ButtonSegment(value: 'kakao', label: Text('Kakao')),
-                    ],
-                    selected: {platform},
-                    onSelectionChanged: searching
-                        ? null
-                        : (selection) => onPlatformChanged(selection.first),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: searching ? null : () => onSearch(),
-                  icon: searching
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.query_stats),
-                  label: Text(searching ? '검색 중...' : '분석 시작'),
-                ),
-              ],
-            ),
-          ),
+        // 홈과 같은 검색 바를 재사용해 검색 UI가 중복되지 않게 한다.
+        PlayerSearchBar(
+          controller: controller,
+          platform: platform,
+          searching: searching,
+          errorText: errorText,
+          onPlatformChanged: onPlatformChanged,
+          onSearch: onSearch,
+          onTextChanged: onTextChanged,
         ),
         const SizedBox(height: 12),
         _PlayerShortcutPanel(

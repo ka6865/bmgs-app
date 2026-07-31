@@ -81,7 +81,11 @@ class LocalNotificationPresenter implements NotificationPresenter {
               IOSFlutterLocalNotificationsPlugin
             >();
         _granted =
-            await ios?.requestPermissions(alert: true, badge: true, sound: true) ??
+            await ios?.requestPermissions(
+              alert: true,
+              badge: true,
+              sound: true,
+            ) ??
             false;
       } else if (Platform.isAndroid) {
         final android = _plugin
@@ -96,7 +100,10 @@ class LocalNotificationPresenter implements NotificationPresenter {
         '알림 권한 요청에 실패했습니다.',
         error: error,
         stackTrace: stackTrace,
-        context: {'feature': 'notifications', 'operation': 'request_permission'},
+        context: {
+          'feature': 'notifications',
+          'operation': 'request_permission',
+        },
       );
       return false;
     }

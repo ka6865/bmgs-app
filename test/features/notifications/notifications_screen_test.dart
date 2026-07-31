@@ -36,15 +36,10 @@ Future<NotificationStore> _seed(List<BgmsNotification> items) async {
   return store;
 }
 
-Future<void> _pumpScreen(
-  WidgetTester tester,
-  NotificationStore store,
-) async {
+Future<void> _pumpScreen(WidgetTester tester, NotificationStore store) async {
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [
-        notificationStoreProvider.overrideWith((ref) async => store),
-      ],
+      overrides: [notificationStoreProvider.overrideWith((ref) async => store)],
       child: MaterialApp(
         theme: AppTheme.dark(),
         home: const NotificationsScreen(),
@@ -79,10 +74,7 @@ void main() {
   });
 
   testWidgets('모두 읽음을 누르면 미읽음이 사라진다', (tester) async {
-    final store = await _seed([
-      _notification(id: 'a'),
-      _notification(id: 'b'),
-    ]);
+    final store = await _seed([_notification(id: 'a'), _notification(id: 'b')]);
     await _pumpScreen(tester, store);
     expect(store.unreadCount, 2);
 

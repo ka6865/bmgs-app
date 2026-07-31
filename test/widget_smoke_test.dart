@@ -21,7 +21,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('PUBG 플레이어 검색'), findsOneWidget);
-    expect(find.text('빠른 메뉴'), findsOneWidget);
     expect(find.text('랭킹'), findsWidgets);
     expect(find.text('지도'), findsWidgets);
     expect(find.text('게시판'), findsWidgets);
@@ -76,7 +75,7 @@ void main() {
 
       await tester.tap(find.text('Kakao'));
       await tester.enterText(find.byType(TextField), 'firstLaunchPlayer');
-      await tester.tap(find.byKey(const Key('home_search_submit')));
+      await tester.tap(find.byKey(const Key('player_search_submit')));
       await tester.pump();
 
       await tester.tap(find.text('Kakao'));
@@ -114,7 +113,7 @@ void main() {
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
 
       await tester.enterText(find.byType(TextField), 'homeDelayedPlayer');
-      await tester.tap(find.byKey(const Key('home_search_submit')));
+      await tester.tap(find.byKey(const Key('player_search_submit')));
       await tester.pump();
 
       await tester.tap(find.byIcon(Icons.map).last);
@@ -195,10 +194,10 @@ void main() {
       await tester.tap(find.byIcon(Icons.query_stats));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'searchedFromStats');
-      await tester.tap(find.text('분석 시작'));
+      await tester.tap(find.byKey(const Key('player_search_submit')));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.search).last);
+      await tester.tap(find.widgetWithText(NavigationDestination, '홈'));
       await tester.pumpAndSettle();
 
       expect(find.text('searchedFromStats · steam'), findsOneWidget);
@@ -222,7 +221,7 @@ void main() {
     await tester.tap(find.byTooltip('즐겨찾기 해제'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.search).last);
+    await tester.tap(find.widgetWithText(NavigationDestination, '홈'));
     await tester.pumpAndSettle();
 
     expect(find.text('managedPlayer · steam'), findsNothing);
@@ -236,7 +235,7 @@ void main() {
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('home_search_submit')));
+    await tester.tap(find.byKey(const Key('player_search_submit')));
     await tester.pumpAndSettle();
 
     expect(find.text('닉네임을 입력해 주세요.'), findsOneWidget);
@@ -264,7 +263,7 @@ void main() {
     expect(find.byTooltip('입력 지우기'), findsNothing);
   });
 
-  testWidgets('home quick action opens rankings', (tester) async {
+  testWidgets('bottom tab opens rankings', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
@@ -275,7 +274,7 @@ void main() {
     expect(find.text('딜량'), findsOneWidget);
   });
 
-  testWidgets('home quick action opens maps', (tester) async {
+  testWidgets('bottom tab opens maps', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
@@ -286,7 +285,7 @@ void main() {
     expect(find.widgetWithText(ChoiceChip, '에란겔'), findsOneWidget);
   });
 
-  testWidgets('home quick action opens board', (tester) async {
+  testWidgets('bottom tab opens board', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
@@ -299,9 +298,7 @@ void main() {
     expect(find.byTooltip('글쓰기'), findsOneWidget);
   });
 
-  testWidgets('home quick action opens the notification center', (
-    tester,
-  ) async {
+  testWidgets('home bell opens the notification center', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
@@ -310,8 +307,8 @@ void main() {
     await tester.tap(find.widgetWithText(NavigationDestination, '홈'));
     await tester.pumpAndSettle();
 
-    // 알림 센터는 하단 탭에 없으므로 홈 빠른 메뉴가 유일한 진입 경로다.
-    await tester.tap(find.text('알림').last);
+    // 알림 센터는 하단 탭에 없고 홈 헤더의 벨이 진입 경로다.
+    await tester.tap(find.byIcon(Icons.notifications_none));
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('모두 읽음'), findsOneWidget);
@@ -319,7 +316,7 @@ void main() {
     // push로 열린 화면이므로 닫아서 다음 테스트에 셸 상태를 남기지 않는다.
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('빠른 메뉴'), findsOneWidget);
+    expect(find.byIcon(Icons.notifications_none), findsOneWidget);
   });
 
   testWidgets('stats tab shows analysis workspace without home duplicates', (
@@ -336,7 +333,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('전적 분석'), findsOneWidget);
-    expect(find.text('분석 시작'), findsOneWidget);
+    expect(find.byKey(const Key('player_search_submit')), findsOneWidget);
     expect(find.text('최근 분석'), findsOneWidget);
     expect(find.text('kangheesung_ · steam'), findsOneWidget);
     expect(find.text('즐겨찾기'), findsNothing);
@@ -357,7 +354,7 @@ void main() {
 
     await tester.tap(find.text('Kakao'));
     await tester.enterText(find.byType(TextField), 'analysisKakaoPlayer');
-    await tester.tap(find.text('분석 시작'));
+    await tester.tap(find.byKey(const Key('player_search_submit')));
     await tester.pump();
 
     expect(

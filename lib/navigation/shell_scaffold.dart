@@ -45,7 +45,7 @@ class _ShellScaffoldState extends State<ShellScaffold> {
           );
         },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.search), label: '홈'),
+          NavigationDestination(icon: Icon(Icons.home_outlined), label: '홈'),
           NavigationDestination(icon: Icon(Icons.query_stats), label: '전적'),
           NavigationDestination(icon: Icon(Icons.leaderboard), label: '랭킹'),
           NavigationDestination(icon: Icon(Icons.map), label: '지도'),

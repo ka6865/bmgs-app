@@ -1,10 +1,7 @@
 import 'package:bgms_mobile_app/core/config/app_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const _config = AppConfig(
-  apiBaseUrl: 'https://bgms.kr/',
-  authRedirectUrl: '',
-);
+const _config = AppConfig(apiBaseUrl: 'https://bgms.kr/', authRedirectUrl: '');
 
 void main() {
   test('후행 슬래시를 제거한 기준 URL을 만든다', () {

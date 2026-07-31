@@ -194,7 +194,6 @@ class _BoardScreenState extends State<BoardScreen> {
 class _PostTile extends StatelessWidget {
   const _PostTile({required this.post});
 
-
   final BoardPostSummary post;
 
   @override

@@ -7,12 +7,7 @@ import '../theme/bgms_theme.dart';
 ///
 /// 네트워크 실패 시 방패 아이콘으로 대체해 레이아웃이 흔들리지 않게 한다.
 class TierIcon extends StatelessWidget {
-  const TierIcon({
-    super.key,
-    required this.tier,
-    this.subTier,
-    this.size = 48,
-  });
+  const TierIcon({super.key, required this.tier, this.subTier, this.size = 48});
 
   final String? tier;
   final String? subTier;

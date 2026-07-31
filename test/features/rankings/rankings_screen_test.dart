@@ -17,10 +17,7 @@ Map<String, Object> _rankingsResponse() {
   };
 }
 
-Future<void> _pumpRankings(
-  WidgetTester tester,
-  FakeHttpAdapter adapter,
-) async {
+Future<void> _pumpRankings(WidgetTester tester, FakeHttpAdapter adapter) async {
   final repository = RankingsRepository(
     client: BgmsApiClient(
       baseUrl: 'https://bgms.kr',

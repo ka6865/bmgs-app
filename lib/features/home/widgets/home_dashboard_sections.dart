@@ -192,65 +192,6 @@ class FavoritePlayersSection extends StatelessWidget {
   }
 }
 
-class HomeQuickActions extends StatelessWidget {
-  const HomeQuickActions({
-    super.key,
-    required this.onRankingsTap,
-    required this.onMapsTap,
-    required this.onBoardTap,
-    required this.onNotificationsTap,
-  });
-
-  final VoidCallback onRankingsTap;
-  final VoidCallback onMapsTap;
-  final VoidCallback onBoardTap;
-  final VoidCallback onNotificationsTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SectionBand(
-      title: '빠른 메뉴',
-      icon: Icons.grid_view_outlined,
-      child: Row(
-        children: [
-          Expanded(
-            child: _QuickAction(
-              label: '랭킹',
-              icon: Icons.leaderboard_outlined,
-              onTap: onRankingsTap,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _QuickAction(
-              label: '지도',
-              icon: Icons.map_outlined,
-              onTap: onMapsTap,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _QuickAction(
-              label: '게시판',
-              icon: Icons.forum_outlined,
-              onTap: onBoardTap,
-            ),
-          ),
-          const SizedBox(width: 8),
-          // 알림 센터는 하단 탭에 없으므로 홈에서 진입 경로를 제공한다.
-          Expanded(
-            child: _QuickAction(
-              label: '알림',
-              icon: Icons.notifications_outlined,
-              onTap: onNotificationsTap,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class RecentActivitySection extends StatelessWidget {
   const RecentActivitySection({
     super.key,
@@ -290,62 +231,6 @@ class RecentActivitySection extends StatelessWidget {
                 ],
               ),
             ),
-    );
-  }
-}
-
-class _QuickAction extends StatelessWidget {
-  const _QuickAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: label,
-      child: InkSurface(
-        borderRadius: 8,
-        decoration: BoxDecoration(
-          color: BgmsColors.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: BgmsColors.border),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            height: 64,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 20, color: BgmsColors.accent),
-                const SizedBox(height: 6),
-                // 좁은 화면에서도 라벨이 잘리지 않도록 가로 폭에 맞춰 축소한다.
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: BgmsColors.textSecondary,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

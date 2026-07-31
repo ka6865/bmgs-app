@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/bgms_theme.dart';
+import '../theme/bgms_theme.dart';
 
 /// 검색 바 컨트롤 높이. 접근성 최소 터치 영역(48)을 만족시킨다.
 const double _controlHeight = 48;
 
-/// 홈 상단의 한 줄 검색 바.
+/// 플레이어 검색 한 줄 바.
 ///
-/// 전적 탭에는 플랫폼 선택과 분석 버튼을 갖춘 전체 검색 허브가 따로 있다.
-/// 홈에서는 진입 동선만 담당하므로 입력 한 줄과 플랫폼 토글로 압축한다.
-class HomeSearchBar extends StatelessWidget {
-  const HomeSearchBar({
+/// 홈과 전적 탭이 같은 위젯을 공유해 검색 UI가 중복되지 않게 한다.
+/// 입력, 플랫폼 토글, 실행 버튼이 한 행에 들어간다.
+class PlayerSearchBar extends StatelessWidget {
+  const PlayerSearchBar({
     super.key,
     required this.controller,
     required this.platform,
@@ -181,7 +181,7 @@ class _SearchButton extends StatelessWidget {
         width: _controlHeight,
         height: _controlHeight,
         child: FilledButton(
-          key: const Key('home_search_submit'),
+          key: const Key('player_search_submit'),
           onPressed: searching ? null : onSearch,
           style: FilledButton.styleFrom(
             padding: EdgeInsets.zero,

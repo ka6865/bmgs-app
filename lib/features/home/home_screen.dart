@@ -9,10 +9,10 @@ import '../../core/player/player_suggestion_controller.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../../core/widgets/player_search_bar.dart';
 import '../../navigation/shell_scaffold.dart';
 import '../notifications/notification_bell.dart';
 import 'widgets/home_dashboard_sections.dart';
-import 'widgets/home_search_bar.dart';
 import 'widgets/player_suggestion_list.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -272,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const BgmsBrandHeader(title: 'BGMS', trailing: NotificationBell()),
             const SizedBox(height: 14),
-            HomeSearchBar(
+            PlayerSearchBar(
               controller: _nicknameController,
               platform: _platform,
               searching: _searching,
@@ -311,13 +311,6 @@ class _HomeScreenState extends State<HomeScreen> {
               loading: _loadingStore,
               onTap: (player) =>
                   _search(nickname: player.nickname, platform: player.platform),
-            ),
-            const SizedBox(height: 20),
-            HomeQuickActions(
-              onRankingsTap: () => context.go('/rankings'),
-              onMapsTap: () => context.go('/maps'),
-              onBoardTap: () => context.go('/board'),
-              onNotificationsTap: () => context.push('/notifications'),
             ),
             if (_loadingStore || remainingRecent.isNotEmpty) ...[
               const SizedBox(height: 20),

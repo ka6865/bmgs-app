@@ -92,9 +92,8 @@ class NotificationSettings {
     final kinds = rawKinds is List
         ? rawKinds
               .map(
-                (value) => BgmsNotificationKindLabel.fromStorageKey(
-                  value.toString(),
-                ),
+                (value) =>
+                    BgmsNotificationKindLabel.fromStorageKey(value.toString()),
               )
               .whereType<BgmsNotificationKind>()
               .toSet()

@@ -97,9 +97,7 @@ class NotificationStore {
     next[snapshot.playerId] = snapshot;
     await _prefs.setString(
       _snapshotsKey,
-      jsonEncode(
-        next.map((key, value) => MapEntry(key, value.toJson())),
-      ),
+      jsonEncode(next.map((key, value) => MapEntry(key, value.toJson()))),
     );
   }
 

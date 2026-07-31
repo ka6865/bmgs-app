@@ -109,7 +109,7 @@ void main() {
 
     // 자동완성은 보조 기능이므로 에러 화면으로 전환되지 않는다.
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('빠른 메뉴'), findsOneWidget);
+    expect(find.text('즐겨찾는 플레이어'), findsOneWidget);
   });
 
   testWidgets('자동완성을 주입하지 않으면 후보 목록을 만들지 않는다', (tester) async {

@@ -58,10 +58,10 @@ class _BellFrame extends StatelessWidget {
               padding: EdgeInsets.zero,
               onPressed: () => context.push('/notifications'),
               icon: Icon(
-                hasUnread ? Icons.notifications_active : Icons.notifications_none,
-                color: hasUnread
-                    ? BgmsColors.accent
-                    : BgmsColors.textSecondary,
+                hasUnread
+                    ? Icons.notifications_active
+                    : Icons.notifications_none,
+                color: hasUnread ? BgmsColors.accent : BgmsColors.textSecondary,
               ),
             ),
           ),

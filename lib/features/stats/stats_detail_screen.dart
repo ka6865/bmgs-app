@@ -1001,33 +1001,22 @@ class _EmptyStatsPanel extends StatelessWidget {
   }
 }
 
-class _MatchSummaryPanel extends StatefulWidget {
+class _MatchSummaryPanel extends StatelessWidget {
   const _MatchSummaryPanel({required this.bundle});
 
   final PlayerStatsBundle bundle;
 
   @override
-  State<_MatchSummaryPanel> createState() => _MatchSummaryPanelState();
-}
-
-class _MatchSummaryPanelState extends State<_MatchSummaryPanel> {
-  /// 매치 리스트 전용 모드 필터. 기본은 전체를 보여준다.
-  ///
-  /// 상단 큐/모드 선택은 시즌 지표용이므로, 리스트는 사용자가 따로 좁힌다.
-  String _modeFilter = 'all';
-
-  @override
   Widget build(BuildContext context) {
-    final all = widget.bundle.matches;
-    final modes = MatchModeFilters.availableModes(all);
-    final filtered = MatchModeFilters.apply(all, _modeFilter);
+    final matches = bundle.matches;
 
-    // 매치 항목 자체가 카드이므로 섹션은 밴드로 두어 카드 중첩을 만들지 않는다.
+    // 최근 매치는 항상 전체를 보여준다.
+    // 상단 큐/모드 선택은 시즌 지표에만 적용되고 이 리스트에는 걸지 않는다.
     return SectionBand(
       title: '최근 매치',
       icon: Icons.receipt_long_outlined,
       action: Text(
-        '${filtered.length}경기',
+        '${matches.length}경기',
         style: Theme.of(
           context,
         ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
@@ -1035,16 +1024,7 @@ class _MatchSummaryPanelState extends State<_MatchSummaryPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (modes.length > 1) ...[
-            _MatchModeFilter(
-              modes: modes,
-              selected: _modeFilter,
-              labelBuilder: MatchModeFilters.label,
-              onChanged: (mode) => setState(() => _modeFilter = mode),
-            ),
-            const SizedBox(height: 12),
-          ],
-          if (widget.bundle.summaryFallback) ...[
+          if (bundle.summaryFallback) ...[
             Text(
               '일부 매치는 서버 분석이 끝나지 않아 요약만 표시합니다.',
               style: Theme.of(
@@ -1053,7 +1033,7 @@ class _MatchSummaryPanelState extends State<_MatchSummaryPanel> {
             ),
             const SizedBox(height: 10),
           ],
-          if (filtered.isEmpty)
+          if (matches.isEmpty)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
@@ -1063,57 +1043,15 @@ class _MatchSummaryPanelState extends State<_MatchSummaryPanel> {
                 border: Border.all(color: BgmsColors.border),
               ),
               child: Text(
-                all.isEmpty
-                    ? '최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.'
-                    : '이 모드의 매치가 없습니다. 다른 모드를 선택해 보세요.',
+                '최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: BgmsColors.textSecondary,
                 ),
               ),
             )
           else
-            ...filtered.map(
-              (match) =>
-                  _MatchCard(match: match, profile: widget.bundle.profile),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 매치 리스트 상단의 모드 필터. '전체'가 기본 선택이다.
-class _MatchModeFilter extends StatelessWidget {
-  const _MatchModeFilter({
-    required this.modes,
-    required this.selected,
-    required this.labelBuilder,
-    required this.onChanged,
-  });
-
-  final List<String> modes;
-  final String selected;
-  final String Function(String mode) labelBuilder;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final mode in ['all', ...modes])
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(mode == 'all' ? '전체' : labelBuilder(mode)),
-                selected: selected == mode,
-                showCheckmark: false,
-                onSelected: (isSelected) {
-                  if (!isSelected || selected == mode) return;
-                  onChanged(mode);
-                },
-              ),
+            ...matches.map(
+              (match) => _MatchCard(match: match, profile: bundle.profile),
             ),
         ],
       ),

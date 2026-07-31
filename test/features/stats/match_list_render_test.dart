@@ -8,6 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// 실제 서버 응답을 재현한다. KangHeeSung_ 계정은 4경기 모두 squad다.
 class _SingleModeRepository extends Fake implements PlayerStatsRepository {
+  _SingleModeRepository({
+    this.modes = const ['squad', 'squad', 'squad', 'squad'],
+  });
+
+  /// 각 매치의 게임 모드. 모드가 섞인 경우를 재현할 때 쓴다.
+  final List<String> modes;
+
   @override
   Future<PlayerStatsBundle> fetchPlayerStats({
     required String nickname,
@@ -25,25 +32,22 @@ class _SingleModeRepository extends Fake implements PlayerStatsRepository {
           adr: 180,
           winRate: 0,
           averageRank: 17,
-          roundsPlayed: 4,
-          recentMatches: const ['m1', 'm2', 'm3', 'm4'],
-          matchModes: const {
-            'm1': 'squad',
-            'm2': 'squad',
-            'm3': 'squad',
-            'm4': 'squad',
+          roundsPlayed: modes.length,
+          recentMatches: [for (var i = 1; i <= modes.length; i++) 'm$i'],
+          matchModes: {
+            for (var i = 1; i <= modes.length; i++) 'm$i': modes[i - 1],
           },
           seasonsList: const ['division.bro.official.pc-2018-42'],
           updatedAt: DateTime(2026, 8, 1),
           modeStats: const {},
         ),
         matches: [
-          for (var i = 1; i <= 4; i++)
+          for (var i = 1; i <= modes.length; i++)
             MatchSummary(
               matchId: 'm$i',
               mapName: '태이고',
               mapId: null,
-              gameMode: 'squad',
+              gameMode: modes[i - 1],
               kills: i,
               damage: 100.0 * i,
               rank: 10 + i,
@@ -63,7 +67,25 @@ class _SingleModeRepository extends Fake implements PlayerStatsRepository {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('모드가 한 종류여도 매치 카드가 모두 렌더링된다', (tester) async {
+  Future<void> pump(
+    WidgetTester tester,
+    _SingleModeRepository repository,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'KangHeeSung_',
+            platform: 'steam',
+            repository: repository,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('필터 없이 모든 매치 카드를 렌더링한다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -80,7 +102,7 @@ void main() {
     expect(find.text('최근 매치'), findsOneWidget);
     expect(find.text('4경기'), findsOneWidget);
 
-    // 모드가 하나뿐이면 필터 칩을 노출하지 않는다.
+    // 매치 리스트에는 모드 필터를 두지 않는다. 항상 전체를 보여준다.
     expect(find.widgetWithText(ChoiceChip, '전체'), findsNothing);
 
     // 매치 카드가 실제로 트리에 존재해야 한다.
@@ -88,5 +110,27 @@ void main() {
       (w) => w.runtimeType.toString() == '_MatchCard',
     );
     expect(cards, findsNWidgets(4));
+  });
+
+  testWidgets('모드가 섞여 있어도 상단 큐/모드 선택과 무관하게 전부 보여준다', (tester) async {
+    // 상단 지표 필터 기본값은 경쟁전/스쿼드지만, 리스트는 솔로와 듀오도 남긴다.
+    await pump(
+      tester,
+      _SingleModeRepository(
+        modes: const ['squad', 'duo-fpp', 'solo', 'squad-fpp', 'duo'],
+      ),
+    );
+
+    expect(find.text('5경기'), findsOneWidget);
+
+    final cards = find.byWidgetPredicate(
+      (w) => w.runtimeType.toString() == '_MatchCard',
+    );
+    expect(cards, findsNWidgets(5));
+
+    // 상단 지표용 모드 칩(솔로/듀오/스쿼드) 3개만 있고,
+    // 매치 리스트를 좁히는 '전체' 칩은 없다.
+    expect(find.byType(ChoiceChip), findsNWidgets(3));
+    expect(find.widgetWithText(ChoiceChip, '전체'), findsNothing);
   });
 }

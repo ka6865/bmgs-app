@@ -24,13 +24,6 @@ void main() {
   }
 
   Future<void> shoot(String name) async {
-    // convertFlutterSurfaceToImage는 Android에서만 필요하다. iOS에서는 미구현이라
-    // 예외가 발생하므로 무시하고 스크린샷만 남긴다.
-    try {
-      await binding.convertFlutterSurfaceToImage();
-    } on Exception {
-      // iOS/시뮬레이터: 변환 없이 바로 캡처한다.
-    }
     await binding.takeScreenshot(name);
   }
 
@@ -49,6 +42,9 @@ void main() {
   testWidgets('운영 API 기준 전체 탭 워크스루', (tester) async {
     await tester.pumpWidget(const BgmsApp());
     await settle(tester, seconds: 3);
+    // Android는 테스트당 한 번 변환하며, iOS에서는 no-op이다.
+    await binding.convertFlutterSurfaceToImage();
+    await tester.pump();
 
     // 홈: 개인화 대시보드
     expect(find.text('PUBG 플레이어 검색'), findsOneWidget);
@@ -88,6 +84,9 @@ void main() {
 
     // 전적 결과: 홈에서 실제 닉네임을 검색한다.
     await openTab(tester, '홈');
+    // Profile 모드에서도 유효한 입력 client ID를 사용한다. OS 키보드는 별도 QA 대상이다.
+    tester.testTextInput.register();
+    addTearDown(tester.testTextInput.unregister);
     await tester.enterText(find.byType(TextField).first, 'TGLTN');
     await settle(tester, seconds: 2);
     await tester.tap(find.byKey(const Key('player_search_submit')));

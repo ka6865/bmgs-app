@@ -378,11 +378,13 @@ class PlayerStatsBundle {
     required this.profile,
     required this.matches,
     required this.summaryFallback,
+    this.summaryError,
   });
 
   final PlayerStatsProfile profile;
   final List<MatchSummary> matches;
   final bool summaryFallback;
+  final String? summaryError;
 }
 
 /// 전체 매치 화면의 모드 필터 유틸.

@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bgms_mobile_app/features/stats/stats_detail_screen.dart';
+import 'package:bgms_mobile_app/features/stats/ai_coaching_card.dart';
+import 'package:bgms_mobile_app/features/stats/ai_coaching_models.dart';
+import 'package:bgms_mobile_app/features/stats/ai_coaching_repository.dart';
 import 'package:bgms_mobile_app/features/stats/widgets/match_card.dart';
 import 'package:bgms_mobile_app/features/stats/match_detail_screen.dart';
 import 'package:bgms_mobile_app/features/stats/match_detail_models.dart';
@@ -148,7 +151,113 @@ class _RecordingPlayerStatsRepository extends MockPlayerStatsRepository {
   }
 }
 
+class _RecordingAiCoachingRepository extends Fake
+    implements AiCoachingRepository {
+  int calls = 0;
+
+  @override
+  Future<AiCoachingSummary> summarize({
+    required PlayerStatsProfile profile,
+    required List<MatchSummary> matches,
+    bool allowRemote = true,
+  }) async {
+    calls++;
+    return AiCoachingSummary.unavailable('이전 매치 코칭 결과');
+  }
+}
+
+class _SummaryErrorRepository extends MockPlayerStatsRepository {
+  @override
+  Future<PlayerStatsBundle> fetchPlayerStats({
+    required String nickname,
+    required String platform,
+    String? season,
+    bool refresh = false,
+  }) async {
+    final bundle = await super.fetchPlayerStats(
+      nickname: nickname,
+      platform: platform,
+      season: season,
+      refresh: refresh,
+    );
+    return PlayerStatsBundle(
+      profile: bundle.profile,
+      matches: [
+        for (final match in bundle.matches)
+          MatchSummary.fallback(
+            matchId: match.matchId,
+            gameMode: match.gameMode,
+          ),
+      ],
+      summaryFallback: true,
+      summaryError: '요약 서버가 일시적으로 응답하지 않습니다.',
+    );
+  }
+}
+
 void main() {
+  testWidgets('최근 매치 요약 오류는 시즌 전적과 별도로 표시한다', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'TestUser',
+            platform: 'steam',
+            repository: _SummaryErrorRepository(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Gold III'), findsOneWidget);
+    final error = find.text('최근 매치 요약을 불러오지 못했습니다. 요약 서버가 일시적으로 응답하지 않습니다.');
+    await tester.scrollUntilVisible(
+      error,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(error, findsOneWidget);
+    expect(find.text('일부 매치는 서버 분석이 끝나지 않아 요약만 표시합니다.'), findsNothing);
+    expect(find.byType(MatchCard), findsNWidgets(2));
+  });
+
+  testWidgets('같은 플레이어의 매치가 바뀌면 AI 결과를 지우고 수동 실행을 기다린다', (tester) async {
+    final repository = _RecordingAiCoachingRepository();
+    Widget card(List<String> matchIds) => MaterialApp(
+      home: Scaffold(
+        body: AiCoachingCard(
+          repository: repository,
+          bundle: PlayerStatsBundle(
+            profile: PlayerStatsProfile.fromJson({
+              'nickname': 'TestUser',
+              'platform': 'steam',
+              'recentMatches': matchIds,
+            }),
+            matches: const [],
+            summaryFallback: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(card(['match-1']));
+    await tester.tap(find.text('AI 스쿼드 분석 및 코칭 받기'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    expect(find.text('이전 매치 코칭 결과'), findsOneWidget);
+    expect(repository.calls, 1);
+
+    await tester.pumpWidget(card(['match-1']));
+    await tester.pumpAndSettle();
+    expect(find.text('이전 매치 코칭 결과'), findsOneWidget);
+
+    await tester.pumpWidget(card(['match-2', 'match-1']));
+    await tester.pumpAndSettle();
+    expect(find.text('이전 매치 코칭 결과'), findsNothing);
+    expect(find.text('AI 스쿼드 분석 및 코칭 받기'), findsOneWidget);
+    expect(repository.calls, 1);
+  });
+
   testWidgets(
     'StatsDetailScreen normalizes an invalid deep-link platform to steam',
     (WidgetTester tester) async {

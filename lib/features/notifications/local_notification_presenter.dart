@@ -67,6 +67,7 @@ class LocalNotificationPresenter implements NotificationPresenter {
   @override
   Future<bool> hasPermission() async {
     if (!_initialized) await initialize();
+    _granted = await _readPermission();
     return _granted;
   }
 
@@ -142,22 +143,19 @@ class LocalNotificationPresenter implements NotificationPresenter {
 
   Future<bool> _readPermission() async {
     try {
-      if (Platform.isAndroid) {
-        final android = _plugin
-            .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin
-            >();
-        return await android?.areNotificationsEnabled() ?? false;
+      final android = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      if (android != null) {
+        return await android.areNotificationsEnabled() ?? false;
       }
-      if (Platform.isIOS) {
-        final ios = _plugin
-            .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin
-            >();
-        final options = await ios?.checkPermissions();
-        return options?.isAlertEnabled ?? false;
-      }
-      return false;
+      final ios = _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >();
+      final options = await ios?.checkPermissions();
+      return options?.isAlertEnabled ?? false;
     } catch (_) {
       return false;
     }

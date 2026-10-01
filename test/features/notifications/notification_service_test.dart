@@ -226,19 +226,42 @@ void main() {
     expect(repository.callCount, 1);
   });
 
-  test('한 번에 확인하는 즐겨찾기 인원에 상한이 있다', () async {
+  test('즐겨찾기 7명을 미확인·오래된 순으로 한 번에 최대 5명씩 확인한다', () async {
     final stores = await _buildStores(
       favorites: const ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
     );
     final repository = _FakeStatsRepository();
+    var currentTime = _now;
     final service = NotificationService(
       store: stores.store,
       playerStore: stores.players,
       statsRepository: repository,
-      clock: () => _now,
+      clock: () => currentTime,
     );
 
     await service.checkNow();
     expect(repository.callCount, NotificationService.maxPlayersPerRun);
+    expect(stores.store.getSnapshots(), hasLength(5));
+
+    currentTime = _now.add(const Duration(hours: 1));
+    await service.checkNow();
+    expect(repository.callCount, 2 * NotificationService.maxPlayersPerRun);
+    expect(
+      stores.store.getSnapshots().keys,
+      containsAll(['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id) => 'steam:$id')),
+    );
+
+    final oldest = stores.store
+        .getSnapshots()
+        .values
+        .where((snapshot) => snapshot.capturedAt == _now)
+        .map((snapshot) => snapshot.playerId)
+        .toList();
+    expect(oldest, hasLength(2));
+    currentTime = _now.add(const Duration(hours: 2));
+    await service.checkNow();
+    for (final playerId in oldest) {
+      expect(stores.store.getSnapshot(playerId)?.capturedAt, currentTime);
+    }
   });
 }

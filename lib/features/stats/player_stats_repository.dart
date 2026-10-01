@@ -11,9 +11,8 @@ class PlayerStatsRepository {
 
   /// 요약 캐시가 없는 매치를 상세 API로 보완할 최대 건수.
   ///
-  /// 서버 `matches-summary`는 캐시만 읽고 분석을 트리거하지 않는다.
-  /// 반면 `match` 상세 API는 미분석 매치를 처리해 결과를 남기므로,
-  /// 앞쪽 몇 건만 상세로 채워 "분석 대기" 카드가 계속 남는 것을 막는다.
+  /// 서버가 일부 누락 요약을 보완한 뒤에도 비어 있는 매치만 대상으로 한다.
+  /// 상세 API는 분석 비용이 있으므로 앞쪽 몇 건만 채운다.
   static const maxDetailBackfill = 4;
 
   Future<PlayerStatsBundle> fetchPlayerStats({
@@ -40,15 +39,21 @@ class PlayerStatsRepository {
         );
       }
 
-      final summariesJson = await _client.fetchMatchesSummary(
-        matchIds: matchIds,
-        nickname: profile.nickname.isNotEmpty ? profile.nickname : nickname,
-        platform: profile.platform,
-      );
-      final summaries = summariesJson['summaries'] as Map? ?? const {};
       final resolvedNickname = profile.nickname.isNotEmpty
           ? profile.nickname
           : nickname;
+      Map summaries = const {};
+      String? summaryError;
+      try {
+        final summariesJson = await _client.fetchMatchesSummary(
+          matchIds: matchIds,
+          nickname: resolvedNickname,
+          platform: profile.platform,
+        );
+        summaries = summariesJson['summaries'] as Map? ?? const {};
+      } catch (error) {
+        summaryError = ApiException.from(error).message;
+      }
       final matches = matchIds.map((matchId) {
         final summary = summaries[matchId];
         if (summary is Map) {
@@ -63,16 +68,19 @@ class PlayerStatsRepository {
         );
       }).toList();
 
-      await _backfillMissingSummaries(
-        matches: matches,
-        nickname: resolvedNickname,
-        platform: profile.platform,
-      );
+      if (summaryError == null) {
+        await _backfillMissingSummaries(
+          matches: matches,
+          nickname: resolvedNickname,
+          platform: profile.platform,
+        );
+      }
 
       return PlayerStatsBundle(
         profile: profile,
         matches: matches,
         summaryFallback: matches.any((match) => match.isFallback),
+        summaryError: summaryError,
       );
     } catch (error) {
       throw PlayerStatsException.from(ApiException.from(error));

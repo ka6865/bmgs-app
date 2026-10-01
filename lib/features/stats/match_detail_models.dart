@@ -279,6 +279,9 @@ class MatchDetail {
     required this.teamKills,
     required this.isFallback,
     this.message,
+    this.analysisAvailability,
+    this.analysisUnavailableReason,
+    this.availableAnalysisFields = const {},
     required this.tradeStats,
     required this.isolationData,
     required this.duelStats,
@@ -299,6 +302,17 @@ class MatchDetail {
   final int teamKills;
   final bool isFallback;
   final String? message;
+  final String? analysisAvailability;
+  final String? analysisUnavailableReason;
+  final Set<String> availableAnalysisFields;
+
+  bool get hasTacticalAnalysis =>
+      !isFallback &&
+      analysisAvailability != 'basic_only' &&
+      availableAnalysisFields.isNotEmpty;
+
+  bool hasAnalysisField(String field) =>
+      hasTacticalAnalysis && availableAnalysisFields.contains(field);
 
   // 고정밀 전술 분석 필드
   final TradeStats tradeStats;
@@ -398,6 +412,27 @@ class MatchDetail {
       ]).round(),
       isFallback: false,
       message: json['message']?.toString(),
+      analysisAvailability: json['analysisAvailability']?.toString(),
+      analysisUnavailableReason: json['analysisUnavailableReason']?.toString(),
+      availableAnalysisFields: {
+        for (final field in const [
+          'benchmark',
+          'tradeStats',
+          'isolationData',
+          'duelStats',
+          'combatPressure',
+          'leadShotKills',
+          'leadShotKnocks',
+          'ridingShotKills',
+          'ridingShotKnocks',
+          'roadKills',
+          'roadKnocks',
+        ])
+          if (json[field] is Map
+              ? (json[field] as Map).isNotEmpty
+              : json[field] is num)
+            field,
+      },
       tradeStats: trade != null
           ? TradeStats.fromJson(trade)
           : TradeStats.empty(),

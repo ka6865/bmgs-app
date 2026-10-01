@@ -1,5 +1,6 @@
 import 'package:bgms_mobile_app/core/network/api_exception.dart';
 import 'package:bgms_mobile_app/core/network/bgms_api_client.dart';
+import 'package:bgms_mobile_app/features/board/board_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/fake_http_adapter.dart';
@@ -28,6 +29,23 @@ void main() {
     );
 
     expect(json['nickname'], 'tester');
+  });
+
+  test('게시글 강제 갱신은 서버 캐시를 우회하는 refresh 계약을 전달한다', () async {
+    adapter.stub('/api/mobile/board/posts/42', {
+      'id': 42,
+      'title': '테스트 게시글',
+      'comments': [],
+    });
+    final repository = BoardRepository(client: buildClient());
+    await repository.fetchPost(42);
+    await repository.fetchPost(42, refresh: true);
+
+    expect(Uri.parse(adapter.requestedPaths.first).queryParameters, isEmpty);
+    expect(
+      Uri.parse(adapter.requestedPaths.last).queryParameters['refresh'],
+      '1',
+    );
   });
 
   test('404 응답을 notFound ApiException으로 정규화한다', () async {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bgms_mobile_app/core/storage/local_player_store.dart';
 import 'package:bgms_mobile_app/features/stats/player_stats_models.dart';
 import 'package:bgms_mobile_app/features/stats/player_stats_repository.dart';
@@ -89,5 +91,68 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('즐겨찾기에 추가'), findsNothing);
+  });
+
+  testWidgets('검색 대상과 플랫폼이 바뀌면 즐겨찾기 상태를 다시 읽는다', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalPlayerStore(await SharedPreferences.getInstance());
+    await store.toggleFavorite('favoritePlayer', platform: 'steam');
+    await store.toggleFavorite('otherPlayer', platform: 'kakao');
+    final repository = _EmptyStatsRepository();
+
+    Widget screen(String? nickname, String platform) => MaterialApp(
+      home: Scaffold(
+        body: StatsDetailScreen(
+          nickname: nickname,
+          platform: platform,
+          repository: repository,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(screen(null, 'steam'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(screen('favoritePlayer', 'steam'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('즐겨찾기 해제'), findsOneWidget);
+
+    await tester.pumpWidget(screen('favoritePlayer', 'kakao'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('즐겨찾기에 추가'), findsOneWidget);
+
+    await tester.pumpWidget(screen('otherPlayer', 'kakao'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('즐겨찾기 해제'), findsOneWidget);
+  });
+
+  testWidgets('저장소를 기다리는 즐겨찾기 변경은 요청한 플레이어와 플랫폼에 적용한다', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = LocalPlayerStore(prefs);
+    final pendingPreferences = Completer<SharedPreferences>();
+    final repository = _EmptyStatsRepository();
+
+    Widget screen(String nickname, String platform) => MaterialApp(
+      home: Scaffold(
+        body: StatsDetailScreen(
+          nickname: nickname,
+          platform: platform,
+          repository: repository,
+          preferencesLoader: () => pendingPreferences.future,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(screen('firstPlayer', 'steam'));
+    await tester.tap(find.byTooltip('즐겨찾기에 추가'));
+    await tester.pumpWidget(screen('secondPlayer', 'kakao'));
+    pendingPreferences.complete(prefs);
+    await tester.pumpAndSettle();
+
+    expect(await store.isFavorite('firstPlayer', platform: 'steam'), isTrue);
+    expect(await store.isFavorite('firstPlayer', platform: 'kakao'), isFalse);
+    expect(await store.isFavorite('secondPlayer', platform: 'kakao'), isFalse);
+    expect(find.byTooltip('즐겨찾기에 추가'), findsOneWidget);
+    expect(find.text('즐겨찾기에 추가했습니다.'), findsNothing);
   });
 }

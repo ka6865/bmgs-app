@@ -28,9 +28,12 @@ class BoardRepository {
     }
   }
 
-  Future<BoardPostDetail> fetchPost(int postId) async {
+  Future<BoardPostDetail> fetchPost(int postId, {bool refresh = false}) async {
     try {
-      final json = await _client.fetchBoardPost(postId: postId);
+      final json = await _client.fetchBoardPost(
+        postId: postId,
+        refresh: refresh,
+      );
       return BoardPostDetail.fromJson(json);
     } catch (error) {
       throw BoardException(ApiException.from(error).message);

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/bgms_theme.dart';
@@ -7,9 +8,10 @@ import 'ai_coaching_repository.dart';
 import 'player_stats_models.dart';
 
 class AiCoachingCard extends StatefulWidget {
-  const AiCoachingCard({super.key, required this.bundle});
+  const AiCoachingCard({super.key, required this.bundle, this.repository});
 
   final PlayerStatsBundle bundle;
+  final AiCoachingRepository? repository;
 
   @override
   State<AiCoachingCard> createState() => _AiCoachingCardState();
@@ -22,14 +24,18 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
   @override
   void initState() {
     super.initState();
-    _repository = AiCoachingRepository();
+    _repository = widget.repository ?? AiCoachingRepository();
   }
 
   @override
   void didUpdateWidget(covariant AiCoachingCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.bundle.profile.nickname != widget.bundle.profile.nickname ||
-        oldWidget.bundle.profile.platform != widget.bundle.profile.platform) {
+        oldWidget.bundle.profile.platform != widget.bundle.profile.platform ||
+        !listEquals(
+          oldWidget.bundle.profile.recentMatches,
+          widget.bundle.profile.recentMatches,
+        )) {
       _summaryFuture = null;
     }
   }
@@ -42,7 +48,9 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
   }
 
   void _retry() {
-    setState(() => _summaryFuture = _loadSummary());
+    setState(() {
+      _summaryFuture = _loadSummary();
+    });
   }
 
   @override

@@ -13,6 +13,7 @@ import '../../core/widgets/player_search_bar.dart';
 import '../../navigation/shell_scaffold.dart';
 import '../notifications/notification_bell.dart';
 import 'widgets/home_dashboard_sections.dart';
+import 'widgets/home_live_banner.dart';
 import 'widgets/player_suggestion_list.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -313,6 +314,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _search(nickname: player.nickname, platform: player.platform),
             ),
             const SizedBox(height: 20),
+            HomeLiveBanner(onTap: () => context.go('/maps')),
+            const SizedBox(height: 16),
             CrateSimBanner(onTap: () => context.push('/crates')),
             if (_loadingStore || remainingRecent.isNotEmpty) ...[
               const SizedBox(height: 20),

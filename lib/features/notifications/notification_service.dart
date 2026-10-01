@@ -54,6 +54,15 @@ class NotificationService {
       return 0;
     }
 
+    final snapshots = store.getSnapshots();
+    favorites.sort((a, b) {
+      final first = snapshots[a.id]?.capturedAt;
+      final second = snapshots[b.id]?.capturedAt;
+      if (first == null) return second == null ? 0 : -1;
+      if (second == null) return 1;
+      return first.compareTo(second);
+    });
+
     final created = <BgmsNotification>[];
     for (final player in favorites.take(maxPlayersPerRun)) {
       created.addAll(await _checkPlayer(player, settings: settings));

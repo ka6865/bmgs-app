@@ -3,13 +3,20 @@ import 'package:flutter/material.dart';
 class BgmsColors {
   const BgmsColors._();
 
-  static const accent = Color(0xFFF2A900);
-  static const bgBase = Color(0xFF0D0D0D);
-  static const surface = Color(0xFF161616);
-  static const elevated = Color(0xFF1F1F1F);
+  static const accent = Color(0xFFF5A623);
+  static const bgBase = Color(0xFF0B0C0E);
+  static const surface = Color(0xFF15171B);
+  static const elevated = Color(0xFF1E2127);
   static const border = Color(0x14FFFFFF);
-  static const success = Color(0xFF34A853);
-  static const danger = Color(0xFFEF4444);
+  static const success = Color(0xFF00D26A);
+  static const danger = Color(0xFFFF4D4D);
+  static const top10 = Color(0xFF00D26A);
+  static const defeat = Color(0xFF8B95A1);
+  static const goldGlow = Color(0x26F5A623);
+  static const victoryStart = Color(0xFFF5A623);
+  static const victoryEnd = Color(0xFFFFD000);
+  static const glassBg = Color(0xD9121418);
+  static const glassBorder = Color(0x14FFFFFF);
   static const textPrimary = Color(0xFFFFFFFF);
   static const textSecondary = Color(0x99FFFFFF);
   static const textMuted = Color(0x4DFFFFFF);
@@ -62,6 +69,7 @@ class BgmsRadius {
   static const BorderRadius sm = BorderRadius.all(Radius.circular(6));
   static const BorderRadius md = BorderRadius.all(Radius.circular(8));
   static const BorderRadius lg = BorderRadius.all(Radius.circular(12));
+  static const BorderRadius xl = BorderRadius.all(Radius.circular(16));
 }
 
 class BgmsTheme {

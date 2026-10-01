@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/bgms_theme.dart';
-import '../../../core/widgets/app_panels.dart';
+import '../../../core/widgets/bgms_card.dart';
 import '../player_stats_models.dart';
 import 'tier_style.dart';
 
-/// 매치 한 건을 한 행으로 보여주는 카드.
-///
-/// 전적 화면의 미리보기와 전체 매치 화면이 같은 위젯을 공유한다.
+/// 매치 한 건을 고도화된 모던 카드 형태로 보여주는 위젯.
 class MatchCard extends StatelessWidget {
   const MatchCard({super.key, required this.match, required this.profile});
 
@@ -23,12 +21,19 @@ class MatchCard extends StatelessWidget {
     return '${difference.inDays}일 전';
   }
 
-  /// 순위 구간별 강조 색. 1등은 골드, 상위권은 강조색을 쓴다.
+  Color get _statusColor {
+    final rank = match.rank;
+    if (rank == null) return BgmsColors.defeat.withValues(alpha: 0.25);
+    if (rank == 1) return BgmsColors.accent;
+    if (rank <= 10) return BgmsColors.top10;
+    return BgmsColors.defeat.withValues(alpha: 0.25);
+  }
+
   Color get _rankColor {
     final rank = match.rank;
     if (rank == null) return BgmsColors.textMuted;
     if (rank == 1) return BgmsColors.accent;
-    if (rank <= 10) return BgmsColors.success;
+    if (rank <= 10) return BgmsColors.top10;
     return BgmsColors.textSecondary;
   }
 
@@ -50,65 +55,105 @@ class MatchCard extends StatelessWidget {
     final isChicken = match.rank == 1;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: InkSurface(
-        borderRadius: 10,
-        decoration: BoxDecoration(
-          color: isChicken
-              ? BgmsColors.accent.withValues(alpha: 0.08)
-              : BgmsColors.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isChicken
-                ? BgmsColors.accent.withValues(alpha: 0.45)
-                : BgmsColors.border,
-          ),
-        ),
-        child: InkWell(
-          onTap: () {
-            context.push(
-              '/stats/match/${match.matchId}',
-              extra: {
-                'nickname': profile.nickname,
-                'platform': profile.platform,
-                'summary': match,
-              },
-            );
-          },
-          borderRadius: BorderRadius.circular(10),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stackStats =
+              constraints.maxWidth < 352 ||
+              MediaQuery.textScalerOf(context).scale(14) > 18;
+          final stats = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MatchStat(label: '킬', value: '${match.kills}'),
+              const SizedBox(width: 14),
+              _MatchStat(label: '딜량', value: match.damage.toStringAsFixed(0)),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: BgmsColors.textMuted,
+              ),
+            ],
+          );
+          return BgmsCard(
+            statusColor: _statusColor,
+            isGlow: isChicken,
+            borderRadius: 14,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            backgroundColor: isChicken
+                ? BgmsColors.accent.withValues(alpha: 0.05)
+                : BgmsColors.surface,
+            onTap: () {
+              context.push(
+                '/stats/match/${match.matchId}',
+                extra: {
+                  'nickname': profile.nickname,
+                  'platform': profile.platform,
+                  'summary': match,
+                },
+              );
+            },
             child: Row(
               children: [
-                _RankBlock(rank: match.rank, color: _rankColor),
-                const SizedBox(width: 12),
+                _RankBlock(
+                  rank: match.rank,
+                  color: _rankColor,
+                  isChicken: isChicken,
+                ),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Expanded(
+                          Flexible(
                             child: Text(
                               match.mapName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.2,
                               ),
                             ),
                           ),
                           if (isChicken) ...[
                             const SizedBox(width: 6),
-                            const Icon(
-                              Icons.emoji_events,
-                              size: 14,
-                              color: BgmsColors.accent,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: BgmsColors.accent.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(
+                                    Icons.emoji_events,
+                                    size: 12,
+                                    color: BgmsColors.accent,
+                                  ),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'WIN',
+                                    style: TextStyle(
+                                      color: BgmsColors.accent,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ],
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 4),
                       Row(
                         children: [
                           Flexible(
@@ -123,7 +168,7 @@ class MatchCard extends StatelessWidget {
                             ),
                           ),
                           if (match.tier != null) ...[
-                            _DotSeparator(),
+                            const _DotSeparator(),
                             Flexible(
                               child: Text(
                                 match.tierName,
@@ -137,50 +182,49 @@ class MatchCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          _DotSeparator(),
-                          Text(
-                            _formatElapsedTime(match.createdAt),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: BgmsColors.textMuted,
-                              letterSpacing: 0,
+                          const _DotSeparator(),
+                          Flexible(
+                            child: Text(
+                              _formatElapsedTime(match.createdAt),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: BgmsColors.textMuted,
+                                letterSpacing: 0,
+                              ),
                             ),
                           ),
                         ],
                       ),
+                      if (stackStats) ...[const SizedBox(height: 8), stats],
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                _MatchStat(label: '킬', value: '${match.kills}'),
-                const SizedBox(width: 14),
-                _MatchStat(label: '딜량', value: match.damage.toStringAsFixed(0)),
-                const Icon(
-                  Icons.chevron_right,
-                  size: 18,
-                  color: BgmsColors.textMuted,
-                ),
+                if (!stackStats) ...[const SizedBox(width: 12), stats],
               ],
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 }
 
-/// 매치 순위를 좌측에 고정 폭으로 표시한다.
-///
-/// 폭을 고정해 매치마다 본문 시작 위치가 흔들리지 않게 한다.
 class _RankBlock extends StatelessWidget {
-  const _RankBlock({required this.rank, required this.color});
+  const _RankBlock({
+    required this.rank,
+    required this.color,
+    required this.isChicken,
+  });
 
   final int? rank;
   final Color color;
+  final bool isChicken;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 38,
+      width: 44,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -189,13 +233,16 @@ class _RankBlock extends StatelessWidget {
             maxLines: 1,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: color,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
             ),
           ),
           Text(
-            '순위',
+            isChicken ? '치킨' : '순위',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: BgmsColors.textMuted,
+              color: isChicken ? BgmsColors.accent : BgmsColors.textMuted,
+              fontSize: 10,
+              fontWeight: isChicken ? FontWeight.w700 : FontWeight.w500,
               letterSpacing: 0,
             ),
           ),
@@ -205,7 +252,6 @@ class _RankBlock extends StatelessWidget {
   }
 }
 
-/// 매치 카드 우측의 소형 지표.
 class _MatchStat extends StatelessWidget {
   const _MatchStat({required this.label, required this.value});
 
@@ -220,14 +266,16 @@ class _MatchStat extends StatelessWidget {
         Text(
           value,
           maxLines: 1,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.3,
+          ),
         ),
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: BgmsColors.textMuted,
+            fontSize: 10,
             letterSpacing: 0,
           ),
         ),
@@ -236,7 +284,6 @@ class _MatchStat extends StatelessWidget {
   }
 }
 
-/// 메타 정보 사이의 가운뎃점 구분자.
 class _DotSeparator extends StatelessWidget {
   const _DotSeparator();
 

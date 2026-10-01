@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../../core/widgets/bgms_card.dart';
 import 'match_detail_models.dart';
 import 'match_detail_repository.dart';
 import 'player_stats_models.dart';
@@ -132,26 +133,34 @@ class _DetailContent extends StatelessWidget {
         _MetricGrid(detail: detail),
         const SizedBox(height: 12),
 
+        if (!detail.isFallback && !detail.hasTacticalAnalysis)
+          const BgmsCard(
+            child: Text(
+              '전술 분석을 사용할 수 없습니다. 기본 전적은 정상적으로 표시합니다.',
+              style: TextStyle(color: BgmsColors.textSecondary),
+            ),
+          ),
+
         // 3. [고도화] 벤치마크 점수 카드 (웹의 Benchmark Breakdown 이식)
-        if (!detail.isFallback) ...[
+        if (detail.hasAnalysisField('benchmark')) ...[
           _BenchmarkScoreCard(benchmark: detail.benchmark),
           const SizedBox(height: 12),
         ],
 
         // 4. [고도화] 교전 포지셔닝 & 고립 지수 분석 카드
-        if (!detail.isFallback) ...[
+        if (detail.hasAnalysisField('isolationData')) ...[
           _TacticalPositioningCard(isolation: detail.isolationData),
           const SizedBox(height: 12),
         ],
 
         // 5. [고도화] 팀 백업 및 유틸리티 레이턴시 카드
-        if (!detail.isFallback) ...[
+        if (detail.hasAnalysisField('tradeStats')) ...[
           _TeamBackupCard(trade: detail.tradeStats),
           const SizedBox(height: 12),
         ],
 
         // 6. [고도화] 차량 및 교전 압박 특수 지표 카드
-        if (!detail.isFallback && _hasSpecialStats(detail)) ...[
+        if (detail.hasTacticalAnalysis && _hasSpecialStats(detail)) ...[
           _SpecialCombatCard(
             vehicle: detail.vehicleCombat,
             pressure: detail.combatPressure,
@@ -188,81 +197,85 @@ class _MetadataCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: BgmsColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: BgmsColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    detail.nickname,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: BgmsColors.accent,
-                      fontWeight: FontWeight.w900,
-                    ),
+    final isChicken = detail.rank == 1;
+
+    return BgmsCard(
+      isGlow: isChicken,
+      statusColor: isChicken ? BgmsColors.accent : null,
+      backgroundColor: BgmsColors.surface,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  detail.nickname,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: BgmsColors.accent,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: detail.isFallback
-                        ? Colors.amber.withValues(alpha: 0.15)
-                        : Colors.green.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: detail.isFallback ? Colors.amber : Colors.green,
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    detail.isFallback ? '대기 중' : '분석 완료',
-                    style: TextStyle(
-                      color: detail.isFallback
-                          ? Colors.amber
-                          : Colors.greenAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: !detail.hasTacticalAnalysis
+                      ? Colors.amber.withValues(alpha: 0.15)
+                      : Colors.green.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: !detail.hasTacticalAnalysis
+                        ? Colors.amber
+                        : Colors.green,
+                    width: 1,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${detail.mapName} · ${detail.gameMode}',
-              style: const TextStyle(color: BgmsColors.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '매치 ID: ${detail.matchId}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: BgmsColors.textMuted),
-            ),
-            if (detail.message != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                detail.message!,
-                style: const TextStyle(color: BgmsColors.textSecondary),
+                child: Text(
+                  detail.isFallback
+                      ? '대기 중'
+                      : detail.hasTacticalAnalysis
+                      ? '분석 완료'
+                      : '분석 불가',
+                  style: TextStyle(
+                    color: !detail.hasTacticalAnalysis
+                        ? Colors.amber
+                        : Colors.greenAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${detail.mapName} · ${detail.gameMode}',
+            style: const TextStyle(color: BgmsColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '매치 ID: ${detail.matchId}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: BgmsColors.textMuted),
+          ),
+          if (detail.message != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              detail.message!,
+              style: const TextStyle(color: BgmsColors.textSecondary),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

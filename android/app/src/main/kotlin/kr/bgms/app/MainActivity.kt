@@ -1,4 +1,4 @@
-package kr.bgms.bgms_mobile_app
+package kr.bgms.app
 
 import io.flutter.embedding.android.FlutterActivity
 

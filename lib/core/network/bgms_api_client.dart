@@ -128,8 +128,9 @@ class BgmsApiClient {
     );
   }
 
-  Uri buildBoardPostUri(int postId) {
-    return Uri.parse('$_baseUrl/api/mobile/board/posts/$postId');
+  Uri buildBoardPostUri(int postId, {bool refresh = false}) {
+    final uri = Uri.parse('$_baseUrl/api/mobile/board/posts/$postId');
+    return refresh ? uri.replace(queryParameters: {'refresh': '1'}) : uri;
   }
 
   Uri buildDeleteAccountUri() {
@@ -278,8 +279,11 @@ class BgmsApiClient {
     );
   }
 
-  Future<Map<String, dynamic>> fetchBoardPost({required int postId}) {
-    return _getJson(buildBoardPostUri(postId));
+  Future<Map<String, dynamic>> fetchBoardPost({
+    required int postId,
+    bool refresh = false,
+  }) {
+    return _getJson(buildBoardPostUri(postId, refresh: refresh));
   }
 
   Future<Map<String, dynamic>> createBoardPost({

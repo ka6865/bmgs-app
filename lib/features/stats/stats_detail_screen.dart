@@ -9,6 +9,7 @@ import '../../core/storage/local_player_store.dart';
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/app_panels.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../../core/widgets/bgms_sparkline_bar.dart';
 import '../../core/widgets/player_search_bar.dart';
 import '../../navigation/shell_scaffold.dart';
 import 'ai_coaching_card.dart';
@@ -85,7 +86,9 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
         oldWidget.platform != widget.platform) {
       _selectedSeason = null; // 닉네임이나 플랫폼이 바뀌면 시즌 필터 초기화
       _searchPlatform = _normalizedPlatform;
+      _isFavorite = false;
       _startFetch();
+      _refreshPlayers();
     }
   }
 
@@ -113,12 +116,17 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   Future<void> _refreshPlayers() async {
     final store = _store;
     if (store == null) return;
-    final recent = await store.getRecentPlayers();
     final nickname = widget.nickname?.trim() ?? '';
+    final platform = _normalizedPlatform;
+    final recent = await store.getRecentPlayers();
     final favorite = nickname.isEmpty
         ? false
-        : await store.isFavorite(nickname, platform: _normalizedPlatform);
-    if (!mounted) return;
+        : await store.isFavorite(nickname, platform: platform);
+    if (!mounted ||
+        nickname != (widget.nickname?.trim() ?? '') ||
+        platform != _normalizedPlatform) {
+      return;
+    }
     setState(() {
       _recentPlayers = recent;
       _isFavorite = favorite;
@@ -130,15 +138,20 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   /// 홈으로 돌아가지 않고 전적 화면에서 바로 등록할 수 있게 한다.
   Future<void> _toggleFavorite() async {
     final nickname = widget.nickname?.trim() ?? '';
+    final platform = _normalizedPlatform;
     if (nickname.isEmpty) return;
     try {
       await _storeReady;
       final store = _store;
       if (store == null) return;
 
-      await store.toggleFavorite(nickname, platform: _normalizedPlatform);
+      await store.toggleFavorite(nickname, platform: platform);
       await _refreshPlayers();
-      if (!mounted) return;
+      if (!mounted ||
+          nickname != (widget.nickname?.trim() ?? '') ||
+          platform != _normalizedPlatform) {
+        return;
+      }
       // _refreshPlayers 이후 _isFavorite은 이미 새 상태다.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1032,7 +1045,15 @@ class _MatchSummaryPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (bundle.summaryFallback) ...[
+          if (bundle.summaryError != null) ...[
+            Text(
+              '최근 매치 요약을 불러오지 못했습니다. ${bundle.summaryError}',
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
+            ),
+            const SizedBox(height: 10),
+          ] else if (bundle.summaryFallback) ...[
             Text(
               '일부 매치는 서버 분석이 끝나지 않아 요약만 표시합니다.',
               style: Theme.of(
@@ -1058,6 +1079,45 @@ class _MatchSummaryPanel extends StatelessWidget {
               ),
             )
           else ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: BgmsColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: BgmsColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        '최근 순위 흐름',
+                        style: TextStyle(
+                          color: BgmsColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        '치킨 ${matches.where((m) => m.rank == 1).length}회',
+                        style: const TextStyle(
+                          color: BgmsColors.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  BgmsSparklineBar(
+                    ranks: matches.take(20).map((m) => m.rank).toList(),
+                  ),
+                ],
+              ),
+            ),
             ...preview.map(
               (match) => MatchCard(match: match, profile: bundle.profile),
             ),
@@ -1069,7 +1129,8 @@ class _MatchSummaryPanel extends StatelessWidget {
                     builder: (context) => AllMatchesScreen(
                       matches: matches,
                       profile: bundle.profile,
-                      summaryFallback: bundle.summaryFallback,
+                      summaryFallback:
+                          bundle.summaryFallback && bundle.summaryError == null,
                     ),
                   ),
                 );

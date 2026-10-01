@@ -35,7 +35,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   }
 
   void _reload() {
-    setState(() => _future = _repository.fetchPost(widget.postId));
+    setState(
+      () => _future = _repository.fetchPost(widget.postId, refresh: true),
+    );
   }
 
   Future<void> _submitComment() async {
@@ -48,10 +50,11 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         postId: widget.postId,
         content: _commentController.text,
       );
+      if (!mounted) return;
       _commentController.clear();
       _reload();
     } on BoardException catch (error) {
-      setState(() => _commentError = error.message);
+      if (mounted) setState(() => _commentError = error.message);
     } finally {
       if (mounted) setState(() => _commentSubmitting = false);
     }

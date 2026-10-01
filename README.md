@@ -72,19 +72,21 @@ flutter test
 dart analyze
 ```
 
-현재 코드 기준:
+2026-10-01 점검 기준:
 
-- `flutter test`: 22개 테스트 통과
+- `flutter test --concurrency=2`: 225개 테스트 통과
 - `dart analyze`: `No issues found!`
 
 참고: 현재 로컬 환경에서 `flutter analyze`는 Flutter analysis server JSON parsing 예외가 발생할 수 있습니다. 코드 정적 분석은 `dart analyze` 통과 여부를 우선 기준으로 봅니다.
 
 ## Android/iOS 로컬 빌드 환경
 
-현재 앱 코드는 Flutter 3.44.4 / Dart 3.12.2에서 테스트와 정적 분석을 통과했습니다. 다만 이 Mac의 네이티브 빌드 환경은 아래 항목이 준비되어야 Android/iOS 빌드까지 확인할 수 있습니다.
+앱 코드는 Flutter 3.44.4 / Dart 3.12.2에서 테스트와 정적 분석을 통과했습니다. 2026-10-01 점검에서는 맥북 용량 제약에 따라 시뮬레이터와 네이티브 release 빌드를 생략했습니다. 내부 배포 전 아래 항목을 별도로 확인해야 합니다.
 
-- Android: `flutter doctor -v` 기준 Android SDK가 감지되지 않습니다. Android Studio 설치 후 SDK 경로를 `flutter config --android-sdk`로 연결해야 합니다.
-- iOS: Xcode는 감지되지만 CocoaPods가 설치되어 있지 않습니다. 현재 시뮬레이터 런타임은 iOS 26.2/26.4만 설치되어 있고, Xcode 빌드는 iOS 26.5 런타임을 요구하므로 Xcode > Settings > Components에서 iOS 26.5 플랫폼/런타임을 추가 설치해야 합니다.
+- Android: SDK/Java 설정, release keystore와 실제 서명된 APK/AAB.
+- iOS: Xcode/CocoaPods, signing team과 provisioning profile, archive/TestFlight 및 iPad 지원 설정.
+
+기능·UI 확인 결과와 개선 우선순위는 [모바일 앱 점검 보고서](docs/mobile-audit-2026-10-01.md)에 정리했습니다.
 
 ## 현재 MVP 범위
 

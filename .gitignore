@@ -22,6 +22,9 @@ docs/
 captures/
 assets/maps/README.md
 
+# 통합 테스트 워크스루 산출물
+screenshots/
+
 # IntelliJ related
 *.iml
 *.ipr

@@ -30,7 +30,7 @@ class CratesRepository {
           .select(
             'id, name, description, image_url, price_gcoin, '
             'bundle_price_gcoin, '
-            'crate_item_relations(id, probability, token_count, '
+            'crate_item_relations(id, drop_type, probability, token_count, '
             'is_prime_parcel, crate_item_assets(id, display_name, rarity, '
             'image_url))',
           )

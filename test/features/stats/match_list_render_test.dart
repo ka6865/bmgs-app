@@ -22,6 +22,7 @@ class _SingleModeRepository extends Fake implements PlayerStatsRepository {
     required String platform,
     String? season,
     bool refresh = false,
+    bool includeSummaries = true,
   }) {
     return SynchronousFuture(
       PlayerStatsBundle(

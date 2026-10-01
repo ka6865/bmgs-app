@@ -2,6 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../features/guide/guide_screen.dart';
+import '../features/tools/weapons_screen.dart';
+import '../features/tools/backpack_screen.dart';
+import '../features/meta/weapon_meta_screen.dart';
+import '../features/maps/hotdrop_screen.dart';
+import '../features/maps/replay/match_replay_screen.dart';
+import '../features/support/support_screen.dart';
+import '../features/support/support_create_screen.dart';
+import '../features/support/support_detail_screen.dart';
 import '../features/board/board_detail_screen.dart';
 import '../features/board/board_screen.dart';
 import '../features/crates/crates_screen.dart';
@@ -42,6 +51,42 @@ GoRouter createAppRouter({
   return GoRouter(
     initialLocation: '/',
     routes: [
+      GoRoute(path: '/tools', builder: (_, _) => const GuideScreen()),
+      GoRoute(path: '/tools/weapons', builder: (_, _) => const WeaponsScreen()),
+      GoRoute(
+        path: '/tools/backpack',
+        builder: (_, _) => const BackpackScreen(),
+      ),
+      GoRoute(path: '/meta', builder: (_, _) => const WeaponMetaScreen()),
+      GoRoute(
+        path: '/hotdrop',
+        builder: (_, state) =>
+            HotdropScreen(initialMapId: state.uri.queryParameters['mapId']),
+      ),
+      GoRoute(
+        path: '/replay/:matchId',
+        builder: (_, state) => MatchReplayScreen(
+          matchId: state.pathParameters['matchId'] ?? '',
+          nickname: state.uri.queryParameters['nickname'] ?? '',
+          platform: normalizePlayerPlatform(
+            state.uri.queryParameters['platform'] ?? 'steam',
+          ),
+          mapId: state.uri.queryParameters['mapId'] ?? 'Erangel',
+        ),
+      ),
+      GoRoute(
+        path: '/support',
+        builder: (_, _) => const SupportScreen(),
+        routes: [
+          GoRoute(path: 'new', builder: (_, _) => const SupportCreateScreen()),
+          GoRoute(
+            path: ':ticketId',
+            builder: (_, state) => SupportDetailScreen(
+              ticketId: state.pathParameters['ticketId'] ?? '',
+            ),
+          ),
+        ],
+      ),
       // 알림 센터는 확인 후 벗어나는 화면이므로 하단 탭 셸 밖에 둔다.
       GoRoute(
         path: '/notifications',
@@ -107,13 +152,11 @@ GoRouter createAppRouter({
                             mapName: query['mapName'] ?? '맵 정보 없음',
                             mapId: query['mapId'],
                             gameMode: query['gameMode'] ?? '모드 정보 없음',
-                            kills: int.tryParse(query['kills'] ?? '') ?? 0,
-                            damage: double.tryParse(query['damage'] ?? '') ?? 0,
+                            kills: int.tryParse(query['kills'] ?? ''),
+                            damage: double.tryParse(query['damage'] ?? ''),
                             rank: int.tryParse(query['rank'] ?? ''),
                             isFallback: query['fallback'] == 'true',
-                            createdAt:
-                                DateTime.tryParse(query['date'] ?? '') ??
-                                DateTime.now(),
+                            createdAt: DateTime.tryParse(query['date'] ?? ''),
                           );
 
                       return MatchDetailScreen(

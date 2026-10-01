@@ -122,6 +122,18 @@ class _MyScreenState extends State<MyScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         const ScreenHeader(title: '내 정보'),
+        ListTile(
+          leading: const Icon(Icons.support_agent),
+          title: const Text('고객센터'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/support'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.apps),
+          title: const Text('BGMS 도구'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/tools'),
+        ),
         const SizedBox(height: 16),
         // Supabase 초기화 여부에 따라 인증 섹션 분기
         if (!AppConfig.local.canInitializeSupabase)

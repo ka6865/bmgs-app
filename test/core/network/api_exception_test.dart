@@ -8,6 +8,7 @@ DioException _dioError({
   int? statusCode,
   Object? data,
   DioExceptionType type = DioExceptionType.badResponse,
+  Map<String, List<String>>? headers,
 }) {
   final requestOptions = RequestOptions(path: '/api/pubg/player');
   return DioException(
@@ -19,6 +20,7 @@ DioException _dioError({
             requestOptions: requestOptions,
             statusCode: statusCode,
             data: data,
+            headers: headers == null ? null : Headers.fromMap(headers),
           ),
   );
 }
@@ -75,6 +77,19 @@ void main() {
     expect(ApiException.from(_dioError(statusCode: 429)).isRetryable, isTrue);
     expect(ApiException.from(_dioError(statusCode: 404)).isRetryable, isFalse);
     expect(ApiException.from(_dioError(statusCode: 401)).isRetryable, isFalse);
+  });
+
+  test('429 Retry-After 초를 대기 시간으로 읽는다', () {
+    final error = ApiException.from(
+      _dioError(
+        statusCode: 429,
+        headers: {
+          'retry-after': ['60'],
+        },
+      ),
+    );
+
+    expect(error.retryAfter, const Duration(seconds: 60));
   });
 
   test('404는 미구현 엔드포인트 분기로 쓸 수 있다', () {

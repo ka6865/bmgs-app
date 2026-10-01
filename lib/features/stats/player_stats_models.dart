@@ -10,6 +10,13 @@ String seasonLabel(String seasonId) {
   return '시즌 $number';
 }
 
+int? _positiveIntOrNull(Object? value) {
+  final parsed = value is num
+      ? value.toInt()
+      : int.tryParse(value?.toString() ?? '');
+  return parsed != null && parsed > 0 ? parsed : null;
+}
+
 class GameModeStats {
   const GameModeStats({
     required this.roundsPlayed,
@@ -103,6 +110,39 @@ class GameModeStats {
   }
 }
 
+/// 강제 갱신에서 서버가 각 큐의 실제 조회 결과를 함께 내려준다.
+///
+/// 캐시 일반 조회에는 이 필드가 없을 수 있으므로 [unknown]을 별도로 둔다.
+enum StatsAvailabilityStatus { ready, stale, unavailable, unknown }
+
+class StatsAvailability {
+  const StatsAvailability({required this.status, this.updatedAt});
+
+  final StatsAvailabilityStatus status;
+  final DateTime? updatedAt;
+
+  bool get hasUsableStats =>
+      status == StatsAvailabilityStatus.ready ||
+      status == StatsAvailabilityStatus.stale;
+
+  static StatsAvailability fromJson(Object? raw) {
+    if (raw is! Map) {
+      return const StatsAvailability(status: StatsAvailabilityStatus.unknown);
+    }
+    final value = raw['status']?.toString().trim().toLowerCase();
+    final status = switch (value) {
+      'ready' => StatsAvailabilityStatus.ready,
+      'stale' => StatsAvailabilityStatus.stale,
+      'unavailable' => StatsAvailabilityStatus.unavailable,
+      _ => StatsAvailabilityStatus.unknown,
+    };
+    return StatsAvailability(
+      status: status,
+      updatedAt: DateTime.tryParse(raw['updatedAt']?.toString() ?? ''),
+    );
+  }
+}
+
 class PlayerStatsProfile {
   const PlayerStatsProfile({
     required this.nickname,
@@ -118,6 +158,8 @@ class PlayerStatsProfile {
     required this.seasonsList,
     required this.updatedAt,
     required this.modeStats,
+    this.statsAvailability = const {},
+    this.retryAfterSeconds,
   });
 
   final String nickname;
@@ -133,6 +175,10 @@ class PlayerStatsProfile {
   final List<String> seasonsList;
   final DateTime? updatedAt;
   final Map<String, Map<String, GameModeStats>> modeStats;
+
+  /// refresh 응답에서만 제공된다. 캐시 응답에는 없을 수 있다.
+  final Map<String, StatsAvailability> statsAvailability;
+  final int? retryAfterSeconds;
 
   bool get hasSeasonStats => roundsPlayed > 0;
 
@@ -194,6 +240,18 @@ class PlayerStatsProfile {
               .toList()
         : const <String>[];
 
+    final availability = <String, StatsAvailability>{};
+    final rawAvailability = json['statsAvailability'];
+    if (rawAvailability is Map) {
+      for (final mode in const ['ranked', 'normal']) {
+        if (rawAvailability.containsKey(mode)) {
+          availability[mode] = StatsAvailability.fromJson(
+            rawAvailability[mode],
+          );
+        }
+      }
+    }
+
     return PlayerStatsProfile(
       nickname: json['nickname']?.toString() ?? '',
       platform: json['platform']?.toString() ?? 'steam',
@@ -215,6 +273,8 @@ class PlayerStatsProfile {
       seasonsList: parsedSeasons,
       updatedAt: DateTime.tryParse(json['updatedAt']?.toString() ?? ''),
       modeStats: parsedModeStats,
+      statsAvailability: availability,
+      retryAfterSeconds: _positiveIntOrNull(json['retryAfterSeconds']),
     );
   }
 }
@@ -231,6 +291,7 @@ class MatchSummary {
     required this.isFallback,
     this.tier,
     required this.createdAt,
+    this.matchType,
     this.headshotKills = 0,
     this.timeSurvived = 0.0,
   });
@@ -239,12 +300,17 @@ class MatchSummary {
   final String mapName;
   final String? mapId;
   final String gameMode;
-  final int kills;
-  final double damage;
+
+  /// 서버에 경기 요약이 없거나 사용할 수 없는 경우 null이다. 0으로 대체하지 않는다.
+  final int? kills;
+  final double? damage;
   final int? rank;
   final bool isFallback;
   final Map<String, dynamic>? tier;
-  final DateTime createdAt;
+
+  /// 서버 관측 시간이 없으면 null이다. 현재 시각을 넣어 "방금 전"으로 보이지 않게 한다.
+  final DateTime? createdAt;
+  final String? matchType;
   final int headshotKills;
   final double timeSurvived;
 
@@ -261,31 +327,35 @@ class MatchSummary {
   }) {
     return MatchSummary(
       matchId: matchId,
-      mapName: '분석 대기',
+      mapName: '경기 정보 없음',
       mapId: null,
-      gameMode: gameMode.isEmpty ? '모드 확인 중' : gameMode,
-      kills: 0,
-      damage: 0,
+      gameMode: gameMode.isEmpty ? '모드 정보 없음' : gameMode,
+      kills: null,
+      damage: null,
       rank: null,
       isFallback: true,
       tier: null,
-      createdAt: DateTime.now(),
+      createdAt: null,
+      matchType: null,
       headshotKills: 0,
       timeSurvived: 0.0,
     );
   }
 
   static MatchSummary fromJson(String matchId, Map<String, dynamic> json) {
+    // 서버의 unavailable 응답은 0킬·0딜·99등 같은 placeholder를 포함할 수 있다.
+    // 이를 실제 경기 기록으로 렌더링하지 않는다.
+    if (json['matchType']?.toString().trim().toLowerCase() == 'unavailable') {
+      return fallback(matchId: matchId, gameMode: '');
+    }
+
     final matchInfo = json['matchInfo'] is Map
         ? json['matchInfo'] as Map
         : null;
     final player = json['player'] is Map ? json['player'] as Map : null;
     final stats = json['stats'] is Map ? json['stats'] as Map : null;
 
-    final dateStr = _firstText([
-      json['createdAt'],
-      matchInfo?['date'],
-    ], fallback: DateTime.now().toIso8601String());
+    final dateStr = _nullableText([json['createdAt'], matchInfo?['date']]);
 
     return MatchSummary(
       matchId: matchId,
@@ -301,12 +371,8 @@ class MatchSummary {
         matchInfo?['mode'],
         matchInfo?['gameMode'],
       ], fallback: '모드 정보 없음'),
-      kills: _firstNum([
-        json['kills'],
-        player?['kills'],
-        stats?['kills'],
-      ]).round(),
-      damage: _firstNum([
+      kills: _nullableInt([json['kills'], player?['kills'], stats?['kills']]),
+      damage: _nullableDouble([
         json['damage'],
         json['damageDealt'],
         player?['damage'],
@@ -328,7 +394,8 @@ class MatchSummary {
           : (json['currentTier'] is Map
                 ? Map<String, dynamic>.from(json['currentTier'])
                 : null),
-      createdAt: DateTime.tryParse(dateStr) ?? DateTime.now(),
+      createdAt: dateStr == null ? null : DateTime.tryParse(dateStr),
+      matchType: json['matchType']?.toString(),
       headshotKills: _firstNum([
         json['headshotKills'],
         player?['headshotKills'],
@@ -359,17 +426,24 @@ class MatchSummary {
   }
 
   static double _firstNum(List<Object?> values) {
+    return _firstOptionalNum(values) ?? 0;
+  }
+
+  static double? _firstOptionalNum(List<Object?> values) {
     for (final value in values) {
       if (value is num) return value.toDouble();
       final parsed = double.tryParse(value?.toString() ?? '');
       if (parsed != null) return parsed;
     }
-    return 0;
+    return null;
   }
 
   static int? _nullableInt(List<Object?> values) {
-    final value = _firstNum(values);
-    return value > 0 ? value.round() : null;
+    return _firstOptionalNum(values)?.round();
+  }
+
+  static double? _nullableDouble(List<Object?> values) {
+    return _firstOptionalNum(values);
   }
 }
 

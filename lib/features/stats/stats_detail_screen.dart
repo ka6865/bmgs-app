@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,11 +15,16 @@ import '../../core/widgets/bgms_sparkline_bar.dart';
 import '../../core/widgets/player_search_bar.dart';
 import '../../navigation/shell_scaffold.dart';
 import 'ai_coaching_card.dart';
+import 'all_matches_screen.dart';
+import 'battle_screen.dart';
+import 'ban_watch_screen.dart';
+import 'encounter_screen.dart';
+import 'player_match_history_screen.dart';
 import 'player_stats_models.dart';
 import 'player_stats_repository.dart';
-import 'all_matches_screen.dart';
 import 'widgets/match_card.dart';
 import 'widgets/radar_chart_widget.dart';
+import 'weapon_mastery_screen.dart';
 
 class StatsDetailScreen extends StatefulWidget {
   const StatsDetailScreen({
@@ -51,6 +58,8 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   String? _searchError;
   bool? _wasActive;
   bool _isFavorite = false;
+  DateTime? _refreshAvailableAt;
+  Timer? _refreshCooldownTimer;
 
   String get _normalizedPlatform => normalizePlayerPlatform(widget.platform);
 
@@ -65,6 +74,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
 
   @override
   void dispose() {
+    _refreshCooldownTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -174,16 +184,80 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
       _statsFuture = null;
       return;
     }
-    _statsFuture = _repository.fetchPlayerStats(
+    _statsFuture = _observeStatsRequest(
+      refresh: refresh,
       nickname: nickname,
       platform: _normalizedPlatform,
-      season: _selectedSeason,
-      refresh: refresh,
     );
   }
 
-  void _retry() {
+  Future<PlayerStatsBundle> _observeStatsRequest({
+    required bool refresh,
+    required String nickname,
+    required String platform,
+  }) async {
+    try {
+      final bundle = await _repository.fetchPlayerStats(
+        nickname: nickname,
+        platform: platform,
+        season: _selectedSeason,
+        refresh: refresh,
+      );
+      if (refresh) {
+        _setRefreshCooldownSeconds(bundle.profile.retryAfterSeconds);
+      }
+      return bundle;
+    } on PlayerStatsException catch (error) {
+      _setRefreshCooldown(error.retryAfter);
+      rethrow;
+    }
+  }
+
+  bool get _isRefreshCoolingDown {
+    final availableAt = _refreshAvailableAt;
+    return availableAt != null && availableAt.isAfter(DateTime.now());
+  }
+
+  int? get _refreshRemainingSeconds {
+    final availableAt = _refreshAvailableAt;
+    if (availableAt == null) return null;
+    final seconds = availableAt.difference(DateTime.now()).inSeconds;
+    return seconds > 0 ? seconds : null;
+  }
+
+  void _setRefreshCooldownSeconds(int? seconds) {
+    _setRefreshCooldown(seconds == null ? null : Duration(seconds: seconds));
+  }
+
+  void _setRefreshCooldown(Duration? duration) {
+    final nextAvailableAt = duration == null || duration <= Duration.zero
+        ? null
+        : DateTime.now().add(duration);
+    if (_refreshAvailableAt == nextAvailableAt) return;
+    _refreshAvailableAt = nextAvailableAt;
+    _refreshCooldownTimer?.cancel();
+    if (nextAvailableAt != null) {
+      _refreshCooldownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        if (!_isRefreshCoolingDown) {
+          _refreshCooldownTimer?.cancel();
+          setState(() => _refreshAvailableAt = null);
+          return;
+        }
+        setState(() {});
+      });
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _retry() async {
+    if (_isRefreshCoolingDown) return;
     setState(() => _startFetch(refresh: true));
+    try {
+      await _statsFuture;
+    } catch (_) {
+      // FutureBuilder가 오류 상태와 재시도 안내를 렌더링한다.
+    }
   }
 
   void _onSeasonChanged(String? newSeason) {
@@ -286,9 +360,23 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
                       tooltip: _isFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가',
                     ),
                     IconButton(
-                      onPressed: _retry,
+                      onPressed: _isRefreshCoolingDown ? null : _retry,
                       icon: const Icon(Icons.refresh, color: BgmsColors.accent),
-                      tooltip: '새로고침',
+                      tooltip: _isRefreshCoolingDown
+                          ? '${_refreshRemainingSeconds ?? 1}초 후 새로고침 가능'
+                          : '새로고침',
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => BattleScreen(
+                            initialNickname: nickname,
+                            initialPlatform: _normalizedPlatform,
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.compare_arrows),
+                      tooltip: '전적 비교',
                     ),
                   ],
                 ),
@@ -324,7 +412,8 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
               if (snapshot.hasError) {
                 final error = snapshot.error;
                 final canRetry =
-                    error is! PlayerStatsException || error.isRetryable;
+                    (error is! PlayerStatsException || error.isRetryable) &&
+                    !_isRefreshCoolingDown;
                 // 레포지토리가 모든 예외를 PlayerStatsException으로 감싸지만,
                 // 예기치 못한 예외가 올라와도 원시 문자열을 노출하지 않는다.
                 final message = error is PlayerStatsException
@@ -333,6 +422,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
                 return _ErrorPanel(
                   message: message,
                   onRetry: canRetry ? _retry : null,
+                  retryAfterSeconds: _refreshRemainingSeconds,
                   suggestions: error is PlayerStatsException
                       ? error.suggestions
                       : const [],
@@ -359,6 +449,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
                 bundle: bundle,
                 selectedSeason: _selectedSeason,
                 onSeasonChanged: _onSeasonChanged,
+                refreshRemainingSeconds: _refreshRemainingSeconds,
               );
             },
           ),
@@ -369,7 +460,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
 
     // 검색 전에는 새로고침할 대상이 없으므로 결과 화면에서만 당겨서 새로고침을 붙인다.
     if (nickname.isEmpty) return content;
-    return RefreshIndicator(onRefresh: () async => _retry(), child: content);
+    return RefreshIndicator(onRefresh: _retry, child: content);
   }
 }
 
@@ -500,11 +591,13 @@ class _StatsContent extends StatefulWidget {
     required this.bundle,
     required this.selectedSeason,
     required this.onSeasonChanged,
+    this.refreshRemainingSeconds,
   });
 
   final PlayerStatsBundle bundle;
   final String? selectedSeason;
   final ValueChanged<String?> onSeasonChanged;
+  final int? refreshRemainingSeconds;
 
   @override
   State<_StatsContent> createState() => _StatsContentState();
@@ -536,6 +629,7 @@ class _StatsContentState extends State<_StatsContent> {
           profile: profile,
           selectedSeason: widget.selectedSeason,
           onSeasonChanged: widget.onSeasonChanged,
+          refreshRemainingSeconds: widget.refreshRemainingSeconds,
         ),
         const SizedBox(height: 12),
 
@@ -852,7 +946,10 @@ class _MetricsGrid extends StatelessWidget {
         top10Rate = (top10Count / validMatches.length) * 100.0;
 
         // 헤드샷 비율 계산
-        final totalKills = validMatches.fold<int>(0, (sum, m) => sum + m.kills);
+        final totalKills = validMatches.fold<int>(
+          0,
+          (sum, match) => sum + (match.kills ?? 0),
+        );
         final totalHeadshots = validMatches.fold<int>(
           0,
           (sum, m) => sum + m.headshotKills,
@@ -1055,7 +1152,7 @@ class _MatchSummaryPanel extends StatelessWidget {
             const SizedBox(height: 10),
           ] else if (bundle.summaryFallback) ...[
             Text(
-              '일부 매치는 서버 분석이 끝나지 않아 요약만 표시합니다.',
+              '일부 매치의 서버 기록을 찾지 못했습니다. 자동 분석이 진행 중인 상태는 아닙니다.',
               style: Theme.of(
                 context,
               ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
@@ -1072,7 +1169,7 @@ class _MatchSummaryPanel extends StatelessWidget {
                 border: Border.all(color: BgmsColors.border),
               ),
               child: Text(
-                '최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.',
+                '최근 매치가 없거나 서버에 저장된 경기 기록이 없습니다.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: BgmsColors.textSecondary,
                 ),
@@ -1139,6 +1236,61 @@ class _MatchSummaryPanel extends StatelessWidget {
               label: Text(
                 hasMore ? '전체 보기 (${matches.length}경기)' : '전체 보기 · 모드별 필터',
               ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) =>
+                        PlayerMatchHistoryScreen(profile: bundle.profile),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.history, size: 18),
+              label: const Text('전체 이력 조회'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => WeaponMasteryScreen(
+                      nickname: bundle.profile.nickname,
+                      platform: bundle.profile.platform,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.workspace_premium_outlined, size: 18),
+              label: const Text('무기 숙련도'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => EncounterScreen(
+                      nickname: bundle.profile.nickname,
+                      platform: bundle.profile.platform,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.people_outline, size: 18),
+              label: const Text('만난 상대 · 관심 등록'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => const BanWatchScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.visibility_outlined, size: 18),
+              label: const Text('관심 추적 목록'),
             ),
           ],
         ],
@@ -1272,6 +1424,7 @@ class _ErrorPanel extends StatelessWidget {
     this.onRetry,
     this.suggestions = const [],
     this.onSuggestionTap,
+    this.retryAfterSeconds,
   });
 
   final String message;
@@ -1280,6 +1433,7 @@ class _ErrorPanel extends StatelessWidget {
   /// 닉네임을 찾지 못했을 때 서버가 제안한 유사 플레이어.
   final List<PlayerSuggestion> suggestions;
   final void Function(PlayerSuggestion suggestion)? onSuggestionTap;
+  final int? retryAfterSeconds;
 
   @override
   Widget build(BuildContext context) {
@@ -1345,6 +1499,15 @@ class _ErrorPanel extends StatelessWidget {
                 label: const Text('다시 시도'),
               ),
             ],
+            if (retryAfterSeconds != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${retryAfterSeconds!}초 후 다시 시도할 수 있습니다.',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
+              ),
+            ],
           ],
         ),
       ),
@@ -1365,11 +1528,13 @@ class _ProfileHeader extends StatelessWidget {
     required this.profile,
     required this.selectedSeason,
     required this.onSeasonChanged,
+    this.refreshRemainingSeconds,
   });
 
   final PlayerStatsProfile profile;
   final String? selectedSeason;
   final ValueChanged<String?> onSeasonChanged;
+  final int? refreshRemainingSeconds;
 
   @override
   Widget build(BuildContext context) {
@@ -1495,8 +1660,70 @@ class _ProfileHeader extends StatelessWidget {
                 ),
               ),
             ],
+            _AvailabilityNotice(
+              availability: profile.statsAvailability,
+              retryAfterSeconds:
+                  refreshRemainingSeconds ?? profile.retryAfterSeconds,
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AvailabilityNotice extends StatelessWidget {
+  const _AvailabilityNotice({
+    required this.availability,
+    this.retryAfterSeconds,
+  });
+
+  final Map<String, StatsAvailability> availability;
+  final int? retryAfterSeconds;
+
+  @override
+  Widget build(BuildContext context) {
+    final states = availability.entries
+        .where((entry) => entry.value.status != StatsAvailabilityStatus.ready)
+        .toList(growable: false);
+    final retry = retryAfterSeconds;
+    if (states.isEmpty && retry == null) return const SizedBox.shrink();
+
+    String queueLabel(String queue) => queue == 'ranked' ? '경쟁전' : '일반전';
+    String stateText(MapEntry<String, StatsAvailability> entry) {
+      return switch (entry.value.status) {
+        StatsAvailabilityStatus.stale =>
+          '${queueLabel(entry.key)}은 이전 동기화 기록입니다.',
+        StatsAvailabilityStatus.unavailable =>
+          '${queueLabel(entry.key)} 데이터를 지금 불러올 수 없습니다.',
+        StatsAvailabilityStatus.unknown => '',
+        StatsAvailabilityStatus.ready => '',
+      };
+    }
+
+    final messages = states
+        .map(stateText)
+        .where((message) => message.isNotEmpty)
+        .toList(growable: false);
+    if (retry != null && retry > 0) {
+      messages.add('$retry초 후 새로고침할 수 있습니다.');
+    }
+    if (messages.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, size: 15, color: BgmsColors.textMuted),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              messages.join(' '),
+              style: const TextStyle(color: BgmsColors.textMuted, fontSize: 11),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -26,6 +26,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
     required String platform,
     String? season,
     bool refresh = false,
+    bool includeSummaries = true,
   }) {
     lastRefresh = refresh;
     final modeStats = {
@@ -140,6 +141,7 @@ class _RecordingPlayerStatsRepository extends MockPlayerStatsRepository {
     required String platform,
     String? season,
     bool refresh = false,
+    bool includeSummaries = true,
   }) {
     platforms.add(platform);
     return super.fetchPlayerStats(
@@ -173,6 +175,7 @@ class _SummaryErrorRepository extends MockPlayerStatsRepository {
     required String platform,
     String? season,
     bool refresh = false,
+    bool includeSummaries = true,
   }) async {
     final bundle = await super.fetchPlayerStats(
       nickname: nickname,
@@ -218,7 +221,10 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(error, findsOneWidget);
-    expect(find.text('일부 매치는 서버 분석이 끝나지 않아 요약만 표시합니다.'), findsNothing);
+    expect(
+      find.text('일부 매치의 서버 기록을 찾지 못했습니다. 자동 분석이 진행 중인 상태는 아닙니다.'),
+      findsNothing,
+    );
     expect(find.byType(MatchCard), findsNWidgets(2));
   });
 
@@ -242,7 +248,7 @@ void main() {
     );
 
     await tester.pumpWidget(card(['match-1']));
-    await tester.tap(find.text('AI 스쿼드 분석 및 코칭 받기'));
+    await tester.tap(find.text('최근 경기 AI 코칭 받기'));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     expect(find.text('이전 매치 코칭 결과'), findsOneWidget);
     expect(repository.calls, 1);
@@ -254,7 +260,7 @@ void main() {
     await tester.pumpWidget(card(['match-2', 'match-1']));
     await tester.pumpAndSettle();
     expect(find.text('이전 매치 코칭 결과'), findsNothing);
-    expect(find.text('AI 스쿼드 분석 및 코칭 받기'), findsOneWidget);
+    expect(find.text('최근 경기 AI 코칭 받기'), findsOneWidget);
     expect(repository.calls, 1);
   });
 
@@ -419,8 +425,8 @@ void main() {
     expect(find.text('Diamond I'), findsOneWidget);
 
     // 3. 맵 배경 및 맵 종류 정보 노출 검증
-    expect(find.textContaining('Erangel'), findsWidgets);
-    expect(find.textContaining('Miramar'), findsWidgets);
+    expect(find.textContaining('에란겔'), findsWidgets);
+    expect(find.textContaining('미라마'), findsWidgets);
   });
 
   testWidgets('StatsDetailScreen - 플레이어 변경 시 내부 필터 탭 초기화 검증 (ValueKey 테스트)', (
@@ -591,9 +597,9 @@ void main() {
     final matchCards = find.byType(MatchCard);
     expect(matchCards, findsNWidgets(3));
 
-    // 맵별 그라디언트는 제거했고, 서버가 준 맵 이름을 그대로 표시한다.
+    // 맵별 그라디언트는 제거했고, 서버 맵 별칭은 한국어 표시 이름으로 변환한다.
     // 화면에 보이는 카드만 검증한다(나머지는 스크롤 밖).
-    expect(find.text('Desert_Main'), findsWidgets);
+    expect(find.text('미라마'), findsWidgets);
   });
 }
 
@@ -618,6 +624,7 @@ class MockMiramarMapNameStatsRepository extends Fake
     required String platform,
     String? season,
     bool refresh = false,
+    bool includeSummaries = true,
   }) {
     final modeStats = {
       'ranked': {
@@ -709,6 +716,7 @@ class MockRankedStatsSupplementRepository extends Fake
     required String platform,
     String? season,
     bool refresh = false,
+    bool includeSummaries = true,
   }) {
     final modeStats = {
       'ranked': {

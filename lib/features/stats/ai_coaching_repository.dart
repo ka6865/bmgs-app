@@ -30,7 +30,7 @@ class AiCoachingRepository {
         matchIds: profile.recentMatches.take(10).toList(),
         nickname: profile.nickname,
         platform: profile.platform,
-        accessToken: _accessTokenOrNull(),
+        accessToken: await _accessTokenOrNull(),
       );
       return AiCoachingSummary.fromNdjson(body);
     } catch (error) {
@@ -51,8 +51,17 @@ class AiCoachingRepository {
     }
   }
 
-  String? _accessTokenOrNull() {
+  Future<String?> _accessTokenOrNull() async {
     if (!AppConfig.local.canInitializeSupabase) return null;
-    return Supabase.instance.client.auth.currentSession?.accessToken;
+    try {
+      final client = Supabase.instance.client;
+      var session = client.auth.currentSession;
+      if (session?.isExpired == true) {
+        session = (await client.auth.refreshSession()).session;
+      }
+      return session?.accessToken;
+    } catch (_) {
+      return null;
+    }
   }
 }

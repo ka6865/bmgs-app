@@ -81,7 +81,7 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
                 ),
                 icon: const Icon(Icons.psychology_alt, size: 20),
                 label: const Text(
-                  'AI 스쿼드 분석 및 코칭 받기',
+                  '최근 경기 AI 코칭 받기',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -106,7 +106,7 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
                 ),
                 SizedBox(height: 12),
                 Text(
-                  'AI 분석관들이 텔레메트리 리플레이 조각들을 모으고 있습니다...',
+                  '최근 경기 지표와 AI 해석을 불러오고 있습니다...',
                   style: TextStyle(
                     color: BgmsColors.textSecondary,
                     fontSize: 12,
@@ -165,6 +165,10 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
                     ),
                 ],
               ),
+              if (summary.subtitle != null && summary.subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(summary.subtitle!),
+              ],
               const SizedBox(height: 12),
               // AI 코칭 핵심 본문에 부드러운 타이핑 효과 적용
               _TypingText(
@@ -175,7 +179,18 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
                   height: 1.5,
                 ),
               ),
-              if (summary.hasActionableItems) ...[
+              if (summary.cards.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text('서버 경기 지표와 AI 해석'),
+                ...summary.cards.map((card) => _FactCard(card: card)),
+                _InsightGroup(
+                  title: '추천 액션',
+                  items: summary.improvements,
+                  color: BgmsColors.accent,
+                  icon: Icons.track_changes,
+                ),
+              ],
+              if (summary.hasActionableItems && summary.cards.isEmpty) ...[
                 const SizedBox(height: 16),
                 const Divider(color: BgmsColors.border, height: 1),
                 const SizedBox(height: 14),
@@ -430,4 +445,48 @@ class _TypingTextState extends State<_TypingText> {
   Widget build(BuildContext context) {
     return Text(_displayedText, style: widget.style);
   }
+}
+
+class _FactCard extends StatelessWidget {
+  const _FactCard({required this.card});
+  final AiCoachingFactCard card;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(card.topic, style: Theme.of(context).textTheme.titleSmall),
+        if (card.question.isNotEmpty) Text(card.question),
+        Text('${card.gameMode} · ${card.matchType} · 선택 ${card.matchCount}경기'),
+        if (card.evidence.isEmpty) const Text('확인된 지표가 없습니다.'),
+        ...card.evidence.map(
+          (row) => Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              '${row.label}: ${row.userValue ?? "미제공"}'
+              '${row.benchmarkValue == null ? " · 비교 자료 없음" : " · ${row.benchmarkLabel}: ${row.benchmarkValue}"}'
+              '${row.userMatchCount == null ? "" : " · 기록 확인 ${row.userMatchCount}경기"}'
+              '${row.sampleCount == null ? "" : " · 비교 표본 ${row.sampleCount}"}'
+              '${row.unavailableReason == null ? "" : "\n${row.unavailableReason}"}',
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (card.analysisReady) ...[
+          if (card.kindOpinion.isNotEmpty) Text('코치 의견: ${card.kindOpinion}'),
+          if (card.spicyOpinion.isNotEmpty) Text('다른 관점: ${card.spicyOpinion}'),
+          if (card.reason.isNotEmpty) Text('근거 해석: ${card.reason}'),
+          if (card.evaluation.isNotEmpty) Text('평가: ${card.evaluation}'),
+        ] else
+          Text(
+            card.analysisStatus == 'pending'
+                ? 'AI 해석이 완료되지 않았습니다.'
+                : 'AI 해석을 표시할 수 없습니다.',
+          ),
+        if (!card.analysisReady && card.analysisReason.isNotEmpty)
+          Text(card.analysisReason),
+      ],
+    ),
+  );
 }

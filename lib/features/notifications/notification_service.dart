@@ -84,6 +84,7 @@ class NotificationService {
       final bundle = await statsRepository.fetchPlayerStats(
         nickname: player.nickname,
         platform: player.platform,
+        includeSummaries: false,
       );
       final current = PlayerSnapshot.fromProfile(
         bundle.profile,

@@ -104,15 +104,18 @@ void main() {
   testWidgets('매치가 없으면 빈 상태를 보여준다', (tester) async {
     await pump(tester, const []);
 
-    expect(find.textContaining('최근 매치가 없거나'), findsOneWidget);
+    expect(find.text('최근 매치가 없거나 서버에 저장된 경기 기록이 없습니다.'), findsOneWidget);
     expect(find.byType(MatchCard), findsNothing);
   });
 
-  testWidgets('일부 미분석 상태를 알린다', (tester) async {
+  testWidgets('서버 기록을 찾지 못한 상태가 자동 분석 대기가 아님을 알린다', (tester) async {
     await pump(tester, [
       _match(matchId: 'm1', gameMode: 'squad'),
     ], summaryFallback: true);
 
-    expect(find.textContaining('서버 분석이 끝나지 않아'), findsOneWidget);
+    expect(
+      find.text('일부 매치의 서버 기록을 찾지 못했습니다. 자동 분석이 진행 중인 상태는 아닙니다.'),
+      findsOneWidget,
+    );
   });
 }

@@ -141,7 +141,12 @@ void main() {
         expect(summary.damage, greaterThan(0));
         expect(summary.timeSurvived, greaterThan(0));
         expect(
-          summary.createdAt.isAfter(DateTime.utc(2024)),
+          summary.createdAt,
+          isNotNull,
+          reason: 'createdAt을 서버 값에서 읽어야 한다',
+        );
+        expect(
+          summary.createdAt!.isAfter(DateTime.utc(2024)),
           isTrue,
           reason: 'createdAt을 서버 값에서 읽어야 한다',
         );
@@ -205,7 +210,7 @@ void main() {
 
       expect(team, isNotEmpty, reason: '팀 정보가 담긴 픽스처여야 한다');
       expect(detail.teamKills, expectedTeamKills);
-      expect(detail.teamKills, greaterThanOrEqualTo(detail.kills));
+      expect(detail.teamKills, greaterThanOrEqualTo(detail.kills ?? 0));
     });
 
     test('전술 분석 블록을 파싱한다', () {

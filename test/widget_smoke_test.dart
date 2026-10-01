@@ -402,7 +402,8 @@ void main() {
     expect(find.text('지도'), findsWidgets);
     expect(find.widgetWithText(ChoiceChip, '에란겔'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '미라마'), findsOneWidget);
-    expect(find.text('차량'), findsWidgets);
+    expect(find.byType(FilterChip), findsNothing);
+    expect(find.byType(MapMarkerWidget), findsNothing);
   });
 
   testWidgets('my tab renders empty local store state', (tester) async {
@@ -500,6 +501,11 @@ void main() {
     // FutureBuilder 완료 대기
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('마커 필터'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilterChip, '차량'));
+    await tester.pumpAndSettle();
+
     final markerFinder = find.byIcon(Icons.local_taxi);
     await tester.ensureVisible(markerFinder);
     await tester.pumpAndSettle();
@@ -535,6 +541,11 @@ void main() {
         ),
       );
 
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('마커 필터'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilterChip, '차량'));
       await tester.pumpAndSettle();
 
       // 1. 전체화면 버튼 확인 및 탭
@@ -586,6 +597,11 @@ void main() {
       ),
     );
 
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('마커 필터'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilterChip, '차량'));
     await tester.pumpAndSettle();
 
     // 1. InteractiveViewer 찾기
@@ -705,13 +721,10 @@ class FakeMapsRepository extends Fake implements MapsRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> fetchAdminSettings() async {
-    return {};
-  }
-
-  @override
   Future<Map<String, List<String>>> fetchMapCategorySettings() async {
-    return {};
+    return {
+      'Erangel': ['Garage'],
+    };
   }
 
   @override

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import '../../core/widgets/bgms_card.dart';
+import '../maps/map_models.dart';
 import 'match_detail_models.dart';
 import 'match_detail_repository.dart';
 import 'player_stats_models.dart';
@@ -87,7 +89,7 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                 title: '매치 분석 리포트',
                 subtitle: detail == null
                     ? widget.matchId
-                    : '${detail.mapName} · ${detail.gameMode}',
+                    : '${bgmsMapDisplayName(detail.mapName)} · ${detail.gameMode}',
                 trailing: IconButton(
                   onPressed: _retry,
                   icon: const Icon(Icons.refresh, color: BgmsColors.accent),
@@ -95,6 +97,22 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.play_circle_outline),
+                label: const Text('경기 2D 리플레이'),
+                onPressed: () => context.push(
+                  Uri(
+                    path: '/replay/${widget.matchId}',
+                    queryParameters: {
+                      'nickname': widget.nickname,
+                      'platform': widget.platform,
+                      'mapId':
+                          detail?.mapId ?? widget.summary.mapId ?? 'Erangel',
+                    },
+                  ).toString(),
+                ),
+              ),
+              const SizedBox(height: 12),
               if (snapshot.connectionState == ConnectionState.waiting &&
                   detail == null)
                 const _LoadingCard()
@@ -256,7 +274,7 @@ class _MetadataCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${detail.mapName} · ${detail.gameMode}',
+            '${bgmsMapDisplayName(detail.mapName)} · ${detail.gameMode}',
             style: const TextStyle(color: BgmsColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -293,8 +311,8 @@ class _MetricGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final metrics = [
       _DetailMetric('순위', detail.rank == null ? '-' : '#${detail.rank}'),
-      _DetailMetric('개인 킬', '${detail.kills}'),
-      _DetailMetric('가한 피해량', detail.damage.toStringAsFixed(0)),
+      _DetailMetric('개인 킬', detail.kills?.toString() ?? '-'),
+      _DetailMetric('가한 피해량', detail.damage?.toStringAsFixed(0) ?? '-'),
       _DetailMetric('생존 시간', detail.survivalText),
       _DetailMetric(
         '스쿼드 총 킬',

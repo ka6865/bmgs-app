@@ -25,7 +25,7 @@ void main() {
     testWidgets('치킨(#1) 매치는 승리 엠블럼과 골드 하이라이트를 표시한다', (tester) async {
       final chickenMatch = MatchSummary(
         matchId: 'match-1',
-        mapName: 'Erangel',
+        mapName: 'Baltic_Main',
         gameMode: 'squad',
         createdAt: DateTime.now().subtract(const Duration(minutes: 10)),
         rank: 1,
@@ -45,7 +45,7 @@ void main() {
       );
 
       expect(find.text('#1'), findsOneWidget);
-      expect(find.text('Erangel'), findsOneWidget);
+      expect(find.text('에란겔'), findsOneWidget);
       expect(find.text('7'), findsOneWidget);
       expect(find.byIcon(Icons.emoji_events), findsOneWidget);
       expect(find.text('WIN'), findsOneWidget);
@@ -54,7 +54,7 @@ void main() {
     testWidgets('일반 순위 매치를 올바른 정보로 렌더링한다', (tester) async {
       final normalMatch = MatchSummary(
         matchId: 'match-2',
-        mapName: 'Miramar',
+        mapName: 'Desert_Main',
         gameMode: 'squad',
         createdAt: DateTime.now().subtract(const Duration(hours: 2)),
         rank: 12,
@@ -74,8 +74,29 @@ void main() {
       );
 
       expect(find.text('#12'), findsOneWidget);
-      expect(find.text('Miramar'), findsOneWidget);
+      expect(find.text('미라마'), findsOneWidget);
       expect(find.text('3'), findsOneWidget);
+    });
+
+    testWidgets('경기 정보 fallback은 분석 대기 대신 조회 불가와 시간 미확인을 표시한다', (tester) async {
+      final missingMatch = MatchSummary.fallback(
+        matchId: 'missing-match',
+        gameMode: '',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: BgmsTheme.dark(),
+          home: Scaffold(
+            body: MatchCard(match: missingMatch, profile: sampleProfile),
+          ),
+        ),
+      );
+
+      expect(find.text('경기 정보 없음'), findsOneWidget);
+      expect(find.text('경기 시간 확인 전'), findsOneWidget);
+      expect(find.text('분석 대기'), findsNothing);
+      expect(find.text('-'), findsNWidgets(3));
     });
 
     testWidgets('좁은 화면과 큰 글꼴에서 매치 카드가 넘치지 않는다', (tester) async {

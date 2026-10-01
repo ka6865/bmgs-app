@@ -8,6 +8,7 @@ import 'package:integration_test/integration_test_driver_extended.dart';
 ///   --target integration_test/app_walkthrough_test.dart -d DEVICE_ID`
 Future<void> main() async {
   await integrationDriver(
+    writeResponseOnFailure: true,
     onScreenshot: (name, bytes, [args]) async {
       final file = File('screenshots/$name.png');
       await file.parent.create(recursive: true);

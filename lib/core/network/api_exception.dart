@@ -61,6 +61,7 @@ class ApiException implements Exception {
     this.statusCode,
     this.diagnostic,
     this.suggestions = const [],
+    this.retryAfter,
   });
 
   final ApiErrorKind kind;
@@ -72,6 +73,11 @@ class ApiException implements Exception {
 
   /// 서버가 404와 함께 내려주는 유사 닉네임 후보. 검색 오타 복구에 쓴다.
   final List<PlayerSuggestion> suggestions;
+
+  /// 서버가 `Retry-After` 헤더로 안내한 대기 시간.
+  ///
+  /// 화면은 이 값을 이용해 무의미한 재시도를 막되, 헤더 원문은 노출하지 않는다.
+  final Duration? retryAfter;
 
   bool get isRetryable =>
       kind == ApiErrorKind.network ||
@@ -166,6 +172,7 @@ class ApiException implements Exception {
         kind: ApiErrorKind.rateLimited,
         message: serverMessage ?? '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
         statusCode: status,
+        retryAfter: _retryAfter(error.response),
       );
     }
     if (status >= 500) {
@@ -190,6 +197,23 @@ class ApiException implements Exception {
       }
     }
     return null;
+  }
+
+  /// HTTP `Retry-After`는 초 또는 HTTP 날짜일 수 있다.
+  static Duration? _retryAfter(Response<Object?>? response) {
+    final raw = response?.headers.value('retry-after')?.trim();
+    if (raw == null || raw.isEmpty) return null;
+
+    final seconds = int.tryParse(raw);
+    if (seconds != null && seconds >= 0) return Duration(seconds: seconds);
+
+    try {
+      final retryAt = HttpDate.parse(raw);
+      final remaining = retryAt.difference(DateTime.now());
+      return remaining.isNegative ? Duration.zero : remaining;
+    } on FormatException {
+      return null;
+    }
   }
 
   @override

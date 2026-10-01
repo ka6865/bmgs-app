@@ -66,6 +66,58 @@ void main() {
     expect(summary.timeSurvived, 1234.5);
   });
 
+  test('강제 갱신 상태와 재시도 대기 시간을 읽는다', () {
+    final profile = PlayerStatsProfile.fromJson({
+      'nickname': 'tester',
+      'platform': 'steam',
+      'stats': const {},
+      'statsAvailability': {
+        'ranked': {'status': 'stale', 'updatedAt': '2026-07-30T00:00:00Z'},
+        'normal': {'status': 'unavailable'},
+      },
+      'retryAfterSeconds': 60,
+    });
+
+    expect(
+      profile.statsAvailability['ranked']?.status,
+      StatsAvailabilityStatus.stale,
+    );
+    expect(
+      profile.statsAvailability['normal']?.status,
+      StatsAvailabilityStatus.unavailable,
+    );
+    expect(profile.retryAfterSeconds, 60);
+  });
+
+  test('요약이 없으면 경기 정보 없음 fallback에 0과 현재 시간을 만들지 않는다', () {
+    final summary = MatchSummary.fallback(matchId: 'missing', gameMode: '');
+
+    expect(summary.mapName, '경기 정보 없음');
+    expect(summary.kills, isNull);
+    expect(summary.damage, isNull);
+    expect(summary.rank, isNull);
+    expect(summary.createdAt, isNull);
+  });
+
+  test('unavailable placeholder는 실제 0킬 99등 기록으로 렌더링하지 않는다', () {
+    final summary = MatchSummary.fromJson('unavailable-match', {
+      'mapName': 'unknown',
+      'mapId': 'unknown',
+      'gameMode': 'unknown',
+      'matchType': 'unavailable',
+      'kills': 0,
+      'damage': 0,
+      'winPlace': 99,
+    });
+
+    expect(summary.isFallback, isTrue);
+    expect(summary.mapName, '경기 정보 없음');
+    expect(summary.kills, isNull);
+    expect(summary.damage, isNull);
+    expect(summary.rank, isNull);
+    expect(summary.createdAt, isNull);
+  });
+
   test('AiCoachingSummary parses normal NDJSON final response', () {
     final summary = AiCoachingSummary.fromNdjson(
       '{"type":"delta","data":"draft"}\n'
@@ -132,7 +184,7 @@ void main() {
       expect(board.entries.single.nickname, 'Player');
       expect(board.entries.single.value, 312.4);
       expect(board.displaySourceLabel, '최신 랭킹');
-      expect(board.displayMessage, contains('최근 경기'));
+      expect(board.displayMessage, contains('최근 7일'));
       expect(unavailable.source, RankingSource.unavailable);
       expect(unavailable.entries, isEmpty);
       expect(unavailable.displaySourceLabel, '준비 중');

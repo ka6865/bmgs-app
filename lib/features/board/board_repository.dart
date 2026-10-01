@@ -4,6 +4,7 @@ import '../../core/config/app_config.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/bgms_api_client.dart';
 import 'board_models.dart';
+import 'board_categories.dart';
 
 class BoardRepository {
   BoardRepository({BgmsApiClient? client})
@@ -18,11 +19,18 @@ class BoardRepository {
   }) async {
     try {
       final json = await _client.fetchBoardPosts(
-        category: category,
+        category: 'all',
         cursor: cursor,
         query: query,
       );
-      return BoardPostPage.fromJson(json);
+      final page = BoardPostPage.fromJson(json);
+      return BoardPostPage(
+        items: page.items
+            .where((post) => BoardCategories.matches(category, post.category))
+            .toList(),
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor,
+      );
     } catch (error) {
       throw BoardException(ApiException.from(error).message);
     }
@@ -64,6 +72,7 @@ class BoardRepository {
   Future<void> createComment({
     required int postId,
     required String content,
+    int? parentId,
   }) async {
     final token = _accessTokenOrNull();
     if (token == null) throw const BoardException('카카오 로그인 후 댓글을 작성할 수 있습니다.');
@@ -72,6 +81,7 @@ class BoardRepository {
       await _client.createBoardComment(
         postId: postId,
         content: content,
+        parentId: parentId,
         accessToken: token,
       );
     } catch (error) {

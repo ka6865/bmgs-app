@@ -1,3 +1,4 @@
+import 'package:bgms_mobile_app/features/crates/crate_draw.dart';
 import 'package:bgms_mobile_app/features/crates/crate_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -31,6 +32,7 @@ void main() {
       'crate_item_relations': [
         {
           'id': 'rel-1',
+          'drop_type': 'base',
           'probability': 0.00875,
           'token_count': 0,
           'is_prime_parcel': false,
@@ -43,6 +45,7 @@ void main() {
         },
         {
           'id': 'rel-2',
+          'drop_type': 'base',
           'probability': 0.5,
           'token_count': 3,
           'is_prime_parcel': true,
@@ -62,8 +65,8 @@ void main() {
     expect(template.bundlePriceGcoin, 1800);
     expect(template.items.length, 2);
 
-    // 프라임 소포는 기본 추첨 대상에서 빠진다.
-    expect(template.baseItems.length, 1);
+    // 기본 그룹의 프라임 소포 자체도 당첨 대상이다.
+    expect(template.baseItems.length, 2);
     expect(template.baseItems.first.rarity, CrateRarity.legendary);
     expect(template.baseItems.first.probability, 0.00875);
 
@@ -79,14 +82,17 @@ void main() {
       'name': '테스트 상자',
       'crate_item_relations': [
         {
+          'drop_type': 'base',
           'probability': 0,
           'crate_item_assets': {'display_name': '확률 없음', 'rarity': 'RARE'},
         },
         {
+          'drop_type': 'base',
           'probability': 0.3,
           'crate_item_assets': {'display_name': '  ', 'rarity': 'RARE'},
         },
         {
+          'drop_type': 'base',
           'probability': 0.7,
           'crate_item_assets': {'display_name': '정상', 'rarity': 'RARE'},
         },
@@ -95,6 +101,29 @@ void main() {
 
     expect(template!.items.length, 1);
     expect(template.items.first.name, '정상');
+  });
+
+  test('기본·프라임·보너스를 분리하고 알 수 없는 그룹은 추첨하지 않는다', () {
+    final template = CrateTemplate.tryParse({
+      'name': '그룹 상자',
+      'crate_item_relations': [
+        for (final group in ['base', 'prime', 'bonus', 'unknown'])
+          {
+            'id': group,
+            'drop_type': group,
+            'probability': 1,
+            'is_prime_parcel': group == 'base',
+            'crate_item_assets': {'display_name': group, 'rarity': 'COMMON'},
+          },
+      ],
+    })!;
+    expect(template.baseItems.single.id, 'base');
+    expect(template.baseItems.single.isPrimeParcel, isTrue);
+    expect(template.primeItems.single.id, 'prime');
+    expect(template.bonusItems.single.id, 'bonus');
+    expect(template.items, hasLength(3));
+    final results = CrateDrawMachine().draw(template.baseItems, count: 10);
+    expect(results.every((result) => result.item.id == 'base'), isTrue);
   });
 
   test('아이템이 하나도 없으면 템플릿을 만들지 않는다', () {

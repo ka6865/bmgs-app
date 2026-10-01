@@ -20,6 +20,7 @@ class FakeHttpAdapter implements HttpClientAdapter {
 
   /// 실제로 요청된 경로 목록. 계약 검증에 사용한다.
   final List<String> requestedPaths = <String>[];
+  final List<RequestOptions> recordedRequests = <RequestOptions>[];
 
   void stub(String path, Object body, {int statusCode = 200}) {
     _responses[path] = body;
@@ -37,6 +38,7 @@ class FakeHttpAdapter implements HttpClientAdapter {
   ) async {
     final path = options.uri.path;
     requestedPaths.add(options.uri.toString());
+    recordedRequests.add(options);
 
     final body = _responses[path];
     final status = _statusCodes[path] ?? (body == null ? 404 : 200);

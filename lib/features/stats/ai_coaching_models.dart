@@ -18,6 +18,8 @@ class AiCoachingSummary {
     required this.weaknesses,
     required this.warnings,
     required this.improvements,
+    this.cards = const [],
+    this.subtitle,
   });
 
   final AiCoachingStatus status;
@@ -28,6 +30,8 @@ class AiCoachingSummary {
   final List<String> weaknesses;
   final List<String> warnings;
   final List<String> improvements;
+  final List<AiCoachingFactCard> cards;
+  final String? subtitle;
 
   bool get hasActionableItems =>
       strengths.isNotEmpty ||
@@ -52,7 +56,7 @@ class AiCoachingSummary {
     return const AiCoachingSummary(
       status: AiCoachingStatus.loginRequired,
       title: '로그인 후 사용 가능',
-      summary: 'AI 코칭은 서버 인증과 비용 정책이 확정된 뒤 로그인 사용자에게 제공합니다.',
+      summary: '최근 경기 AI 코칭은 로그인한 사용자에게 제공합니다.',
       grade: null,
       strengths: [],
       weaknesses: [],
@@ -65,7 +69,7 @@ class AiCoachingSummary {
     return const AiCoachingSummary(
       status: AiCoachingStatus.costRestricted,
       title: 'AI 코칭 사용 제한',
-      summary: '외부 AI 비용 보호를 위해 현재 모바일 앱에서는 요약 카드만 표시합니다.',
+      summary: '서버의 사용량 또는 비용 제한으로 AI 코칭 요청을 완료하지 못했습니다.',
       grade: null,
       strengths: [],
       weaknesses: [],
@@ -143,6 +147,10 @@ class AiCoachingSummary {
       ]),
       warnings: _stringList(json['warnings']),
       improvements: _nonEmptyOr(_stringList(json['improvements']), actionItems),
+      cards: AiCoachingFactCard.parseList(json['cards']),
+      subtitle: json['signatureSub'] is String
+          ? json['signatureSub'] as String
+          : null,
     );
   }
 
@@ -159,29 +167,54 @@ class AiCoachingSummary {
 
     Object? finalData;
     Map<String, dynamic>? visuals;
+    var cards = <AiCoachingFactCard>[];
     var hasStreamRecords = false;
+    String? failure;
     for (final line in const LineSplitter().convert(body)) {
       final decoded = _tryDecode(line);
       if (decoded is! Map || decoded['type'] is! String) continue;
       hasStreamRecords = true;
       if (decoded['type'] == 'error' ||
           (decoded['type'] == 'done' && decoded['valid'] == false)) {
-        return unavailable(
-          decoded['error']?.toString() ?? 'AI 요약 생성이 완료되지 않았습니다.',
-        );
+        failure ??= decoded['error']?.toString() ?? 'AI 요약 생성이 완료되지 않았습니다.';
       }
-      if (decoded['type'] == 'visuals') {
-        final data = decoded['data'];
-        if (data is Map) visuals = Map<String, dynamic>.from(data);
+      if (decoded['type'] == 'cards') {
+        final parsed = AiCoachingFactCard.parseList(decoded['data']);
+        if (parsed.isNotEmpty) cards = parsed;
+      }
+      if (decoded['type'] == 'visuals' && decoded['data'] is Map) {
+        visuals = Map<String, dynamic>.from(decoded['data'] as Map);
       }
       if (decoded['type'] == 'final') {
         finalData = decoded['data'];
+        final finalJson = finalData is Map
+            ? finalData
+            : _tryDecode(finalData?.toString() ?? '');
+        if (finalJson is Map) {
+          final parsed = AiCoachingFactCard.parseList(finalJson['cards']);
+          if (parsed.isNotEmpty) cards = parsed;
+        }
       }
+    }
+    if (failure != null || (hasStreamRecords && finalData == null)) {
+      return AiCoachingSummary(
+        status: AiCoachingStatus.unavailable,
+        title: cards.isEmpty ? 'AI 코칭 준비 전' : '경기 지표 · AI 해석 미완료',
+        summary: failure ?? 'AI 요약의 최종 결과가 없습니다.',
+        strengths: const [],
+        weaknesses: const [],
+        warnings: const [],
+        improvements: const [],
+        cards: cards,
+      );
     }
 
     if (finalData is Map) {
       final json = Map<String, dynamic>.from(finalData);
       if (visuals != null) json['visuals'] ??= visuals;
+      if (cards.isNotEmpty) {
+        json['cards'] ??= cards.map((card) => card.json).toList();
+      }
       return fromJson(json);
     }
 
@@ -206,6 +239,9 @@ class AiCoachingSummary {
     if (decodedFinal is Map) {
       final json = Map<String, dynamic>.from(decodedFinal);
       if (visuals != null) json['visuals'] ??= visuals;
+      if (cards.isNotEmpty) {
+        json['cards'] ??= cards.map((card) => card.json).toList();
+      }
       return fromJson(json);
     }
 
@@ -316,3 +352,81 @@ class _DebateItems {
   final List<String> strengths;
   final List<String> weaknesses;
 }
+
+class AiCoachingFactCard {
+  AiCoachingFactCard(this.json);
+  final Map<String, dynamic> json;
+  String get topic => json['topic'] as String;
+  String get question => json['question']?.toString() ?? '';
+  String get analysisReason => json['analysisReason']?.toString() ?? '';
+  String get gameMode => (json['context'] as Map)['gameMode']?.toString() ?? '';
+  String get matchType =>
+      (json['context'] as Map)['matchType']?.toString() ?? '';
+  int get matchCount => _count((json['context'] as Map)['userMatchCount']) ?? 0;
+  String get analysisStatus =>
+      json['analysisStatus']?.toString() ?? 'unavailable';
+  bool get analysisReady => analysisStatus == 'ready';
+  String get kindOpinion => json['kindOpinion']?.toString() ?? '';
+  String get spicyOpinion => json['spicyOpinion']?.toString() ?? '';
+  String get reason => json['reason']?.toString() ?? '';
+  String get evaluation => json['evaluation']?.toString() ?? '';
+  List<AiCoachingEvidence> get evidence => (json['evidence'] as List)
+      .whereType<Map>()
+      .map((row) => AiCoachingEvidence(row))
+      .toList();
+
+  static List<AiCoachingFactCard> parseList(Object? value) {
+    if (value is! List) return [];
+    final result = <AiCoachingFactCard>[];
+    final topics = <String>{};
+    for (final row in value.whereType<Map>()) {
+      if (row['topicId'] is! String ||
+          row['topic'] is! String ||
+          row['context'] is! Map ||
+          row['evidence'] is! List) {
+        continue;
+      }
+      if (!topics.add(row['topicId'] as String)) continue;
+      final evidence = (row['evidence'] as List)
+          .whereType<Map>()
+          .where((item) => item['id'] is String && item['label'] is String)
+          .toList();
+      final ids = evidence.map((item) => item['id']).toSet();
+      final refs = row['evidenceIds'];
+      final validRefs = refs is List && refs.every(ids.contains);
+      final json = Map<String, dynamic>.from(row);
+      json['evidence'] = evidence;
+      if (!validRefs ||
+          ![
+            'ready',
+            'pending',
+            'unavailable',
+          ].contains(row['analysisStatus'])) {
+        json['analysisStatus'] = 'unavailable';
+      }
+      result.add(AiCoachingFactCard(json));
+    }
+    return result;
+  }
+}
+
+class AiCoachingEvidence {
+  AiCoachingEvidence(this.json);
+  final Map json;
+  String get label => json['label'] as String;
+  String? get userValue =>
+      json['userValue'] is String ? json['userValue'] as String : null;
+  String? get benchmarkValue =>
+      json['status'] == 'comparable' && json['benchmarkValue'] is String
+      ? json['benchmarkValue'] as String
+      : null;
+  String get benchmarkLabel => json['benchmarkLabel']?.toString() ?? '비교값';
+  String? get unavailableReason => json['unavailableReason'] is String
+      ? json['unavailableReason'] as String
+      : null;
+  int? get userMatchCount => _count(json['userMatchCount']);
+  int? get sampleCount => _count(json['sampleCount']);
+}
+
+int? _count(Object? value) =>
+    value is num && value.isFinite && value >= 0 ? value.toInt() : null;

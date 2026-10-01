@@ -5,10 +5,10 @@ import '../theme/bgms_theme.dart';
 /// 검색 바 컨트롤 높이. 접근성 최소 터치 영역(48)을 만족시킨다.
 const double _controlHeight = 48;
 
-/// 플레이어 검색 한 줄 바.
+/// 화면 폭에 맞춰 배치하는 플레이어 검색 바.
 ///
 /// 홈과 전적 탭이 같은 위젯을 공유해 검색 UI가 중복되지 않게 한다.
-/// 입력, 플랫폼 토글, 실행 버튼이 한 행에 들어간다.
+/// 좁은 화면에서는 입력과 플랫폼·실행 버튼을 두 줄로 배치한다.
 class PlayerSearchBar extends StatelessWidget {
   const PlayerSearchBar({
     super.key,
@@ -31,41 +31,38 @@ class PlayerSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (context, value, child) {
-              return TextField(
-                controller: controller,
-                textInputAction: TextInputAction.search,
-                enabled: !searching,
-                onChanged: (_) => onTextChanged(),
-                onSubmitted: (_) => onSearch(),
-                decoration: InputDecoration(
-                  isDense: true,
-                  labelText: 'PUBG 플레이어 검색',
-                  hintText: 'KangHeeSung_',
-                  errorText: errorText,
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: value.text.isEmpty || searching
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          tooltip: '입력 지우기',
-                          onPressed: () {
-                            controller.clear();
-                            onTextChanged();
-                          },
-                        ),
-                ),
-              );
-            },
+    final input = ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, child) {
+        return TextField(
+          controller: controller,
+          textInputAction: TextInputAction.search,
+          enabled: !searching,
+          onChanged: (_) => onTextChanged(),
+          onSubmitted: (_) => onSearch(),
+          decoration: InputDecoration(
+            isDense: true,
+            labelText: 'PUBG 플레이어 검색',
+            hintText: 'KangHeeSung_',
+            errorText: errorText,
+            prefixIcon: const Icon(Icons.search, size: 20),
+            suffixIcon: value.text.isEmpty || searching
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    tooltip: '입력 지우기',
+                    onPressed: () {
+                      controller.clear();
+                      onTextChanged();
+                    },
+                  ),
           ),
-        ),
-        const SizedBox(width: 8),
+        );
+      },
+    );
+    final controls = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
         _PlatformToggle(
           platform: platform,
           enabled: !searching,
@@ -74,6 +71,29 @@ class PlayerSearchBar extends StatelessWidget {
         const SizedBox(width: 8),
         _SearchButton(searching: searching, onSearch: onSearch),
       ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 520 ||
+            MediaQuery.textScalerOf(context).scale(14) > 20) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              input,
+              const SizedBox(height: 8),
+              Align(alignment: Alignment.centerRight, child: controls),
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: input),
+            const SizedBox(width: 8),
+            controls,
+          ],
+        );
+      },
     );
   }
 }

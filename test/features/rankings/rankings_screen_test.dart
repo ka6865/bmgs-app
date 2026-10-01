@@ -63,6 +63,36 @@ void main() {
     expect(find.text('12 킬'), findsOneWidget);
   });
 
+  testWidgets('BGMS 최고 경기의 점수·티어와 경기 근거를 함께 표시한다', (tester) async {
+    final adapter = FakeHttpAdapter();
+    adapter.stub('/api/rankings', {
+      'entries': [
+        {
+          'nickname': 'alpha',
+          'platform': 'steam',
+          'value': 92.5,
+          'label': 'Master',
+          'secondary': 9,
+          'gameMode': 'squad-fpp',
+          'mapName': 'Erangel',
+          'createdAt': '2026-10-01T12:30:00Z',
+          'matchCount': 4,
+        },
+      ],
+    });
+    await _pumpRankings(tester, adapter);
+    await tester.tap(find.text('BGMS 점수'));
+    await tester.pumpAndSettle();
+    expect(find.text('BGMS 최고 경기'), findsOneWidget);
+    expect(find.text('92.5 점'), findsOneWidget);
+    expect(find.text('Master'), findsOneWidget);
+    expect(find.text('에란겔 · squad-fpp'), findsOneWidget);
+    expect(find.textContaining('2026-10-01'), findsOneWidget);
+    expect(find.text('4경기'), findsOneWidget);
+    expect(find.text('9 딜'), findsOneWidget);
+    expect(find.textContaining('PUBG 시즌 RP'), findsOneWidget);
+  });
+
   testWidgets('필터를 고르면 쿼리에 반영하고 초기화 버튼이 나온다', (tester) async {
     final adapter = FakeHttpAdapter();
     adapter.stub('/api/rankings', _rankingsResponse());

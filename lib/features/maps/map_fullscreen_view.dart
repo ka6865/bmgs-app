@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/bgms_theme.dart';
 import 'map_models.dart';
+import 'map_marker_overlay.dart';
 import 'maps_screen.dart'; // 기존 타일모자이크 및 마커 사용을 위해
 import 'map_view_helpers.dart'; // Matrix4ScaleExtension 사용을 위해
 
@@ -90,26 +91,20 @@ class _MapFullscreenViewState extends State<MapFullscreenView> {
                 Positioned.fill(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(0),
-                    child: MapTileMosaic(map: widget.map),
+                    child: MapTileMosaic(
+                      map: widget.map,
+                      controller: _transformationController,
+                    ),
                   ),
                 ),
-                ...visibleMarkers.map(
-                  (marker) => ValueListenableBuilder<double>(
+                Positioned.fill(
+                  child: ValueListenableBuilder<double>(
                     valueListenable: _zoomScaleNotifier,
-                    builder: (context, scale, child) {
-                      return Align(
-                        alignment: FractionalOffset(marker.x, marker.y),
-                        child: Transform.scale(
-                          scale: 1.0 / scale,
-                          child: MapMarkerWidget(
-                            marker: marker,
-                            onTap: () {
-                              widget.onMarkerTap(marker);
-                            },
-                          ),
-                        ),
-                      );
-                    },
+                    builder: (context, scale, child) => MapMarkerOverlay(
+                      markers: visibleMarkers,
+                      scale: scale,
+                      onMarkerTap: widget.onMarkerTap,
+                    ),
                   ),
                 ),
               ],

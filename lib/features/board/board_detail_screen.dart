@@ -7,25 +7,40 @@ import 'board_models.dart';
 import 'board_repository.dart';
 
 class BoardDetailScreen extends StatefulWidget {
-  const BoardDetailScreen({super.key, required this.postId});
+  const BoardDetailScreen({super.key, required this.postId, this.repository});
 
   final int postId;
+  final BoardRepository? repository;
 
   @override
   State<BoardDetailScreen> createState() => _BoardDetailScreenState();
 }
 
 class _BoardDetailScreenState extends State<BoardDetailScreen> {
-  final BoardRepository _repository = BoardRepository();
+  late final BoardRepository _repository;
   final TextEditingController _commentController = TextEditingController();
   late Future<BoardPostDetail> _future;
   bool _commentSubmitting = false;
   String? _commentError;
+  BoardComment? _replyingTo;
+  final _commentFormKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
+    _repository = widget.repository ?? BoardRepository();
     _future = _repository.fetchPost(widget.postId);
+  }
+
+  @override
+  void didUpdateWidget(covariant BoardDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.postId != widget.postId) {
+      _replyingTo = null;
+      _commentController.clear();
+      _commentError = null;
+      _future = _repository.fetchPost(widget.postId);
+    }
   }
 
   @override
@@ -35,26 +50,31 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   }
 
   void _reload() {
-    setState(
-      () => _future = _repository.fetchPost(widget.postId, refresh: true),
-    );
+    setState(() {
+      _future = _repository.fetchPost(widget.postId, refresh: true);
+    });
   }
 
   Future<void> _submitComment() async {
+    final postId = widget.postId;
     setState(() {
       _commentSubmitting = true;
       _commentError = null;
     });
     try {
       await _repository.createComment(
-        postId: widget.postId,
+        postId: postId,
         content: _commentController.text,
+        parentId: _replyingTo?.id,
       );
-      if (!mounted) return;
+      if (!mounted || widget.postId != postId) return;
       _commentController.clear();
+      _replyingTo = null;
       _reload();
     } on BoardException catch (error) {
-      if (mounted) setState(() => _commentError = error.message);
+      if (mounted && widget.postId == postId) {
+        setState(() => _commentError = error.message);
+      }
     } finally {
       if (mounted) setState(() => _commentSubmitting = false);
     }
@@ -132,12 +152,15 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
             ),
             const SizedBox(height: 18),
             Text(
-              '댓글 ${post.comments.length}',
+              '댓글 ${post.comments.length}${post.commentsMayBeTruncated ? '개 이상' : '개'}',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
+            const Text('현재 서버는 오래된 댓글부터 최대 50개를 제공합니다.'),
+            if (post.commentsMayBeTruncated)
+              const Text('최신 댓글과 답글 일부가 표시되지 않을 수 있습니다.'),
             if (post.comments.isEmpty)
               const Card(
                 child: Padding(
@@ -146,9 +169,31 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                 ),
               )
             else
-              ...post.comments.map((comment) => _CommentTile(comment: comment)),
+              ...post.comments.map(
+                (comment) => _CommentTile(
+                  comment: comment,
+                  parentAuthor: post.comments
+                      .where((item) => item.id == comment.parentId)
+                      .firstOrNull
+                      ?.author,
+                  onReply: !_repository.canWrite || _commentSubmitting
+                      ? null
+                      : () {
+                          setState(() => _replyingTo = comment);
+                          final formContext = _commentFormKey.currentContext;
+                          if (formContext != null) {
+                            Scrollable.ensureVisible(
+                              formContext,
+                              duration: const Duration(milliseconds: 250),
+                              alignment: 0.1,
+                            );
+                          }
+                        },
+                ),
+              ),
             const SizedBox(height: 14),
             Card(
+              key: _commentFormKey,
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
@@ -167,10 +212,24 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                     if (!_repository.canWrite)
                       _CommentLoginNotice(onLogin: () => context.go('/my'))
                     else ...[
+                      if (_replyingTo != null)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text('${_replyingTo!.author}님에게 답글'),
+                            ),
+                            TextButton(
+                              onPressed: _commentSubmitting
+                                  ? null
+                                  : () => setState(() => _replyingTo = null),
+                              child: const Text('취소'),
+                            ),
+                          ],
+                        ),
                       TextField(
                         controller: _commentController,
-                        decoration: const InputDecoration(
-                          labelText: '댓글',
+                        decoration: InputDecoration(
+                          labelText: _replyingTo == null ? '댓글' : '답글',
                           helperText: '사진 첨부는 앱에서 지원하지 않습니다.',
                         ),
                         minLines: 2,
@@ -198,9 +257,11 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment});
+  const _CommentTile({required this.comment, this.parentAuthor, this.onReply});
 
   final BoardComment comment;
+  final String? parentAuthor;
+  final VoidCallback? onReply;
 
   @override
   Widget build(BuildContext context) {
@@ -227,7 +288,16 @@ class _CommentTile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
+            if (comment.parentId != null)
+              Text(
+                parentAuthor == null
+                    ? '원댓글 #${comment.parentId}에 대한 답글'
+                    : '$parentAuthor님에게 답글',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             Text(comment.content),
+            if (onReply != null)
+              TextButton(onPressed: onReply, child: const Text('답글')),
           ],
         ),
       ),

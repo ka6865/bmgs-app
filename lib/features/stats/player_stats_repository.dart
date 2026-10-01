@@ -9,17 +9,12 @@ class PlayerStatsRepository {
 
   final BgmsApiClient _client;
 
-  /// 요약 캐시가 없는 매치를 상세 API로 보완할 최대 건수.
-  ///
-  /// 서버가 일부 누락 요약을 보완한 뒤에도 비어 있는 매치만 대상으로 한다.
-  /// 상세 API는 분석 비용이 있으므로 앞쪽 몇 건만 채운다.
-  static const maxDetailBackfill = 4;
-
   Future<PlayerStatsBundle> fetchPlayerStats({
     required String nickname,
     required String platform,
     String? season,
     bool refresh = false,
+    bool includeSummaries = true,
   }) async {
     try {
       final playerJson = await _client.fetchPlayer(
@@ -31,7 +26,7 @@ class PlayerStatsRepository {
       final profile = PlayerStatsProfile.fromJson(playerJson);
       final matchIds = profile.recentMatches.take(20).toList();
 
-      if (matchIds.isEmpty) {
+      if (matchIds.isEmpty || !includeSummaries) {
         return PlayerStatsBundle(
           profile: profile,
           matches: const [],
@@ -68,14 +63,6 @@ class PlayerStatsRepository {
         );
       }).toList();
 
-      if (summaryError == null) {
-        await _backfillMissingSummaries(
-          matches: matches,
-          nickname: resolvedNickname,
-          platform: profile.platform,
-        );
-      }
-
       return PlayerStatsBundle(
         profile: profile,
         matches: matches,
@@ -86,45 +73,6 @@ class PlayerStatsRepository {
       throw PlayerStatsException.from(ApiException.from(error));
     }
   }
-
-  /// 요약이 비어 있는 매치를 상세 API로 채운다.
-  ///
-  /// 상세 호출은 비용이 크므로 앞쪽 [maxDetailBackfill]건만 처리하고,
-  /// 개별 실패는 무시해 화면 전체가 막히지 않게 한다.
-  Future<void> _backfillMissingSummaries({
-    required List<MatchSummary> matches,
-    required String nickname,
-    required String platform,
-  }) async {
-    final targets = <int>[];
-    for (var index = 0; index < matches.length; index++) {
-      if (!matches[index].isFallback) continue;
-      targets.add(index);
-      if (targets.length >= maxDetailBackfill) break;
-    }
-    if (targets.isEmpty) return;
-
-    final results = await Future.wait(
-      targets.map((index) async {
-        try {
-          final json = await _client.fetchMatchDetail(
-            matchId: matches[index].matchId,
-            nickname: nickname,
-            platform: platform,
-          );
-          return MatchSummary.fromJson(matches[index].matchId, json);
-        } catch (_) {
-          // 개별 매치 분석 실패는 fallback 카드로 남긴다.
-          return null;
-        }
-      }),
-    );
-
-    for (var i = 0; i < targets.length; i++) {
-      final resolved = results[i];
-      if (resolved != null) matches[targets[i]] = resolved;
-    }
-  }
 }
 
 class PlayerStatsException implements Exception {
@@ -132,6 +80,7 @@ class PlayerStatsException implements Exception {
     this.message, {
     this.isRetryable = true,
     this.suggestions = const [],
+    this.retryAfter,
   });
 
   /// 정규화된 API 에러를 전적 화면 문구로 옮긴다.
@@ -146,6 +95,7 @@ class PlayerStatsException implements Exception {
       message,
       isRetryable: error.isRetryable,
       suggestions: error.suggestions,
+      retryAfter: error.retryAfter,
     );
   }
 
@@ -154,6 +104,7 @@ class PlayerStatsException implements Exception {
 
   /// 닉네임을 찾지 못했을 때 서버가 제안하는 유사 플레이어 목록.
   final List<PlayerSuggestion> suggestions;
+  final Duration? retryAfter;
 
   @override
   String toString() => message;

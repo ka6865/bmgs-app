@@ -295,8 +295,8 @@ class MatchDetail {
   final String? mapId;
   final String gameMode;
   final String nickname;
-  final int kills;
-  final double damage;
+  final int? kills;
+  final double? damage;
   final int? rank;
   final int survivalSeconds;
   final int teamKills;
@@ -376,12 +376,12 @@ class MatchDetail {
         player?['name'],
         stats?['name'],
       ], fallback: '플레이어'),
-      kills: _firstNum([
+      kills: _nullableNum([
         json['kills'],
         player?['kills'],
         stats?['kills'],
-      ]).round(),
-      damage: _firstNum([
+      ])?.round(),
+      damage: _nullableNum([
         json['damage'],
         json['damageDealt'],
         player?['damage'],
@@ -505,6 +505,14 @@ class MatchDetail {
       if (parsed != null) return parsed;
     }
     return 0;
+  }
+
+  static double? _nullableNum(List<Object?> values) {
+    for (final value in values) {
+      final parsed = value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '');
+      if (parsed != null && parsed.isFinite) return parsed;
+    }
+    return null;
   }
 
   static int? _nullableInt(List<Object?> values) {

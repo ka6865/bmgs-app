@@ -21,6 +21,11 @@ class RankingEntry {
     required this.platform,
     required this.value,
     required this.label,
+    this.secondary,
+    this.gameMode,
+    this.mapName,
+    this.createdAt,
+    this.matchCount,
   });
 
   final int rank;
@@ -28,6 +33,11 @@ class RankingEntry {
   final String platform;
   final double value;
   final String label;
+  final double? secondary;
+  final String? gameMode;
+  final String? mapName;
+  final DateTime? createdAt;
+  final int? matchCount;
 
   static RankingEntry fromJson(Map<String, dynamic> json, int index) {
     return RankingEntry(
@@ -45,11 +55,12 @@ class RankingEntry {
           _double(json['score']) ??
           _double(json['tierScore']) ??
           0,
-      label:
-          json['label']?.toString() ??
-          json['tier']?.toString() ??
-          json['secondary']?.toString() ??
-          '',
+      label: json['label']?.toString() ?? json['tier']?.toString() ?? '',
+      secondary: _double(json['secondary']),
+      gameMode: json['gameMode']?.toString(),
+      mapName: json['mapName']?.toString(),
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? ''),
+      matchCount: _int(json['matchCount']),
     );
   }
 
@@ -86,7 +97,9 @@ class RankingBoard {
 
   String get displayMessage {
     if (source == RankingSource.api) {
-      return '최근 경기 데이터를 기준으로 집계한 랭킹입니다.';
+      return query.tab == 'tier'
+          ? '최근 7일 내 BGMS 전술 분석 최고 경기 점수입니다. PUBG 시즌 RP 순위와 다릅니다.'
+          : '최근 7일 내 단일 경기 최고 기록입니다. 플레이어마다 최고 경기만 표시합니다.';
     }
     if (message.contains('비어')) {
       return '아직 이 조건에 맞는 랭킹 데이터가 없습니다. 필터를 바꾸거나 잠시 후 다시 확인해 주세요.';

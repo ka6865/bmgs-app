@@ -5,6 +5,7 @@ import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import 'map_fullscreen_view.dart';
 import 'map_models.dart';
+import 'map_marker_overlay.dart';
 import 'map_view_helpers.dart';
 import 'maps_repository.dart';
 
@@ -21,8 +22,9 @@ class MapsScreen extends StatefulWidget {
 class _MapsScreenState extends State<MapsScreen> {
   late final MapsRepository _repository;
   late BgmsMap _selectedMap;
-  // 기본 선택 레이어. HotDrop은 마커 API가 내려주지 않으므로 제외한다.
-  final Set<String> _layers = {'Garage', 'SecretRoom'};
+  final Set<String> _layers = {};
+  bool _showFilters = false;
+  int _loadGeneration = 0;
   late Future<MapMarkerLayer> _markerFuture;
   Map<String, List<String>> _adminSettings = {};
 
@@ -34,46 +36,38 @@ class _MapsScreenState extends State<MapsScreen> {
     _markerFuture = _loadMarkers();
   }
 
-  Future<MapMarkerLayer> _loadMarkers() {
-    _repository.fetchMapCategorySettings().then((settings) {
-      if (mounted) {
-        setState(() {
-          _adminSettings = settings;
-        });
-      }
-    });
-
-    final future = _repository.fetchMarkers(
-      mapId: _selectedMap.id,
-      layers: const [], // 전체 마커 데이터 로드
-    );
-
-    future.then((layer) {
-      if (mounted) {
-        setState(() {
-          if (layer.markers.isNotEmpty) {
-            // 웹과 동일한 카테고리만 켠다.
-            // 마커 API는 허용 목록 밖의 레이어도 함께 주기 때문에,
-            // 전부 켜면 칩이 숨겨진 레이어가 지도에 그대로 그려진다.
-            final available = layer.markers.map((m) => m.layer).toSet();
-            final allowed = _repository
-                .filterActiveLayers(
-                  _selectedMap.id,
-                  available.toList(),
-                  _adminSettings,
-                )
-                .toSet();
-            _layers.clear();
-            _layers.addAll(allowed.isEmpty ? available : allowed);
-          } else {
-            _layers.clear();
-            _layers.addAll(const ['Garage', 'SecretRoom', 'Esports']);
-          }
-        });
-      }
-    });
-
-    return future;
+  Future<MapMarkerLayer> _loadMarkers() async {
+    final generation = ++_loadGeneration;
+    final mapId = _selectedMap.id;
+    Map<String, List<String>> settings;
+    try {
+      settings = await _repository.fetchMapCategorySettings();
+    } catch (_) {
+      settings = {};
+    }
+    final allowed = settings.entries
+        .where((entry) => entry.key.toLowerCase() == mapId.toLowerCase())
+        .expand((entry) => entry.value)
+        .toList();
+    final layer = allowed.isEmpty
+        ? MapMarkerLayer.unavailable(
+            mapId: mapId,
+            message: '웹 DB의 지도 설정이 없거나 불러오지 못했습니다. 새로고침해 주세요.',
+          )
+        : await _repository.fetchMarkers(mapId: mapId, layers: allowed);
+    if (mounted && generation == _loadGeneration) {
+      setState(() {
+        _adminSettings = settings;
+        _layers.retainAll(
+          _repository.filterActiveLayers(
+            mapId,
+            layer.markers.map((marker) => marker.layer).toSet().toList(),
+            settings,
+          ),
+        );
+      });
+    }
+    return layer;
   }
 
   /// 당겨서 새로고침. 새 future를 직접 기다려 인디케이터 시점을 맞춘다.
@@ -110,7 +104,7 @@ class _MapsScreenState extends State<MapsScreen> {
       future: _markerFuture,
       builder: (context, snapshot) {
         final layer =
-            snapshot.data ??
+            (snapshot.data?.mapId == _selectedMap.id ? snapshot.data : null) ??
             MapMarkerLayer.unavailable(
               mapId: _selectedMap.id,
               message: '지도 마커를 준비하는 중입니다.',
@@ -121,13 +115,9 @@ class _MapsScreenState extends State<MapsScreen> {
         final availableLayers =
             layer.markers.map((m) => m.layer).toSet().toList()..sort();
 
-        final layersToShow = availableLayers.isNotEmpty
-            ? availableLayers
-            : const ['Garage', 'SecretRoom', 'Esports'];
-
         final allowedLayers = _repository.filterActiveLayers(
           _selectedMap.id,
-          layersToShow,
+          availableLayers,
           _adminSettings,
         );
 
@@ -158,6 +148,9 @@ class _MapsScreenState extends State<MapsScreen> {
                             if (!selected || map.id == _selectedMap.id) return;
                             setState(() {
                               _selectedMap = _repository.resolveMap(map.id);
+                              _layers.clear();
+                              _adminSettings = {};
+                              _showFilters = false;
                               _markerFuture = _loadMarkers();
                             });
                           },
@@ -167,28 +160,40 @@ class _MapsScreenState extends State<MapsScreen> {
                 ),
               ),
               const SizedBox(height: BgmsSpacing.lg),
-              Wrap(
-                spacing: BgmsSpacing.sm,
-                runSpacing: BgmsSpacing.sm,
-                children: uniqueKoreanLabels.map((koreanLabel) {
-                  final relatedLayers = allowedLayers
-                      .where((l) => getCategoryLabel(l) == koreanLabel)
-                      .toList();
-                  final isSelected = relatedLayers.any(
-                    (l) => _layers.contains(l),
-                  );
+              if (uniqueKoreanLabels.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () =>
+                        setState(() => _showFilters = !_showFilters),
+                    icon: Icon(_showFilters ? Icons.expand_less : Icons.tune),
+                    label: Text(_showFilters ? '필터 접기' : '마커 필터'),
+                  ),
+                ),
+              if (_showFilters)
+                Wrap(
+                  spacing: BgmsSpacing.sm,
+                  runSpacing: BgmsSpacing.sm,
+                  children: uniqueKoreanLabels.map((koreanLabel) {
+                    final relatedLayers = allowedLayers
+                        .where((l) => getCategoryLabel(l) == koreanLabel)
+                        .toList();
+                    final isSelected = relatedLayers.any(
+                      (l) => _layers.contains(l),
+                    );
 
-                  return FilterChip(
-                    label: Text(koreanLabel),
-                    selected: isSelected,
-                    showCheckmark: false,
-                    onSelected: (_) =>
-                        _toggleCategoryLabel(koreanLabel, allowedLayers),
-                  );
-                }).toList(),
-              ),
+                    return FilterChip(
+                      label: Text(koreanLabel),
+                      selected: isSelected,
+                      showCheckmark: false,
+                      onSelected: (_) =>
+                          _toggleCategoryLabel(koreanLabel, allowedLayers),
+                    );
+                  }).toList(),
+                ),
               const SizedBox(height: BgmsSpacing.lg),
               _MapPanel(
+                key: ValueKey(_selectedMap.id),
                 map: _selectedMap,
                 layer: layer,
                 activeLayers: _layers,
@@ -204,6 +209,7 @@ class _MapsScreenState extends State<MapsScreen> {
 
 class _MapPanel extends StatefulWidget {
   const _MapPanel({
+    super.key,
     required this.map,
     required this.layer,
     required this.activeLayers,
@@ -357,7 +363,14 @@ class _MapPanelState extends State<_MapPanel> {
               children: [
                 Chip(label: Text(widget.layer.displaySourceLabel)),
                 const SizedBox(width: 8),
-                Expanded(child: Text(widget.layer.displayMessage)),
+                Expanded(
+                  child: Text(
+                    widget.layer.source == MapMarkerSource.api &&
+                            widget.activeLayers.isEmpty
+                        ? '마커 필터에서 원하는 항목을 켜 주세요.'
+                        : widget.layer.displayMessage,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -386,31 +399,23 @@ class _MapPanelState extends State<_MapPanel> {
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
-                                    child: MapTileMosaic(map: widget.map),
+                                    child: MapTileMosaic(
+                                      map: widget.map,
+                                      controller: _transformationController,
+                                    ),
                                   ),
                                 ),
                               ),
-                              ...visibleMarkers.map(
-                                (marker) => ValueListenableBuilder<double>(
+                              Positioned.fill(
+                                child: ValueListenableBuilder<double>(
                                   valueListenable: _zoomScaleNotifier,
-                                  builder: (context, scale, child) {
-                                    return Align(
-                                      alignment: FractionalOffset(
-                                        marker.x,
-                                        marker.y,
+                                  builder: (context, scale, child) =>
+                                      MapMarkerOverlay(
+                                        markers: visibleMarkers,
+                                        scale: scale,
+                                        onMarkerTap: (marker) =>
+                                            _showMarkerDetails(context, marker),
                                       ),
-                                      child: Transform.scale(
-                                        scale: 1.0 / scale,
-                                        child: MapMarkerWidget(
-                                          marker: marker,
-                                          onTap: () => _showMarkerDetails(
-                                            context,
-                                            marker,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
                                 ),
                               ),
                             ],
@@ -424,6 +429,7 @@ class _MapPanelState extends State<_MapPanel> {
                     right: 8,
                     child: FloatingActionButton.small(
                       heroTag: 'map_fullscreen',
+                      tooltip: '지도 전체 화면',
                       backgroundColor: Colors.black.withValues(alpha: 0.62),
                       foregroundColor: BgmsColors.accent,
                       onPressed: () {
@@ -457,9 +463,7 @@ class _MapPanelState extends State<_MapPanel> {
                     color: BgmsColors.textSecondary,
                   ),
                   SizedBox(width: 8),
-                  Expanded(
-                    child: Text('선택한 레이어에 표시할 마커가 없습니다. 다른 레이어를 켜 보세요.'),
-                  ),
+                  Expanded(child: Text('마커 필터를 켜면 선택한 항목만 지도에 표시됩니다.')),
                 ],
               ),
             ],
@@ -471,7 +475,7 @@ class _MapPanelState extends State<_MapPanel> {
 }
 
 class MapTileMosaic extends StatelessWidget {
-  const MapTileMosaic({super.key, required this.map});
+  const MapTileMosaic({super.key, required this.map, this.controller});
 
   static const int _zoom = 2;
   static const int _tileCount = 4;
@@ -483,6 +487,7 @@ class MapTileMosaic extends StatelessWidget {
   static const int _tileCacheWidth = 512;
 
   final BgmsMap map;
+  final TransformationController? controller;
 
   @override
   Widget build(BuildContext context) {
@@ -526,28 +531,74 @@ class MapTileMosaic extends StatelessWidget {
                     color: BgmsColors.bgBase,
                     border: Border.all(color: BgmsColors.border),
                   ),
-                  child: const SizedBox.expand(),
+                  child: const Center(child: Icon(Icons.broken_image_outlined,
+                    size: 18, color: BgmsColors.textMuted, semanticLabel: '지도 타일을 불러오지 못했습니다')),
                 );
               },
             );
           },
         ),
-        Align(
-          alignment: Alignment.bottomRight,
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.62),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: BgmsColors.border),
-            ),
-            child: const Text(
-              'tile z2',
-              style: TextStyle(fontSize: 11, color: BgmsColors.textSecondary),
+        if (controller != null)
+          LayoutBuilder(
+            builder: (context, constraints) => ValueListenableBuilder<Matrix4>(
+              valueListenable: controller!,
+              builder: (context, matrix, child) {
+                final scale = matrix.getMaxScaleOnViewport();
+                final zoom = scale >= 4
+                    ? 4
+                    : scale >= 2
+                    ? 3
+                    : 2;
+                if (zoom == 2) return const SizedBox.shrink();
+                final count = 1 << zoom;
+                final size = constraints.biggest;
+                final tileWidth = size.width / count;
+                final tileHeight = size.height / count;
+                final start = controller!.toScene(Offset.zero);
+                final end = controller!.toScene(
+                  Offset(size.width, size.height),
+                );
+                final firstX = (start.dx / tileWidth).floor().clamp(
+                  0,
+                  count - 1,
+                );
+                final lastX = (end.dx / tileWidth).floor().clamp(0, count - 1);
+                final firstY = (start.dy / tileHeight).floor().clamp(
+                  0,
+                  count - 1,
+                );
+                final lastY = (end.dy / tileHeight).floor().clamp(0, count - 1);
+                return Stack(
+                  children: [
+                    for (var y = firstY; y <= lastY; y++)
+                      for (var x = firstX; x <= lastX; x++)
+                        Positioned(
+                          left: x * tileWidth,
+                          top: y * tileHeight,
+                          width: tileWidth,
+                          height: tileHeight,
+                          child: Image.network(
+                            config.mapTileUrl(
+                              mapId: map.tilePath,
+                              zoom: zoom,
+                              column: x,
+                              row: y,
+                            ),
+                            key: ValueKey('${map.id}/$zoom/$x/$y'),
+                            fit: BoxFit.cover,
+                            cacheWidth: _tileCacheWidth,
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                            loadingBuilder: (_, child, progress) =>
+                                progress == null
+                                ? child
+                                : const SizedBox.shrink(),
+                          ),
+                        ),
+                  ],
+                );
+              },
             ),
           ),
-        ),
       ],
     );
   }
@@ -564,16 +615,26 @@ class MapMarkerWidget extends StatelessWidget {
     final icon = getMarkerIcon(marker.layer);
     final color = getMarkerColor(marker.layer);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.2),
-          shape: BoxShape.circle,
-          border: Border.all(color: color, width: 1.5),
+    return Semantics(
+      button: true,
+      label: '${marker.label}, ${getCategoryLabel(marker.layer)}',
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: InkWell(
+          onTap: onTap,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+                border: Border.all(color: color, width: 1.5),
+              ),
+              child: Icon(icon, size: 18, color: color),
+            ),
+          ),
         ),
-        child: Icon(icon, size: 14, color: color),
       ),
     );
   }

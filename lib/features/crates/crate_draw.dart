@@ -21,7 +21,7 @@ class CrateDrawMachine {
 
   final Random _random;
 
-  /// 한 번 뽑는다. 확률 합이 1보다 작으면 남는 몫은 최저 등급으로 흘린다.
+  /// 한 번 뽑는다. 웹처럼 풀의 확률 합으로 가중치를 정규화한다.
   CrateItem drawOne(List<CrateItem> pool) {
     if (pool.isEmpty) {
       throw ArgumentError('뽑을 아이템이 없습니다.');

@@ -130,6 +130,13 @@ class _CratesScreenState extends State<CratesScreen> {
               ),
               const SizedBox(height: 18),
               if (selected != null) ...[
+                const Text(
+                  '기본 상자 결과만 미리 확인합니다. 당첨된 프라임 소포의 추가 개봉과 별도 보너스 추첨은 아직 제공하지 않습니다.',
+                  style: TextStyle(color: BgmsColors.textSecondary),
+                ),
+                if (selected.baseItems.isEmpty)
+                  const Text('기본 추첨 데이터를 확인할 수 없습니다.'),
+                const SizedBox(height: 12),
                 _DrawActions(template: selected, onDraw: _draw),
                 const SizedBox(height: 18),
                 if (_results.isNotEmpty) ...[
@@ -213,14 +220,14 @@ class _DrawActions extends StatelessWidget {
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: () => onDraw(1),
+              onPressed: template.baseItems.isEmpty ? null : () => onDraw(1),
               child: Text(unit == null ? '1회' : '1회 · ${unit}G'),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: FilledButton(
-              onPressed: () => onDraw(10),
+              onPressed: template.baseItems.isEmpty ? null : () => onDraw(10),
               child: Text(bundle == null ? '10연차' : '10연차 · ${bundle}G'),
             ),
           ),
@@ -429,6 +436,13 @@ class _ProbabilityTable extends StatelessWidget {
         ),
         child: Column(
           children: [
+            const Padding(
+              padding: EdgeInsets.all(10),
+              child: Text(
+                '기본 그룹의 저장 확률입니다. 시뮬레이션은 이 그룹의 확률 합을 100%로 환산합니다.',
+                style: TextStyle(color: BgmsColors.textSecondary),
+              ),
+            ),
             for (var i = 0; i < items.length; i++)
               _ProbabilityRow(item: items[i], isLast: i == items.length - 1),
           ],

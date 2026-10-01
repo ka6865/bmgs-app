@@ -174,6 +174,279 @@ class BgmsApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> fetchPlayerMatches({
+    required String nickname,
+    required String platform,
+    int page = 1,
+    String filter = 'all',
+  }) => _getJson(
+    Uri.parse('$_baseUrl/api/pubg/player/matches').replace(
+      queryParameters: {
+        'nickname': nickname,
+        'platform': platform,
+        'page': '$page',
+        'filter': filter,
+      },
+    ),
+  );
+
+  Future<Map<String, dynamic>> fetchEncounters({
+    required String nickname,
+    required String platform,
+    required String accessToken,
+    int page = 1,
+  }) => _getJson(
+    Uri.parse('$_baseUrl/api/pubg/encounters').replace(
+      queryParameters: {
+        'nickname': nickname,
+        'platform': platform,
+        'page': '$page',
+      },
+    ),
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> collectEncounters({
+    required String nickname,
+    required String platform,
+    required String matchId,
+    required String accessToken,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/pubg/encounters'),
+    body: {
+      'action': 'collect',
+      'nickname': nickname,
+      'platform': platform,
+      'matchId': matchId,
+    },
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> fetchEncounterProfile({
+    required String nickname,
+    required String platform,
+    required String matchId,
+    required String targetAccountId,
+    required String accessToken,
+    bool refresh = false,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/pubg/encounters'),
+    body: {
+      'action': 'profiles',
+      'nickname': nickname,
+      'platform': platform,
+      'matchId': matchId,
+      'targetAccountId': targetAccountId,
+      'refresh': refresh,
+    },
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> createBanWatch({
+    required Map<String, dynamic> payload,
+    required String accessToken,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/pubg/ban-watch'),
+    body: payload,
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> fetchBanWatches({required String accessToken}) =>
+      _getJson(
+        Uri.parse('$_baseUrl/api/pubg/ban-watch'),
+        accessToken: accessToken,
+      );
+
+  Future<Map<String, dynamic>> removeBanWatch({
+    required String watchId,
+    required String accessToken,
+  }) async {
+    try {
+      if (accessToken.isEmpty) {
+        throw const ApiException(
+          kind: ApiErrorKind.unauthorized,
+          message: '로그인이 필요합니다.',
+        );
+      }
+      final response = await _dio.deleteUri<dynamic>(
+        Uri.parse(
+          '$_baseUrl/api/pubg/ban-watch',
+        ).replace(queryParameters: {'id': watchId}),
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      return _asJsonMap(response.data);
+    } catch (error) {
+      throw ApiException.from(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchWeaponMastery({
+    required String nickname,
+    required String platform,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/pubg/player/weapon-mastery'),
+    body: {'nickname': nickname, 'platform': platform},
+  );
+
+  Future<Map<String, dynamic>> fetchBattle({
+    required String nick1,
+    required String nick2,
+    required String platform1,
+    String? platform2,
+    String matchType = 'all',
+  }) => _getJson(
+    Uri.parse('$_baseUrl/api/pubg/battle').replace(
+      queryParameters: {
+        'nick1': nick1,
+        'nick2': nick2,
+        'platform1': platform1,
+        'platform2': platform2 ?? platform1,
+        'matchType': matchType,
+      },
+    ),
+  );
+
+  Future<Map<String, dynamic>> fetchWeaponMeta({
+    String matchType = 'all',
+    String? patch,
+  }) => _getJson(
+    Uri.parse('$_baseUrl/api/pubg/meta').replace(
+      queryParameters: {
+        'matchType': matchType,
+        if (patch != null && patch.isNotEmpty) 'patch': patch,
+      },
+    ),
+  );
+
+  Future<Map<String, dynamic>> fetchHotdrops(String mapId) => _getJson(
+    Uri.parse(
+      '$_baseUrl/api/pubg/hotdrop',
+    ).replace(queryParameters: {'mapName': mapId.toLowerCase()}),
+  );
+
+  Future<Map<String, dynamic>> fetchTelemetry({
+    required String matchId,
+    required String nickname,
+    required String platform,
+    required String mapName,
+  }) async {
+    final envelope = await _getJson(
+      Uri.parse('$_baseUrl/api/pubg/telemetry').replace(
+        queryParameters: {
+          'matchId': matchId,
+          'nickname': nickname,
+          'platform': platform,
+          'mapName': mapName,
+          'mode': 'lite',
+        },
+      ),
+    );
+    final identity = envelope['identity'];
+    if (identity is! Map ||
+        identity['matchId'] != matchId ||
+        identity['platform'] != platform ||
+        identity['mode'] != 'lite' ||
+        !RegExp(
+          r'^[a-f0-9]{32}$',
+        ).hasMatch(identity['playerKey']?.toString() ?? '') ||
+        identity['telemetryVersion'] is! num ||
+        !(identity['telemetryVersion'] as num).isFinite ||
+        (identity['telemetryVersion'] as num) <= 0) {
+      throw const ApiException(
+        kind: ApiErrorKind.parse,
+        message: '리플레이 경기 정보가 요청과 일치하지 않습니다.',
+      );
+    }
+    final url = Uri.tryParse(envelope['downloadUrl']?.toString() ?? '');
+    if (url == null ||
+        url.scheme != 'https' ||
+        url.host.isEmpty ||
+        url.userInfo.isNotEmpty ||
+        url.port != 443) {
+      throw const ApiException(
+        kind: ApiErrorKind.parse,
+        message: '리플레이 다운로드 주소를 확인할 수 없습니다.',
+      );
+    }
+    // 외부 서명 URL에는 앱 인증 토큰을 전달하지 않는다.
+    final payload = await _getJson(url);
+    final actual = payload['identity'];
+    if (actual is! Map ||
+        const [
+          'matchId',
+          'platform',
+          'playerKey',
+          'mode',
+          'telemetryVersion',
+        ].any((field) => actual[field] != identity[field])) {
+      throw const ApiException(
+        kind: ApiErrorKind.parse,
+        message: '리플레이 파일의 경기 정보가 일치하지 않습니다.',
+      );
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> fetchSupportFaqs({
+    String? category,
+    String? query,
+  }) => _getJson(
+    Uri.parse('$_baseUrl/api/support/faqs').replace(
+      queryParameters: {
+        if (category != null && category.isNotEmpty) 'category': category,
+        if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+      },
+    ),
+  );
+
+  Future<Map<String, dynamic>> fetchSupportTickets({
+    required String accessToken,
+  }) => _getJson(
+    Uri.parse('$_baseUrl/api/support/tickets'),
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> fetchSupportTicket({
+    required String ticketId,
+    required String accessToken,
+  }) => _getJson(
+    Uri.parse('$_baseUrl/api/support/tickets/${Uri.encodeComponent(ticketId)}'),
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> createSupportTicket({
+    required Map<String, dynamic> body,
+    required String accessToken,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/support/tickets'),
+    body: body,
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> createSupportMessage({
+    required String ticketId,
+    required String body,
+    required String idempotencyKey,
+    required String accessToken,
+  }) => _postJson(
+    Uri.parse(
+      '$_baseUrl/api/support/tickets/${Uri.encodeComponent(ticketId)}/messages',
+    ),
+    body: {'body': body},
+    headers: {'Idempotency-Key': idempotencyKey},
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> fetchSupportAttachmentUrl({
+    required String attachmentId,
+    required String accessToken,
+  }) => _getJson(
+    Uri.parse(
+      '$_baseUrl/api/support/attachments/${Uri.encodeComponent(attachmentId)}/url',
+    ),
+    accessToken: accessToken,
+  );
+
   /// 닉네임 자동완성. 실패해도 화면을 막지 않도록 빈 목록을 허용한다.
   Future<List<PlayerSuggestion>> fetchSuggestions(String query) async {
     final json = await _getJson(buildSuggestUri(query));
@@ -201,6 +474,7 @@ class BgmsApiClient {
           'matchIds': matchIds,
           'nickname': nickname,
           'platform': platform,
+          'summaryContractVersion': 2,
         },
         options: Options(
           responseType: ResponseType.plain,
@@ -303,11 +577,12 @@ class BgmsApiClient {
     required int postId,
     required String content,
     required String accessToken,
+    int? parentId,
   }) {
     final postUri = buildBoardPostUri(postId);
     return _postJson(
       postUri.replace(path: '${postUri.path}/comments'),
-      body: {'content': content},
+      body: {'content': content, 'parent_id': ?parentId},
       accessToken: accessToken,
     );
   }
@@ -325,6 +600,7 @@ class BgmsApiClient {
 
   /// 명시 토큰을 우선 사용하고, 없으면 [authTokenProvider]에서 가져온다.
   Future<Map<String, String>?> _authHeaders({String? explicitToken}) async {
+    if (explicitToken != null && explicitToken.isEmpty) return null;
     if (explicitToken != null && explicitToken.isNotEmpty) {
       return {'Authorization': 'Bearer $explicitToken'};
     }
@@ -335,9 +611,20 @@ class BgmsApiClient {
     return {'Authorization': 'Bearer $token'};
   }
 
-  Future<Map<String, dynamic>> _getJson(Uri uri) async {
+  Future<Map<String, dynamic>> _getJson(Uri uri, {String? accessToken}) async {
     try {
-      final response = await _dio.getUri<dynamic>(uri);
+      if (accessToken != null && accessToken.isEmpty) {
+        throw const ApiException(
+          kind: ApiErrorKind.unauthorized,
+          message: '로그인이 필요합니다.',
+        );
+      }
+      final response = await _dio.getUri<dynamic>(
+        uri,
+        options: accessToken == null
+            ? null
+            : Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
       return _asJsonMap(response.data);
     } catch (error) {
       throw ApiException.from(error);
@@ -348,14 +635,24 @@ class BgmsApiClient {
     Uri uri, {
     Object? body,
     String? accessToken,
+    Map<String, String> headers = const {},
   }) async {
     try {
+      if (accessToken != null && accessToken.isEmpty) {
+        throw const ApiException(
+          kind: ApiErrorKind.unauthorized,
+          message: '로그인이 필요합니다.',
+        );
+      }
       final response = await _dio.postUri<dynamic>(
         uri,
         data: body,
-        options: accessToken == null
-            ? null
-            : Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        options: Options(
+          headers: {
+            ...headers,
+            if (accessToken != null) 'Authorization': 'Bearer $accessToken',
+          },
+        ),
       );
       return _asJsonMap(response.data);
     } catch (error) {

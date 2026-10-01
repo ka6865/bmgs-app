@@ -90,6 +90,9 @@ class BoardPostDetail {
   final int likes;
   final List<BoardComment> comments;
 
+  /// 현재 서버는 오래된 댓글부터 50개만 반환하며 전체 개수는 제공하지 않는다.
+  bool get commentsMayBeTruncated => comments.length >= 50;
+
   factory BoardPostDetail.fromJson(Map<String, dynamic> json) {
     final post = (json['post'] is Map)
         ? (json['post'] as Map).cast<String, dynamic>()
@@ -126,12 +129,14 @@ class BoardComment {
     required this.author,
     required this.content,
     required this.createdAt,
+    this.parentId,
   });
 
   final int id;
   final String author;
   final String content;
   final String createdAt;
+  final int? parentId;
 
   factory BoardComment.fromJson(Map<String, dynamic> json) {
     return BoardComment(
@@ -139,6 +144,7 @@ class BoardComment {
       author: _asString(json['author'], '알 수 없음'),
       content: _asString(json['content'], ''),
       createdAt: _asString(json['createdAt'], ''),
+      parentId: json['parentId'] == null ? null : _asInt(json['parentId']),
     );
   }
 }

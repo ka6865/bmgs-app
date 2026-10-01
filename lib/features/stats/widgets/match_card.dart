@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/bgms_theme.dart';
 import '../../../core/widgets/bgms_card.dart';
+import '../../maps/map_models.dart';
 import '../player_stats_models.dart';
 import 'tier_style.dart';
 
@@ -13,8 +14,10 @@ class MatchCard extends StatelessWidget {
   final MatchSummary match;
   final PlayerStatsProfile profile;
 
-  String _formatElapsedTime(DateTime dateTime) {
+  String _formatElapsedTime(DateTime? dateTime) {
+    if (dateTime == null) return '경기 시간 확인 전';
     final difference = DateTime.now().difference(dateTime.toLocal());
+    if (difference.isNegative) return '시간 확인 중';
     if (difference.inMinutes < 1) return '방금 전';
     if (difference.inMinutes < 60) return '${difference.inMinutes}분 전';
     if (difference.inHours < 24) return '${difference.inHours}시간 전';
@@ -64,9 +67,12 @@ class MatchCard extends StatelessWidget {
           final stats = Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _MatchStat(label: '킬', value: '${match.kills}'),
+              _MatchStat(label: '킬', value: match.kills?.toString() ?? '-'),
               const SizedBox(width: 14),
-              _MatchStat(label: '딜량', value: match.damage.toStringAsFixed(0)),
+              _MatchStat(
+                label: '딜량',
+                value: match.damage?.toStringAsFixed(0) ?? '-',
+              ),
               const SizedBox(width: 4),
               const Icon(
                 Icons.chevron_right_rounded,
@@ -109,7 +115,7 @@ class MatchCard extends StatelessWidget {
                         children: [
                           Flexible(
                             child: Text(
-                              match.mapName,
+                              bgmsMapDisplayName(match.mapName),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.titleSmall?.copyWith(

@@ -1,56 +1,84 @@
 import 'package:bgms_mobile_app/features/maps/maps_repository.dart';
+import 'package:bgms_mobile_app/features/maps/map_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final repository = MapsRepository();
 
-  test('서버 설정이 없으면 내장 카테고리로 레이어를 좁힌다', () {
-    // 마커 API는 허용 목록 밖의 레이어(Boat)도 함께 준다.
-    final available = [
-      'Boat',
-      'Esports',
-      'EsportsBoat',
-      'Garage',
-      'Glider',
-      'SecretRoom',
-    ];
-
-    final allowed = repository.filterActiveLayers('Erangel', available, {});
-
-    // 에란겔에는 Boat가 없어야 한다. 웹과 동일한 기준이다.
-    expect(allowed, isNot(contains('Boat')));
-    expect(allowed, contains('Garage'));
-    expect(allowed, contains('SecretRoom'));
+  test('맵 별칭을 한국어로 표시하고 미지원 이름은 보존한다', () {
+    for (final entry in const {
+      ' Baltic_Main ': '에란겔',
+      'Desert_Main': '미라마',
+      'TIGER_MAIN': '태이고',
+      'Neon_Main': '론도',
+      'DihorOtok_Main': '비켄디',
+      'Kiki_Main': '데스턴',
+      'Erangel': '에란겔',
+      '미라마': '미라마',
+      'Savage_Main': '사녹',
+      'Sanhok': '사녹',
+      '사녹': '사녹',
+      'Summerland_Main': '카라킨',
+      'Karakin': '카라킨',
+      '카라킨': '카라킨',
+      'Chimera_Main': '파라모',
+      'Paramo': '파라모',
+      '파라모': '파라모',
+      'Heaven_Main': '헤이븐',
+      'Haven': '헤이븐',
+      '헤이븐': '헤이븐',
+      'Range_Main': '훈련장',
+      'Range': '훈련장',
+      'Training': '훈련장',
+      '훈련장': '훈련장',
+      'PillarCompound_Main': '필라 기지 (TDM)',
+      'PillarCompound': '필라 기지 (TDM)',
+      '필라 기지 (TDM)': '필라 기지 (TDM)',
+      'Italy_TDM_Main': '리틀 이탈리아 (TDM)',
+      'Italy': '리틀 이탈리아 (TDM)',
+      '리틀 이탈리아 (TDM)': '리틀 이탈리아 (TDM)',
+      'Unknown_Main': 'Unknown_Main',
+    }.entries) {
+      expect(bgmsMapDisplayName(entry.key), entry.value);
+    }
+    expect(bgmsMapDisplayName(null), '맵 정보 없음');
+    expect(repository.availableMaps, same(bgmsMapCatalog));
+    expect(bgmsMapCatalog, hasLength(6));
+    expect(normalizeBgmsMapId('Savage_Main'), 'savage_main');
+    expect(repository.resolveMap('Desert_Main').id, 'Miramar');
   });
 
-  test('서버 설정이 있으면 그 값을 우선한다', () {
-    final allowed = repository.filterActiveLayers(
-      'Erangel',
-      ['Garage', 'Boat', 'Glider'],
-      {
-        'Erangel': ['Garage'],
-      },
+  test('DB 설정이 없거나 맵 설정이 없으면 레이어를 노출하지 않는다', () {
+    expect(
+      repository.filterActiveLayers('Erangel', ['Garage', 'Boat'], {}),
+      isEmpty,
     );
-
-    expect(allowed, ['Garage']);
+    expect(
+      repository.filterActiveLayers(
+        'Deston',
+        ['Garage'],
+        {
+          'Erangel': ['Garage'],
+        },
+      ),
+      isEmpty,
+    );
+    expect(
+      repository.filterActiveLayers('Erangel', ['Garage'], {'Erangel': []}),
+      isEmpty,
+    );
   });
 
-  test('맵 아이디 대소문자가 달라도 매칭한다', () {
-    final allowed = repository.filterActiveLayers('erangel', [
-      'Garage',
-      'Boat',
-    ], {});
-
-    expect(allowed, contains('Garage'));
-    expect(allowed, isNot(contains('Boat')));
-  });
-
-  test('모르는 맵은 받은 레이어를 그대로 준다', () {
-    final allowed = repository.filterActiveLayers('UnknownMap', [
-      'Garage',
-      'Boat',
-    ], {});
-
-    expect(allowed, ['Garage', 'Boat']);
+  test('DB의 허용 목록만 대소문자 구분 없이 노출한다', () {
+    expect(
+      repository.filterActiveLayers(
+        'erangel',
+        ['Garage', 'Boat', 'Glider'],
+        {
+          'Erangel': [' garage ', 'Glider'],
+        },
+      ),
+      ['Garage', 'Glider'],
+    );
   });
 }

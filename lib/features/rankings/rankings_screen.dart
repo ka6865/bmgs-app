@@ -5,6 +5,7 @@ import '../../core/player/player_search_flow.dart';
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/app_panels.dart';
 import '../../core/widgets/bgms_brand_header.dart';
+import '../maps/map_models.dart';
 import 'ranking_models.dart';
 import 'rankings_repository.dart';
 
@@ -40,7 +41,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
   static const _tabs = <String, String>{
     'damage': '딜량',
     'kills': '킬',
-    'tier': '티어',
+    'tier': 'BGMS 점수',
   };
   static const _modes = <String, String>{
     'all': '전체',
@@ -324,7 +325,7 @@ class _RankingBoardView extends StatelessWidget {
   String _title(String tab) {
     return switch (tab) {
       'kills' => '주간 킬 랭킹',
-      'tier' => '티어 랭킹',
+      'tier' => 'BGMS 최고 경기',
       _ => '주간 딜량 랭킹',
     };
   }
@@ -345,11 +346,9 @@ class _RankingTile extends StatelessWidget {
   };
 
   String get _valueText {
-    if (entry.value <= 0) return entry.label;
     return switch (tab) {
       'kills' => '${entry.value.toStringAsFixed(0)} 킬',
-      'tier' =>
-        entry.label.isNotEmpty ? entry.label : entry.value.toStringAsFixed(0),
+      'tier' => '${entry.value.toStringAsFixed(1)} 점',
       _ => '${entry.value.toStringAsFixed(0)} 딜',
     };
   }
@@ -401,6 +400,40 @@ class _RankingTile extends StatelessWidget {
                       color: BgmsColors.textMuted,
                     ),
                   ),
+                  if (entry.label.isNotEmpty)
+                    Text(
+                      entry.label,
+                      style: const TextStyle(color: BgmsColors.accent),
+                    ),
+                  if (entry.mapName != null || entry.gameMode != null)
+                    Text(
+                      [
+                            if (entry.mapName != null)
+                              bgmsMapDisplayName(entry.mapName),
+                            entry.gameMode,
+                          ]
+                          .whereType<String>()
+                          .where((value) => value.isNotEmpty)
+                          .join(' · '),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  if (entry.createdAt != null)
+                    Text(
+                      entry.createdAt!.toLocal().toString().substring(0, 16),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  if (entry.secondary != null)
+                    Text(
+                      tab == 'damage'
+                          ? '${entry.secondary!.toStringAsFixed(0)} 킬'
+                          : '${entry.secondary!.toStringAsFixed(0)} 딜',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  if (entry.matchCount != null)
+                    Text(
+                      '${entry.matchCount}경기',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                 ],
               ),
             ),

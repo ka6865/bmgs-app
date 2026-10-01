@@ -5,6 +5,7 @@ import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/app_panels.dart';
 import '../../core/widgets/bgms_brand_header.dart';
 import 'board_models.dart';
+import 'board_categories.dart';
 import 'board_repository.dart';
 
 class BoardScreen extends StatefulWidget {
@@ -25,13 +26,8 @@ class _BoardScreenState extends State<BoardScreen> {
   bool _loadingMore = false;
   String? _error;
 
-  /// 게시판 분류 키와 표시 라벨.
-  static const _categories = <MapEntry<String, String>>[
-    MapEntry('all', '전체'),
-    MapEntry('free', '자유'),
-    MapEntry('strategy', '공략'),
-    MapEntry('question', '질문'),
-  ];
+  static const _categories = BoardCategories.filters;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -46,11 +42,15 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   Future<void> _load({required bool reset}) async {
+    final generation = reset ? ++_loadGeneration : _loadGeneration;
     if (reset) {
       setState(() {
         _loading = true;
         _error = null;
         _cursor = null;
+        _posts.clear();
+        _hasMore = false;
+        _loadingMore = false;
       });
     } else {
       setState(() => _loadingMore = true);
@@ -62,7 +62,7 @@ class _BoardScreenState extends State<BoardScreen> {
         cursor: reset ? null : _cursor,
         query: _searchController.text,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         if (reset) _posts.clear();
         _posts.addAll(page.items);
@@ -70,10 +70,10 @@ class _BoardScreenState extends State<BoardScreen> {
         _hasMore = page.hasMore;
       });
     } on BoardException catch (error) {
-      if (!mounted) return;
-      setState(() => _error = error.message);
+      if (!mounted || generation != _loadGeneration) return;
+      if (mounted) setState(() => _error = error.message);
     } finally {
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() {
           _loading = false;
           _loadingMore = false;
@@ -185,10 +185,12 @@ class _BoardScreenState extends State<BoardScreen> {
               title: '게시글을 불러오지 못했습니다',
             )
           else if (_posts.isEmpty)
-            const InfoPanel(
+            InfoPanel(
               icon: Icons.forum_outlined,
               title: '게시글이 없습니다',
-              body: '아직 이 조건에 맞는 글이 없습니다. 다른 분류를 선택하거나 첫 글을 남겨 보세요.',
+              body: _hasMore
+                  ? '조회한 구간에는 해당 분류의 글이 없습니다. 더 보기로 이전 글을 확인하세요.'
+                  : '이 조건에 맞는 글이 없습니다. 다른 분류를 선택해 보세요.',
             )
           else
             ..._posts.map((post) => _PostTile(post: post)),
@@ -328,7 +330,7 @@ class _BoardWriteDialogState extends State<_BoardWriteDialog> {
   final BoardRepository _repository = BoardRepository();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
-  String _category = 'free';
+  String _category = '자유';
   bool _submitting = false;
   String? _error;
 
@@ -352,7 +354,7 @@ class _BoardWriteDialogState extends State<_BoardWriteDialog> {
       );
       if (mounted) Navigator.of(context).pop(id);
     } on BoardException catch (error) {
-      setState(() => _error = error.message);
+      if (mounted) setState(() => _error = error.message);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -376,12 +378,15 @@ class _BoardWriteDialogState extends State<_BoardWriteDialog> {
             DropdownButtonFormField<String>(
               initialValue: _category,
               decoration: const InputDecoration(labelText: '카테고리'),
-              items: const [
-                DropdownMenuItem(value: 'free', child: Text('자유')),
-                DropdownMenuItem(value: 'strategy', child: Text('공략')),
-                DropdownMenuItem(value: 'question', child: Text('질문')),
-              ],
-              onChanged: (value) => setState(() => _category = value ?? 'free'),
+              items: BoardCategories.writable
+                  .map(
+                    (category) => DropdownMenuItem(
+                      value: category.key,
+                      child: Text(category.value),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _category = value ?? '자유'),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -394,7 +399,7 @@ class _BoardWriteDialogState extends State<_BoardWriteDialog> {
               controller: _contentController,
               decoration: const InputDecoration(
                 labelText: '본문',
-                helperText: '사진 첨부는 앱에서 지원하지 않습니다.',
+                helperText: '사진·모집 정보 첨부와 일부 웹 분류 작성은 아직 지원하지 않습니다.',
               ),
               minLines: 5,
               maxLines: 8,

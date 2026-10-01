@@ -3,16 +3,8 @@ import 'package:bgms_mobile_app/features/stats/player_stats_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// 요약 캐시가 비어 있는 서버 상태를 재현하는 Fake.
-///
-/// 실제 서버 `matches-summary`는 캐시만 읽고 분석을 트리거하지 않아
-/// 미분석 매치가 전부 missingMatchIds로 빠진다.
 class _EmptySummaryClient extends Fake implements BgmsApiClient {
-  _EmptySummaryClient({this.failingMatchIds = const {}});
-
-  /// 상세 조회가 실패하는 매치. 개별 실패가 전체를 막지 않는지 확인한다.
-  final Set<String> failingMatchIds;
-
-  final List<String> detailRequests = [];
+  var summaryRequests = 0;
 
   @override
   Future<Map<String, dynamic>> fetchPlayer({
@@ -39,37 +31,13 @@ class _EmptySummaryClient extends Fake implements BgmsApiClient {
     required String nickname,
     required String platform,
   }) async {
+    summaryRequests++;
     return {'summaries': {}, 'missingMatchIds': matchIds};
-  }
-
-  @override
-  Future<Map<String, dynamic>> fetchMatchDetail({
-    required String matchId,
-    required String nickname,
-    required String platform,
-  }) async {
-    detailRequests.add(matchId);
-    if (failingMatchIds.contains(matchId)) {
-      throw Exception('분석 실패');
-    }
-    return {
-      'matchId': matchId,
-      'mapName': '태이고',
-      'gameMode': 'squad',
-      'createdAt': '2026-07-31T15:06:35.092Z',
-      'stats': {
-        'kills': 2,
-        'damageDealt': 244.5,
-        'winPlace': 7,
-        'headshotKills': 1,
-        'timeSurvived': 1024,
-      },
-    };
   }
 }
 
 void main() {
-  test('요약이 비면 상세 API로 앞쪽 매치를 채운다', () async {
+  test('요약이 비면 상세 API를 호출하지 않고 경기 정보 없음 카드로 남긴다', () async {
     final client = _EmptySummaryClient();
     final repository = PlayerStatsRepository(client: client);
 
@@ -78,41 +46,27 @@ void main() {
       platform: 'steam',
     );
 
-    // 상한만큼만 상세를 호출한다.
-    expect(
-      client.detailRequests.length,
-      PlayerStatsRepository.maxDetailBackfill,
-    );
-    expect(client.detailRequests, ['m1', 'm2', 'm3', 'm4']);
-
-    final filled = bundle.matches.take(4).toList();
-    for (final match in filled) {
-      expect(match.isFallback, isFalse);
-      expect(match.mapName, '태이고');
-      expect(match.gameMode, 'squad');
-      expect(match.kills, 2);
-      expect(match.damage, 244.5);
-      expect(match.rank, 7);
-    }
-
-    // 상한을 넘은 매치는 fallback으로 남는다.
-    expect(bundle.matches[4].isFallback, isTrue);
-    expect(bundle.matches[4].mapName, '분석 대기');
+    expect(bundle.matches, hasLength(6));
+    expect(bundle.matches.every((match) => match.isFallback), isTrue);
+    expect(bundle.matches.first.kills, isNull);
+    expect(bundle.matches.first.damage, isNull);
+    expect(bundle.matches.first.createdAt, isNull);
     expect(bundle.summaryFallback, isTrue);
+    expect(client.summaryRequests, 1);
   });
 
-  test('개별 상세 조회 실패는 해당 매치만 fallback으로 남긴다', () async {
-    final client = _EmptySummaryClient(failingMatchIds: {'m2'});
+  test('알림용 조회는 요약 API 자체를 생략할 수 있다', () async {
+    final client = _EmptySummaryClient();
     final repository = PlayerStatsRepository(client: client);
 
     final bundle = await repository.fetchPlayerStats(
       nickname: 'KangHeeSung_',
       platform: 'steam',
+      includeSummaries: false,
     );
 
-    expect(bundle.matches[0].isFallback, isFalse);
-    expect(bundle.matches[1].isFallback, isTrue);
-    expect(bundle.matches[2].isFallback, isFalse);
-    expect(bundle.matches[3].isFallback, isFalse);
+    expect(bundle.matches, isEmpty);
+    expect(bundle.summaryFallback, isFalse);
+    expect(client.summaryRequests, 0);
   });
 }

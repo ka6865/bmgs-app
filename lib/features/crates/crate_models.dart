@@ -36,6 +36,8 @@ enum CrateRarity {
       this == CrateRarity.ultimate || this == CrateRarity.legendary;
 }
 
+enum CrateDropType { base, prime, bonus }
+
 /// 상자에서 나올 수 있는 아이템 하나.
 class CrateItem {
   const CrateItem({
@@ -46,6 +48,7 @@ class CrateItem {
     required this.imageUrl,
     this.isPrimeParcel = false,
     this.tokenCount = 0,
+    this.dropType = CrateDropType.base,
   });
 
   final String id;
@@ -56,13 +59,21 @@ class CrateItem {
   final double probability;
   final String? imageUrl;
 
-  /// 프라임 소포(별도 추첨 그룹) 아이템 여부.
+  /// 당첨 후 별도로 개봉하는 프라임 소포 자체인지.
   final bool isPrimeParcel;
+  final CrateDropType dropType;
 
   /// 중복 획득 시 지급되는 토큰 수.
   final int tokenCount;
 
   static CrateItem? tryParse(Map<String, dynamic> json) {
+    final dropType = switch (json['drop_type']) {
+      'base' => CrateDropType.base,
+      'prime' => CrateDropType.prime,
+      'bonus' => CrateDropType.bonus,
+      _ => null,
+    };
+    if (dropType == null) return null;
     final asset = json['crate_item_assets'];
     if (asset is! Map) return null;
 
@@ -70,7 +81,9 @@ class CrateItem {
     if (name.isEmpty) return null;
 
     final probability = _toDouble(json['probability']);
-    if (probability <= 0) return null;
+    if (!probability.isFinite || probability <= 0 || probability > 1) {
+      return null;
+    }
 
     return CrateItem(
       id: (json['id'] ?? asset['id'] ?? name).toString(),
@@ -82,6 +95,7 @@ class CrateItem {
           : asset['image_url'] as String,
       isPrimeParcel: json['is_prime_parcel'] == true,
       tokenCount: _toInt(json['token_count']),
+      dropType: dropType,
     );
   }
 }
@@ -110,9 +124,18 @@ class CrateTemplate {
   /// 10연차 묶음 가격(G코인).
   final int? bundlePriceGcoin;
 
-  /// 프라임 소포를 제외한 기본 추첨 대상.
-  List<CrateItem> get baseItems =>
-      items.where((item) => !item.isPrimeParcel).toList(growable: false);
+  /// 기본 당첨 그룹. 프라임 소포 자체도 기본 풀에 포함한다.
+  List<CrateItem> get baseItems => items
+      .where((item) => item.dropType == CrateDropType.base)
+      .toList(growable: false);
+
+  List<CrateItem> get primeItems => items
+      .where((item) => item.dropType == CrateDropType.prime)
+      .toList(growable: false);
+
+  List<CrateItem> get bonusItems => items
+      .where((item) => item.dropType == CrateDropType.bonus)
+      .toList(growable: false);
 
   static CrateTemplate? tryParse(Map<String, dynamic> json) {
     final name = (json['name'] ?? '').toString().trim();

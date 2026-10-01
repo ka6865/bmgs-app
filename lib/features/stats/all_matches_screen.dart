@@ -64,7 +64,7 @@ class _AllMatchesScreenState extends State<AllMatchesScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
-                '일부 매치는 서버 분석이 끝나지 않아 요약만 표시합니다.',
+                '일부 매치의 서버 기록을 찾지 못했습니다. 자동 분석이 진행 중인 상태는 아닙니다.',
                 style: Theme.of(
                   context,
                 ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
@@ -168,7 +168,7 @@ class _EmptyMatches extends StatelessWidget {
             Text(
               hasAnyMatch
                   ? '이 모드의 매치가 없습니다.\n다른 모드를 선택해 보세요.'
-                  : '최근 매치가 없거나 아직 서버에 분석된 매치가 없습니다.',
+                  : '최근 매치가 없거나 서버에 저장된 경기 기록이 없습니다.',
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,

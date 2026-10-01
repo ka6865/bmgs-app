@@ -317,6 +317,12 @@ class _HomeScreenState extends State<HomeScreen> {
             HomeLiveBanner(onTap: () => context.go('/maps')),
             const SizedBox(height: 16),
             CrateSimBanner(onTap: () => context.push('/crates')),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/tools'),
+              icon: const Icon(Icons.apps),
+              label: const Text('BGMS 도구 보기'),
+            ),
             if (_loadingStore || remainingRecent.isNotEmpty) ...[
               const SizedBox(height: 20),
               RecentActivitySection(

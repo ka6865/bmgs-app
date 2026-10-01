@@ -1,0 +1,75 @@
+{
+  "entries": [
+    {
+      "rank": 1,
+      "nickname": "YouYaDeQianGeGe",
+      "playerId": "youyadeqiangege",
+      "platform": "steam",
+      "value": 3043,
+      "secondary": 30,
+      "label": "S",
+      "gameMode": "스쿼드",
+      "mapName": "태이고",
+      "tier": "S",
+      "createdAt": "2026-07-24T19:45:09.853893+00:00"
+    },
+    {
+      "rank": 2,
+      "nickname": "TGLTN",
+      "playerId": "tgltn",
+      "platform": "steam",
+      "value": 2360,
+      "secondary": 15,
+      "label": "A",
+      "gameMode": "스쿼드",
+      "mapName": "에란겔",
+      "tier": "A",
+      "createdAt": "2026-07-25T16:58:13.876386+00:00"
+    },
+    {
+      "rank": 3,
+      "nickname": "KairoNexus",
+      "playerId": "kaironexus",
+      "platform": "steam",
+      "value": 2206,
+      "secondary": 10,
+      "label": "A",
+      "gameMode": "스쿼드",
+      "mapName": "론도",
+      "tier": "A",
+      "createdAt": "2026-07-25T19:18:04.46139+00:00"
+    },
+    {
+      "rank": 4,
+      "nickname": "You_-die",
+      "playerId": "you_-die",
+      "platform": "steam",
+      "value": 2069,
+      "secondary": 27,
+      "label": "A",
+      "gameMode": "스쿼드",
+      "mapName": "사녹",
+      "tier": "A",
+      "createdAt": "2026-07-28T12:39:18.577714+00:00"
+    },
+    {
+      "rank": 5,
+      "nickname": "sldjdjak",
+      "playerId": "sldjdjak",
+      "platform": "steam",
+      "value": 2005,
+      "secondary": 17,
+      "label": "A+",
+      "gameMode": "스쿼드",
+      "mapName": "태이고",
+      "tier": "A+",
+      "createdAt": "2026-07-29T09:42:30.143025+00:00"
+    }
+  ],
+  "query": {
+    "tab": "damage",
+    "mode": "all",
+    "perspective": "all",
+    "matchType": "all"
+  }
+}

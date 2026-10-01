@@ -21,7 +21,8 @@ class MapsScreen extends StatefulWidget {
 class _MapsScreenState extends State<MapsScreen> {
   late final MapsRepository _repository;
   late BgmsMap _selectedMap;
-  final Set<String> _layers = {'Garage', 'SecretRoom', 'HotDrop'};
+  // 기본 선택 레이어. HotDrop은 마커 API가 내려주지 않으므로 제외한다.
+  final Set<String> _layers = {'Garage', 'SecretRoom'};
   late Future<MapMarkerLayer> _markerFuture;
   Map<String, List<String>> _adminSettings = {};
 
@@ -34,7 +35,7 @@ class _MapsScreenState extends State<MapsScreen> {
   }
 
   Future<MapMarkerLayer> _loadMarkers() {
-    _repository.fetchMapSettingsFromSupabase().then((settings) {
+    _repository.fetchMapCategorySettings().then((settings) {
       if (mounted) {
         setState(() {
           _adminSettings = settings;
@@ -51,23 +52,41 @@ class _MapsScreenState extends State<MapsScreen> {
       if (mounted) {
         setState(() {
           if (layer.markers.isNotEmpty) {
+            // 웹과 동일한 카테고리만 켠다.
+            // 마커 API는 허용 목록 밖의 레이어도 함께 주기 때문에,
+            // 전부 켜면 칩이 숨겨진 레이어가 지도에 그대로 그려진다.
             final available = layer.markers.map((m) => m.layer).toSet();
+            final allowed = _repository
+                .filterActiveLayers(
+                  _selectedMap.id,
+                  available.toList(),
+                  _adminSettings,
+                )
+                .toSet();
             _layers.clear();
-            _layers.addAll(available);
+            _layers.addAll(allowed.isEmpty ? available : allowed);
           } else {
             _layers.clear();
-            _layers.addAll(const [
-              'Garage',
-              'SecretRoom',
-              'Esports',
-              'HotDrop',
-            ]);
+            _layers.addAll(const ['Garage', 'SecretRoom', 'Esports']);
           }
         });
       }
     });
 
     return future;
+  }
+
+  /// 당겨서 새로고침. 새 future를 직접 기다려 인디케이터 시점을 맞춘다.
+  Future<void> _refresh() async {
+    final future = _loadMarkers();
+    setState(() {
+      _markerFuture = future;
+    });
+    try {
+      await future;
+    } catch (_) {
+      // 실패는 FutureBuilder가 fallback 레이어로 표시한다.
+    }
   }
 
   void _toggleCategoryLabel(String labelName, List<String> availableLayers) {
@@ -104,7 +123,7 @@ class _MapsScreenState extends State<MapsScreen> {
 
         final layersToShow = availableLayers.isNotEmpty
             ? availableLayers
-            : const ['Garage', 'SecretRoom', 'Esports', 'HotDrop'];
+            : const ['Garage', 'SecretRoom', 'Esports'];
 
         final allowedLayers = _repository.filterActiveLayers(
           _selectedMap.id,
@@ -117,59 +136,66 @@ class _MapsScreenState extends State<MapsScreen> {
             allowedLayers.map((l) => getCategoryLabel(l)).toSet().toList()
               ..sort();
 
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const BgmsBrandHeader(
-              title: '지도',
-              subtitle: '맵별 차량, 비밀방, 글라이더, 보트 등 전술 마커 분포를 확인합니다.',
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedMap.id,
-              decoration: const InputDecoration(labelText: '맵 선택'),
-              items: _repository.availableMaps
-                  .map(
-                    (map) =>
-                        DropdownMenuItem(value: map.id, child: Text(map.name)),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() {
-                  _selectedMap = _repository.resolveMap(value);
-                  _markerFuture = _loadMarkers();
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: uniqueKoreanLabels.map((koreanLabel) {
-                final relatedLayers = allowedLayers
-                    .where((l) => getCategoryLabel(l) == koreanLabel)
-                    .toList();
-                final isSelected = relatedLayers.any(
-                  (l) => _layers.contains(l),
-                );
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              const ScreenHeader(title: '전술 지도'),
+              const SizedBox(height: BgmsSpacing.lg),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final map in _repository.availableMaps)
+                      Padding(
+                        padding: const EdgeInsets.only(right: BgmsSpacing.sm),
+                        child: ChoiceChip(
+                          label: Text(map.name),
+                          selected: map.id == _selectedMap.id,
+                          showCheckmark: false,
+                          onSelected: (selected) {
+                            if (!selected || map.id == _selectedMap.id) return;
+                            setState(() {
+                              _selectedMap = _repository.resolveMap(map.id);
+                              _markerFuture = _loadMarkers();
+                            });
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: BgmsSpacing.lg),
+              Wrap(
+                spacing: BgmsSpacing.sm,
+                runSpacing: BgmsSpacing.sm,
+                children: uniqueKoreanLabels.map((koreanLabel) {
+                  final relatedLayers = allowedLayers
+                      .where((l) => getCategoryLabel(l) == koreanLabel)
+                      .toList();
+                  final isSelected = relatedLayers.any(
+                    (l) => _layers.contains(l),
+                  );
 
-                return FilterChip(
-                  label: Text(koreanLabel),
-                  selected: isSelected,
-                  onSelected: (_) =>
-                      _toggleCategoryLabel(koreanLabel, allowedLayers),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            _MapPanel(
-              map: _selectedMap,
-              layer: layer,
-              activeLayers: _layers,
-              loading: loading,
-            ),
-          ],
+                  return FilterChip(
+                    label: Text(koreanLabel),
+                    selected: isSelected,
+                    showCheckmark: false,
+                    onSelected: (_) =>
+                        _toggleCategoryLabel(koreanLabel, allowedLayers),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: BgmsSpacing.lg),
+              _MapPanel(
+                map: _selectedMap,
+                layer: layer,
+                activeLayers: _layers,
+                loading: loading,
+              ),
+            ],
+          ),
         );
       },
     );
@@ -223,9 +249,9 @@ class _MapPanelState extends State<_MapPanel> {
   void _showMarkerDetails(BuildContext context, MapMarker marker) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF161b26),
+      backgroundColor: BgmsColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
       builder: (context) {
         final label = getCategoryLabel(marker.layer);
@@ -233,7 +259,7 @@ class _MapPanelState extends State<_MapPanel> {
 
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(BgmsSpacing.xl),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -243,12 +269,12 @@ class _MapPanelState extends State<_MapPanel> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: BgmsSpacing.sm,
+                        vertical: BgmsSpacing.xs,
                       ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: color, width: 0.5),
                       ),
                       child: Text(
@@ -261,35 +287,35 @@ class _MapPanelState extends State<_MapPanel> {
                       ),
                     ),
                     IconButton(
+                      tooltip: '닫기',
                       icon: const Icon(
                         Icons.close,
-                        color: Colors.white70,
+                        color: BgmsColors.textSecondary,
                         size: 20,
                       ),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: BgmsSpacing.md),
                 Text(
                   marker.label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: BgmsSpacing.sm),
                 Text(
                   '위치 좌표: (X: ${(marker.x * 100).toStringAsFixed(1)}%, Y: ${(marker.y * 100).toStringAsFixed(1)}%)',
-                  style: const TextStyle(color: Colors.white54, fontSize: 13),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: BgmsColors.textMuted),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: BgmsSpacing.md),
                 Text(
                   '${marker.label}은(는) ${getCategoryLabel(marker.layer)} 분류 지점입니다. 게임 플레이 전술 수립 시 참고하십시오.',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: BgmsColors.textSecondary,
                     height: 1.4,
                   ),
                 ),
@@ -450,12 +476,17 @@ class MapTileMosaic extends StatelessWidget {
   static const int _zoom = 2;
   static const int _tileCount = 4;
 
+  /// 타일 디코딩 폭 상한.
+  ///
+  /// 4x4 격자를 화면 폭에 맞춰 그리므로 원본 해상도가 필요하지 않다.
+  /// 폭을 제한하면 16장 합계 메모리와 디코딩 시간이 함께 줄어든다.
+  static const int _tileCacheWidth = 512;
+
   final BgmsMap map;
 
   @override
   Widget build(BuildContext context) {
-    final baseUrl = AppConfig.local.apiBaseUrl.replaceFirst(RegExp(r'/$'), '');
-
+    final config = AppConfig.local;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -469,14 +500,26 @@ class MapTileMosaic extends StatelessWidget {
           itemBuilder: (context, index) {
             final x = index % _tileCount;
             final row = index ~/ _tileCount;
-            final y = -(_tileCount - row);
-            final url = '$baseUrl/tiles/${map.tilePath}/$_zoom/$x/$y.jpg';
+            final url = config.mapTileUrl(
+              mapId: map.tilePath,
+              zoom: _zoom,
+              column: x,
+              row: row,
+            );
 
             return Image.network(
               url,
               fit: BoxFit.cover,
               gaplessPlayback: true,
               filterQuality: FilterQuality.medium,
+              // 타일 원본이 화면 표시 크기보다 크므로 디코딩 폭을 제한해
+              // 메모리와 디코딩 비용을 줄인다.
+              cacheWidth: _tileCacheWidth,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                // 로딩 중 빈 화면 대신 배경을 채워 깜빡임을 줄인다.
+                return const ColoredBox(color: BgmsColors.surface);
+              },
               errorBuilder: (context, error, stackTrace) {
                 return DecoratedBox(
                   decoration: BoxDecoration(
@@ -501,7 +544,7 @@ class MapTileMosaic extends StatelessWidget {
             ),
             child: const Text(
               'tile z2',
-              style: TextStyle(fontSize: 11, color: Colors.white70),
+              style: TextStyle(fontSize: 11, color: BgmsColors.textSecondary),
             ),
           ),
         ),

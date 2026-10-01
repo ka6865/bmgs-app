@@ -7,6 +7,9 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// 릴리스 서명 키는 저장소에 커밋하지 않는다.
+// android/key.properties 파일이 있으면 릴리스 서명에 사용하고,
+// 없으면 (로컬 개발 편의를 위해) debug 키로 서명한다.
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
 val hasReleaseKeystore = keystorePropertiesFile.exists()
@@ -16,17 +19,20 @@ if (hasReleaseKeystore) {
 }
 
 android {
-    namespace = "kr.bgms.bgms_mobile_app"
+    namespace = "kr.bgms.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications가 java.time API를 쓰므로 필요하다.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
-        applicationId = "kr.bgms.bgms_mobile_app"
+        // 웹 Capacitor 설정(capacitor.config.ts)과 동일한 appId를 사용한다.
+        applicationId = "kr.bgms.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -51,6 +57,12 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
@@ -59,6 +71,10 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 flutter {

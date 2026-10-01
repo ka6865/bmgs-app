@@ -210,4 +210,16 @@ void main() {
       expect(profile.modeStats['normal']?['squad']?.roundsPlayed, 5);
     },
   );
+
+  group('seasonLabel', () {
+    test('시즌 ID의 마지막 번호를 사람이 읽는 라벨로 바꾼다', () {
+      expect(seasonLabel('division.bro.official.pc-2018-42'), '시즌 42');
+      expect(seasonLabel('division.bro.official.pc-2026-01'), '시즌 1');
+    });
+
+    test('번호를 해석할 수 없으면 원본과 기본값을 유지한다', () {
+      expect(seasonLabel('lifetime'), 'lifetime');
+      expect(seasonLabel('   '), '기본 시즌');
+    });
+  });
 }

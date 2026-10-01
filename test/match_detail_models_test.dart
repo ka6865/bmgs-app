@@ -32,6 +32,38 @@ void main() {
     expect(detail.teamKills, 12);
     expect(detail.survivalText, '25:40');
     expect(detail.isFallback, isFalse);
+    expect(detail.hasTacticalAnalysis, isFalse);
+  });
+
+  test('기본 전적 전용 응답은 분석 불가 상태와 원인을 보존한다', () {
+    final detail = MatchDetail.fromJson('basic-match', {
+      'analysisAvailability': 'basic_only',
+      'analysisUnavailableReason': 'calculation_upgrade_required',
+      'stats': {'kills': 4, 'damageDealt': 350, 'winPlace': 2},
+      'benchmark': {'score': 90},
+    });
+
+    expect(detail.analysisAvailability, 'basic_only');
+    expect(detail.analysisUnavailableReason, 'calculation_upgrade_required');
+    expect(detail.isFallback, isFalse);
+    expect(detail.kills, 4);
+    expect(detail.damage, 350);
+    expect(detail.rank, 2);
+    expect(detail.hasTacticalAnalysis, isFalse);
+    expect(detail.hasAnalysisField('benchmark'), isFalse);
+  });
+
+  test('상태가 없는 과거 응답은 실제 분석 블록만 사용한다', () {
+    final detail = MatchDetail.fromJson('legacy-match', {
+      'benchmark': {'score': 0},
+      'tradeStats': {},
+    });
+
+    expect(detail.analysisAvailability, isNull);
+    expect(detail.hasTacticalAnalysis, isTrue);
+    expect(detail.hasAnalysisField('benchmark'), isTrue);
+    expect(detail.hasAnalysisField('tradeStats'), isFalse);
+    expect(detail.hasAnalysisField('isolationData'), isFalse);
   });
 
   test('MatchDetail creates fallback from summary', () {

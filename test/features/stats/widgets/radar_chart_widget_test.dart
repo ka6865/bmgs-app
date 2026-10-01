@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bgms_mobile_app/features/stats/widgets/radar_chart_widget.dart';
 
 void main() {
-  testWidgets('RadarChartWidget renders and draws canvas', (WidgetTester tester) async {
+  testWidgets('RadarChartWidget renders and draws canvas', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(

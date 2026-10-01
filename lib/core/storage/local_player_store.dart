@@ -84,6 +84,11 @@ class LocalPlayerStore {
     await _prefs.remove(_favoriteKey);
   }
 
+  /// 최근 검색 목록을 주어진 순서로 덮어쓴다. 전체 삭제 되돌리기에 쓴다.
+  Future<void> restoreRecentPlayers(List<StoredPlayer> players) async {
+    await _writePlayers(_recentKey, players.take(10).toList());
+  }
+
   List<StoredPlayer> _readPlayers(String key) {
     final raw = _prefs.getStringList(key) ?? <String>[];
     return raw

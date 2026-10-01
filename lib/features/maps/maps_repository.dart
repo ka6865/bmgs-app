@@ -1,7 +1,7 @@
-import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/network/bgms_api_client.dart';
 import 'map_models.dart';
 
@@ -11,43 +11,56 @@ class MapsRepository {
 
   final BgmsApiClient _client;
 
+  /// 맵별로 노출할 마커 카테고리의 오프라인 폴백값.
+  ///
+  /// 정본은 서버 `/api/maps/settings`이고 [fetchMapCategorySettings]가 우선 사용한다.
+  /// 이 값은 서버 조회가 실패했을 때만 쓰이며, 없으면 마커 API가 준
+  /// 모든 레이어가 그대로 노출되어 웹과 화면이 달라진다.
+  static const defaultMapCategories = <String, List<String>>{
+    'Erangel': [
+      'Garage',
+      'Esports',
+      'EsportsBoat',
+      'Glider',
+      'SecretRoom',
+      'GasPump',
+    ],
+    'Miramar': [
+      'GoldenMirado',
+      'EsportsMirado',
+      'EsportsPickup',
+      'EsportsBoat',
+      'Glider',
+      'SecretRoom',
+    ],
+    'Taego': [
+      'Garage',
+      'Porter',
+      'Boat',
+      'SecretRoom',
+      'Esports',
+      'Glider',
+      'GasPump',
+    ],
+    'Deston': ['Garage', 'PoliceCar', 'Boat', 'Glider'],
+    'Vikendi': [
+      'Garage',
+      'Snowmobile',
+      'Esports',
+      'Boat',
+      'SecretRoom',
+      'BearCave',
+    ],
+    'Rondo': ['Garage', 'Esports', 'Glider', 'GasPump', 'SecretRoom'],
+  };
+
   List<BgmsMap> get availableMaps => const [
-    BgmsMap(
-      id: 'Erangel',
-      name: '에란겔',
-      assetPath: 'assets/maps/Erangel_HeightMap.jpg',
-      tilePath: 'Erangel',
-    ),
-    BgmsMap(
-      id: 'Miramar',
-      name: '미라마',
-      assetPath: 'assets/maps/Miramar_HeightMap.jpg',
-      tilePath: 'Miramar',
-    ),
-    BgmsMap(
-      id: 'Taego',
-      name: '태이고',
-      assetPath: 'assets/maps/Taego_HeightMap.jpg',
-      tilePath: 'Taego',
-    ),
-    BgmsMap(
-      id: 'Rondo',
-      name: '론도',
-      assetPath: 'assets/maps/Rondo_HeightMap.jpg',
-      tilePath: 'Rondo',
-    ),
-    BgmsMap(
-      id: 'Vikendi',
-      name: '비켄디',
-      assetPath: 'assets/maps/Vikendi_HeightMap.jpg',
-      tilePath: 'Vikendi',
-    ),
-    BgmsMap(
-      id: 'Deston',
-      name: '데스턴',
-      assetPath: 'assets/maps/Deston_HeightMap.jpg',
-      tilePath: 'Deston',
-    ),
+    BgmsMap(id: 'Erangel', name: '에란겔', tilePath: 'Erangel'),
+    BgmsMap(id: 'Miramar', name: '미라마', tilePath: 'Miramar'),
+    BgmsMap(id: 'Taego', name: '태이고', tilePath: 'Taego'),
+    BgmsMap(id: 'Rondo', name: '론도', tilePath: 'Rondo'),
+    BgmsMap(id: 'Vikendi', name: '비켄디', tilePath: 'Vikendi'),
+    BgmsMap(id: 'Deston', name: '데스턴', tilePath: 'Deston'),
   ];
 
   BgmsMap resolveMap(String? mapId) {
@@ -78,18 +91,13 @@ class MapsRepository {
     try {
       final json = await _client.fetchMapMarkers(mapId: mapId, layers: layers);
       return MapMarkerLayer.fromJson(json, mapId: mapId);
-    } on DioException catch (error) {
-      final status = error.response?.statusCode;
-      return MapMarkerLayer.unavailable(
-        mapId: mapId,
-        message: status == 404
-            ? '이 맵의 마커 데이터를 준비하고 있습니다.'
-            : '지도 마커를 일시적으로 불러오지 못했습니다. ${_dioMessage(error)}',
-      );
     } catch (error) {
+      final apiError = ApiException.from(error);
       return MapMarkerLayer.unavailable(
         mapId: mapId,
-        message: '지도 마커를 표시하지 못했습니다. $error',
+        message: apiError.isMissingEndpoint
+            ? '이 맵의 마커 데이터를 준비하고 있습니다.'
+            : '지도 마커를 불러오지 못했습니다. ${apiError.message}',
       );
     }
   }
@@ -102,7 +110,18 @@ class MapsRepository {
     }
   }
 
-  Future<Map<String, List<String>>> fetchMapSettingsFromSupabase() async {
+  /// 맵별 마커 카테고리를 가져온다.
+  ///
+  /// 서버 `/api/maps/settings`가 웹과 동일한 정본을 내려주므로 이를 우선 쓴다.
+  /// 실패하면 Supabase 테이블을 시도하고, 그것도 없으면 내장 기본값을 쓴다.
+  Future<Map<String, List<String>>> fetchMapCategorySettings() async {
+    try {
+      final categories = await _client.fetchMapCategories();
+      if (categories.isNotEmpty) return categories;
+    } catch (_) {
+      // 서버 조회 실패는 아래 경로로 넘긴다.
+    }
+
     try {
       final response = await Supabase.instance.client
           .from('map_settings')
@@ -126,17 +145,16 @@ class MapsRepository {
     List<String> availableLayers,
     Map<String, List<String>> settings,
   ) {
-    if (settings.isEmpty) {
-      return availableLayers;
-    }
-    final matchedKey = settings.keys.firstWhere(
+    // 서버 설정이 없으면 웹과 동일한 기본 카테고리를 쓴다.
+    final effective = settings.isEmpty ? defaultMapCategories : settings;
+    final matchedKey = effective.keys.firstWhere(
       (k) => k.toLowerCase() == mapId.toLowerCase(),
       orElse: () => '',
     );
     if (matchedKey.isEmpty) {
       return availableLayers;
     }
-    final allowed = settings[matchedKey];
+    final allowed = effective[matchedKey];
     if (allowed == null) {
       return availableLayers;
     }
@@ -144,15 +162,5 @@ class MapsRepository {
     return availableLayers
         .where((l) => allowedSet.contains(l.toLowerCase()))
         .toList();
-  }
-
-  String _dioMessage(DioException error) {
-    final data = error.response?.data;
-    if (data is Map && data['error'] != null) return data['error'].toString();
-    return [
-      if (error.response?.statusCode != null)
-        'HTTP ${error.response!.statusCode}',
-      if (error.message != null) error.message!,
-    ].join(' · ');
   }
 }

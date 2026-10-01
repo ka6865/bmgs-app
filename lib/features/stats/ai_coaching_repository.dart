@@ -1,7 +1,7 @@
-import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/network/bgms_api_client.dart';
 import 'ai_coaching_models.dart';
 import 'player_stats_models.dart';
@@ -32,35 +32,23 @@ class AiCoachingRepository {
         platform: profile.platform,
         accessToken: _accessTokenOrNull(),
       );
-      final summary = AiCoachingSummary.fromNdjson(body);
-      if (summary.status == AiCoachingStatus.available) {
-        return summary;
-      }
-      return summary;
-    } on DioException catch (error) {
-      final status = error.response?.statusCode;
-      if (status == 401 || status == 403) {
+      return AiCoachingSummary.fromNdjson(body);
+    } catch (error) {
+      final apiError = ApiException.from(error);
+      // 402는 결제/쿼터 초과라서 dio 기본 분류에서 unknown으로 떨어진다.
+      final isCostLimit =
+          apiError.kind == ApiErrorKind.rateLimited ||
+          apiError.statusCode == 402;
+      if (apiError.kind == ApiErrorKind.unauthorized) {
         return AiCoachingSummary.loginRequired();
       }
-      if (status == 402 || status == 429) {
+      if (isCostLimit) {
         return AiCoachingSummary.costRestricted();
       }
       return AiCoachingSummary.unavailable(
-        'AI 요약 API 실패: ${_dioMessage(error)}',
+        'AI 요약을 불러오지 못했습니다. ${apiError.message}',
       );
-    } catch (error) {
-      return AiCoachingSummary.unavailable('AI 요약 응답 파싱 실패: $error');
     }
-  }
-
-  String _dioMessage(DioException error) {
-    final data = error.response?.data;
-    if (data is Map && data['error'] != null) return data['error'].toString();
-    return [
-      if (error.response?.statusCode != null)
-        'HTTP ${error.response!.statusCode}',
-      if (error.message != null) error.message!,
-    ].join(' · ');
   }
 
   String? _accessTokenOrNull() {

@@ -1,0 +1,6 @@
+# 릴리스 서명 설정 예시.
+# 실제 값을 채운 뒤 android/key.properties 로 복사한다. (key.properties는 커밋 금지)
+storePassword=<키스토어 비밀번호>
+keyPassword=<키 비밀번호>
+keyAlias=<키 별칭>
+storeFile=<키스토어 절대 경로 또는 android/ 기준 상대 경로, 예: upload-keystore.jks>

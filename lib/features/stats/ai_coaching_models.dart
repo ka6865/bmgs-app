@@ -153,33 +153,43 @@ class AiCoachingSummary {
     }
 
     final decodedBody = _tryDecode(cleanBody);
-    if (decodedBody is Map<String, dynamic>) {
-      return fromJson(decodedBody);
-    }
-    if (decodedBody is Map) {
+    if (decodedBody is Map && decodedBody['type'] == null) {
       return fromJson(Map<String, dynamic>.from(decodedBody));
     }
 
-    String finalText = '';
+    Object? finalData;
     Map<String, dynamic>? visuals;
+    var hasStreamRecords = false;
     for (final line in const LineSplitter().convert(body)) {
       final decoded = _tryDecode(line);
-      if (decoded is Map && decoded['type'] == 'visuals') {
+      if (decoded is! Map || decoded['type'] is! String) continue;
+      hasStreamRecords = true;
+      if (decoded['type'] == 'error' ||
+          (decoded['type'] == 'done' && decoded['valid'] == false)) {
+        return unavailable(
+          decoded['error']?.toString() ?? 'AI 요약 생성이 완료되지 않았습니다.',
+        );
+      }
+      if (decoded['type'] == 'visuals') {
         final data = decoded['data'];
         if (data is Map) visuals = Map<String, dynamic>.from(data);
       }
-      if (decoded is Map && decoded['type'] == 'final') {
-        final data = decoded['data'];
-        if (data is Map) {
-          final json = Map<String, dynamic>.from(data);
-          if (visuals != null) json['visuals'] ??= visuals;
-          return fromJson(json);
-        }
-        finalText = data?.toString() ?? '';
+      if (decoded['type'] == 'final') {
+        finalData = decoded['data'];
       }
     }
 
+    if (finalData is Map) {
+      final json = Map<String, dynamic>.from(finalData);
+      if (visuals != null) json['visuals'] ??= visuals;
+      return fromJson(json);
+    }
+
+    final finalText = finalData?.toString() ?? '';
     if (finalText.trim().isEmpty) {
+      if (hasStreamRecords) {
+        return unavailable('AI 요약의 최종 결과가 없습니다.');
+      }
       return AiCoachingSummary(
         status: AiCoachingStatus.available,
         title: 'AI 코칭 요약',

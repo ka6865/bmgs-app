@@ -40,7 +40,7 @@ class _AllMatchesScreenState extends State<AllMatchesScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('전체 매치'),
+            const Text('최근 경기 목록'),
             Text(
               widget.profile.nickname,
               style: Theme.of(
@@ -52,6 +52,12 @@ class _AllMatchesScreenState extends State<AllMatchesScreen> {
       ),
       body: Column(
         children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Text(
+              '모든 큐의 최근 최대 20경기입니다. 필터는 이 목록 안에만 적용되며 DB 전체 이력과 다릅니다.',
+            ),
+          ),
           if (modes.length > 1)
             _ModeFilterBar(
               modes: modes,

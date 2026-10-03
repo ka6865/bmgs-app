@@ -7,6 +7,7 @@ import '../../core/widgets/bgms_brand_header.dart';
 import 'board_models.dart';
 import 'board_categories.dart';
 import 'board_repository.dart';
+import 'board_write_dialog.dart';
 
 class BoardScreen extends StatefulWidget {
   const BoardScreen({super.key});
@@ -100,7 +101,8 @@ class _BoardScreenState extends State<BoardScreen> {
 
     final createdId = await showDialog<int>(
       context: context,
-      builder: (context) => const _BoardWriteDialog(),
+      barrierDismissible: false,
+      builder: (context) => BoardWriteDialog(repository: _repository),
     );
     if (!mounted || createdId == null) return;
     await _load(reset: true);
@@ -314,109 +316,6 @@ class _MetaChip extends StatelessWidget {
         Icon(icon, size: 14, color: Theme.of(context).colorScheme.outline),
         const SizedBox(width: 3),
         Text(text, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-  }
-}
-
-class _BoardWriteDialog extends StatefulWidget {
-  const _BoardWriteDialog();
-
-  @override
-  State<_BoardWriteDialog> createState() => _BoardWriteDialogState();
-}
-
-class _BoardWriteDialogState extends State<_BoardWriteDialog> {
-  final BoardRepository _repository = BoardRepository();
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _contentController = TextEditingController();
-  String _category = '자유';
-  bool _submitting = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _contentController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    setState(() {
-      _submitting = true;
-      _error = null;
-    });
-    try {
-      final id = await _repository.createPost(
-        title: _titleController.text,
-        content: _contentController.text,
-        category: _category,
-      );
-      if (mounted) Navigator.of(context).pop(id);
-    } on BoardException catch (error) {
-      if (mounted) setState(() => _error = error.message);
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('게시글 작성'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_error != null) ...[
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-              const SizedBox(height: 10),
-            ],
-            DropdownButtonFormField<String>(
-              initialValue: _category,
-              decoration: const InputDecoration(labelText: '카테고리'),
-              items: BoardCategories.writable
-                  .map(
-                    (category) => DropdownMenuItem(
-                      value: category.key,
-                      child: Text(category.value),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _category = value ?? '자유'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: '제목'),
-              maxLength: 80,
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _contentController,
-              decoration: const InputDecoration(
-                labelText: '본문',
-                helperText: '사진·모집 정보 첨부와 일부 웹 분류 작성은 아직 지원하지 않습니다.',
-              ),
-              minLines: 5,
-              maxLines: 8,
-              maxLength: 5000,
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('취소'),
-        ),
-        FilledButton(
-          onPressed: _submitting ? null : _submit,
-          child: Text(_submitting ? '저장 중...' : '등록'),
-        ),
       ],
     );
   }

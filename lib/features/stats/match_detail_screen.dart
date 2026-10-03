@@ -68,6 +68,15 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
       future: _detailFuture,
       builder: (context, snapshot) {
         final detail = snapshot.data;
+        final normalizedMap = normalizeBgmsMapId(
+          detail?.mapId ??
+              widget.summary.mapId ??
+              detail?.mapName ??
+              widget.summary.mapName,
+        );
+        final supportedMap = bgmsMapCatalog
+            .where((map) => map.id.toLowerCase() == normalizedMap)
+            .firstOrNull;
         return Scaffold(
           appBar: AppBar(
             backgroundColor: BgmsColors.bgBase,
@@ -97,20 +106,52 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.map_outlined),
+                    label: const Text('이 경기 전술 지도'),
+                    onPressed: supportedMap == null
+                        ? null
+                        : () => context.push(
+                            Uri(
+                              path: '/maps',
+                              queryParameters: {'mapId': supportedMap.id},
+                            ).toString(),
+                          ),
+                  ),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.local_fire_department_outlined),
+                    label: const Text('이 맵 핫드랍'),
+                    onPressed: supportedMap == null
+                        ? null
+                        : () => context.push(
+                            Uri(
+                              path: '/hotdrop',
+                              queryParameters: {'mapId': supportedMap.id},
+                            ).toString(),
+                          ),
+                  ),
+                ],
+              ),
+              if (supportedMap == null)
+                const Text('이 경기의 전술 지도·핫드랍·리플레이 맵은 현재 지원하지 않습니다.'),
               OutlinedButton.icon(
                 icon: const Icon(Icons.play_circle_outline),
                 label: const Text('경기 2D 리플레이'),
-                onPressed: () => context.push(
-                  Uri(
-                    path: '/replay/${widget.matchId}',
-                    queryParameters: {
-                      'nickname': widget.nickname,
-                      'platform': widget.platform,
-                      'mapId':
-                          detail?.mapId ?? widget.summary.mapId ?? 'Erangel',
-                    },
-                  ).toString(),
-                ),
+                onPressed: supportedMap == null
+                    ? null
+                    : () => context.push(
+                        Uri(
+                          path: '/replay/${widget.matchId}',
+                          queryParameters: {
+                            'nickname': widget.nickname,
+                            'platform': widget.platform,
+                            'mapId': supportedMap.id,
+                          },
+                        ).toString(),
+                      ),
               ),
               const SizedBox(height: 12),
               if (snapshot.connectionState == ConnectionState.waiting &&

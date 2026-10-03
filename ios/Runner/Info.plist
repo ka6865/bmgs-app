@@ -37,6 +37,8 @@
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>게시글에 첨부할 사진을 선택합니다.</string>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>

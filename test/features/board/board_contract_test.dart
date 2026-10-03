@@ -13,7 +13,7 @@ void main() {
     expect(BoardCategories.matches('공략', 'strategy'), isTrue);
     expect(BoardCategories.matches('듀오/스쿼드 모집', '자유'), isFalse);
   });
-  test('필터에 맞는 글이 없어도 전체 목록 커서를 보존한다', () async {
+  test('서버 분류 필터와 커서를 유지하고 별칭을 인식한다', () async {
     final adapter = FakeHttpAdapter(
       responses: {
         '/api/mobile/board/posts': {
@@ -40,7 +40,7 @@ void main() {
     expect(page.hasMore, isTrue);
     expect(page.nextCursor, 'older');
     final uri = Uri.parse(adapter.requestedPaths.single);
-    expect(uri.queryParameters['category'], isNull);
+    expect(uri.queryParameters['category'], '자유');
     expect(uri.queryParameters['cursor'], 'before');
     expect(uri.queryParameters['q'], '검색');
   });

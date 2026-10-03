@@ -77,6 +77,8 @@ class BoardPostDetail {
     required this.views,
     required this.likes,
     required this.comments,
+    this.canEdit = false,
+    this.revision,
   });
 
   final int id;
@@ -89,8 +91,10 @@ class BoardPostDetail {
   final int views;
   final int likes;
   final List<BoardComment> comments;
+  final bool canEdit;
+  final int? revision;
 
-  /// 현재 서버는 오래된 댓글부터 50개만 반환하며 전체 개수는 제공하지 않는다.
+  /// 상세 응답의 초기 댓글은 50개 제한이며 별도 댓글 페이지 API로 이어 읽는다.
   bool get commentsMayBeTruncated => comments.length >= 50;
 
   factory BoardPostDetail.fromJson(Map<String, dynamic> json) {
@@ -113,6 +117,13 @@ class BoardPostDetail {
       createdAt: _asString(post['createdAt'], ''),
       views: _asInt(post['views']),
       likes: _asInt(post['likes']),
+      canEdit:
+          post['canEdit'] == true &&
+          post['revision'] is int &&
+          (post['revision'] as int) >= 0,
+      revision: post['revision'] is int && (post['revision'] as int) >= 0
+          ? post['revision'] as int
+          : null,
       comments: comments is List
           ? comments
                 .whereType<Map>()
@@ -130,6 +141,7 @@ class BoardComment {
     required this.content,
     required this.createdAt,
     this.parentId,
+    this.canDelete = false,
   });
 
   final int id;
@@ -137,6 +149,7 @@ class BoardComment {
   final String content;
   final String createdAt;
   final int? parentId;
+  final bool canDelete;
 
   factory BoardComment.fromJson(Map<String, dynamic> json) {
     return BoardComment(
@@ -145,6 +158,7 @@ class BoardComment {
       content: _asString(json['content'], ''),
       createdAt: _asString(json['createdAt'], ''),
       parentId: json['parentId'] == null ? null : _asInt(json['parentId']),
+      canDelete: json['canDelete'] == true,
     );
   }
 }
@@ -163,4 +177,72 @@ String _asString(Object? value, String fallback) {
 String? _nullableString(Object? value) {
   final text = value?.toString() ?? '';
   return text.isEmpty ? null : text;
+}
+
+class BoardCommentPage {
+  const BoardCommentPage({
+    required this.items,
+    required this.totalCount,
+    required this.hasMore,
+    this.nextCursor,
+  });
+  final List<BoardComment> items;
+  final int totalCount;
+  final bool hasMore;
+  final String? nextCursor;
+  factory BoardCommentPage.fromJson(Map<String, dynamic> json) =>
+      BoardCommentPage(
+        items: (json['items'] as List? ?? [])
+            .whereType<Map>()
+            .map((item) => BoardComment.fromJson(item.cast()))
+            .toList(),
+        totalCount: _asInt(json['totalCount']),
+        hasMore: json['hasMore'] == true,
+        nextCursor: _nullableString(json['nextCursor']),
+      );
+}
+
+class BoardPostEdit {
+  const BoardPostEdit({
+    required this.id,
+    required this.title,
+    required this.content,
+    required this.category,
+    required this.revision,
+    this.contentImageIds = const [],
+    this.thumbnailImageId,
+  });
+  final int id;
+  final String title;
+  final String content;
+  final String category;
+  final int revision;
+  final List<String> contentImageIds;
+  final String? thumbnailImageId;
+  factory BoardPostEdit.fromJson(Map<String, dynamic> json) {
+    final post = (json['post'] as Map).cast<String, dynamic>();
+    if (_asInt(post['id']) <= 0 ||
+        post['canEdit'] != true ||
+        post['revision'] is! int ||
+        (post['revision'] as int) < 0) {
+      throw const FormatException('수정 권한 또는 버전을 확인하지 못했습니다.');
+    }
+    return BoardPostEdit(
+      id: _asInt(post['id']),
+      title: _asString(post['title'], ''),
+      content: _asString(post['content'], ''),
+      category: _asString(post['category'], '자유'),
+      revision: post['revision'] as int,
+      contentImageIds: (post['contentImageIds'] as List? ?? [])
+          .whereType<String>()
+          .toList(),
+      thumbnailImageId: _nullableString(post['thumbnailImageId']),
+    );
+  }
+}
+
+class BoardUploadedImage {
+  const BoardUploadedImage({required this.id, required this.url});
+  final String id;
+  final String url;
 }

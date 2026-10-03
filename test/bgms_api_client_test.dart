@@ -25,6 +25,23 @@ void main() {
     expect(uri.toString(), 'https://bgms.kr/api/pubg/matches-summary');
   });
 
+  test('자동 갱신은 명시하며 수동 갱신이 우선한다', () {
+    final client = BgmsApiClient(baseUrl: 'https://bgms.kr');
+    Uri player({bool refresh = false, bool autoRefresh = false}) =>
+        client.buildPlayerUri(
+          nickname: 'KangHeeSung_',
+          platform: 'steam',
+          refresh: refresh,
+          autoRefresh: autoRefresh,
+        );
+    expect(player().queryParameters['refresh'], isNull);
+    expect(player(autoRefresh: true).queryParameters['refresh'], 'auto');
+    expect(
+      player(refresh: true, autoRefresh: true).queryParameters['refresh'],
+      'true',
+    );
+  });
+
   test('buildMatchUri includes match nickname and platform', () {
     final client = BgmsApiClient(baseUrl: 'https://example.com/');
 

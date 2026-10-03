@@ -130,4 +130,34 @@ void main() {
     expect(center.dx, closeTo(mapRect.left + mapRect.width * 0.1, 0.01));
     expect(center.dy, closeTo(mapRect.top + mapRect.height * 0.5, 0.01));
   });
+
+  testWidgets('열려 있던 지도에 다른 경기 맵을 전달하면 지도와 필터를 초기화한다', (tester) async {
+    final repository = _Repository();
+    repository.firstSettings.complete({
+      'Erangel': ['Garage'],
+    });
+    Widget screen(String mapId) => MaterialApp(
+      home: Scaffold(
+        body: MapsScreen(initialMapId: mapId, repository: repository),
+      ),
+    );
+    await tester.pumpWidget(screen('Erangel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('마커 필터'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilterChip, '차량'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MapMarkerWidget), findsOneWidget);
+
+    await tester.pumpWidget(screen('Desert_Main'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '미라마'))
+          .selected,
+      isTrue,
+    );
+    expect(find.byType(FilterChip), findsNothing);
+    expect(find.byType(MapMarkerWidget), findsNothing);
+  });
 }

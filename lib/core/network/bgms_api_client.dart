@@ -40,13 +40,14 @@ class BgmsApiClient {
     required String platform,
     String? season,
     bool refresh = false,
+    bool autoRefresh = false,
   }) {
     return Uri.parse('$_baseUrl/api/pubg/player').replace(
       queryParameters: {
         'nickname': nickname,
         'platform': platform,
         if (season != null && season.isNotEmpty) 'season': season,
-        if (refresh) 'refresh': 'true',
+        if (refresh) 'refresh': 'true' else if (autoRefresh) 'refresh': 'auto',
       },
     );
   }
@@ -142,6 +143,7 @@ class BgmsApiClient {
     required String platform,
     String? season,
     bool refresh = false,
+    bool autoRefresh = false,
   }) {
     return _getJson(
       buildPlayerUri(
@@ -149,7 +151,11 @@ class BgmsApiClient {
         platform: platform,
         season: season,
         refresh: refresh,
+        autoRefresh: autoRefresh,
       ),
+      receiveTimeout: refresh || autoRefresh
+          ? const Duration(seconds: 40)
+          : null,
     );
   }
 
@@ -160,7 +166,12 @@ class BgmsApiClient {
   }) {
     return _postJson(
       buildMatchesSummaryUri(),
-      body: {'matchIds': matchIds, 'nickname': nickname, 'platform': platform},
+      body: {
+        'matchIds': matchIds,
+        'nickname': nickname,
+        'platform': platform,
+        'collect': false,
+      },
     );
   }
 
@@ -188,6 +199,14 @@ class BgmsApiClient {
         'filter': filter,
       },
     ),
+  );
+
+  Future<Map<String, dynamic>> collectPlayerMatches({
+    required String nickname,
+    required String platform,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/pubg/player/matches'),
+    body: {'nickname': nickname, 'platform': platform},
   );
 
   Future<Map<String, dynamic>> fetchEncounters({
@@ -556,21 +575,147 @@ class BgmsApiClient {
   Future<Map<String, dynamic>> fetchBoardPost({
     required int postId,
     bool refresh = false,
-  }) {
-    return _getJson(buildBoardPostUri(postId, refresh: refresh));
-  }
+    String? accessToken,
+  }) => _getJson(
+    buildBoardPostUri(postId, refresh: refresh),
+    accessToken: accessToken,
+  );
 
   Future<Map<String, dynamic>> createBoardPost({
     required String title,
     required String content,
     required String category,
     required String accessToken,
-  }) {
-    return _postJson(
-      buildBoardPostsUri(),
-      body: {'title': title, 'content': content, 'category': category},
-      accessToken: accessToken,
-    );
+    List<String> contentImageIds = const [],
+    String? thumbnailImageId,
+  }) => _postJson(
+    buildBoardPostsUri(),
+    body: {
+      'title': title,
+      'content': content,
+      'category': category,
+      'contentImageIds': contentImageIds,
+      'thumbnailImageId': thumbnailImageId,
+    },
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> fetchBoardEdit({
+    required int postId,
+    required String accessToken,
+  }) => _getJson(
+    Uri.parse('$_baseUrl/api/mobile/board/posts/$postId/edit'),
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> updateBoardPost({
+    required int postId,
+    required Map<String, dynamic> body,
+    required String accessToken,
+  }) => _boardMutation(
+    'PATCH',
+    '/api/mobile/board/posts/$postId',
+    body,
+    accessToken,
+  );
+
+  Future<Map<String, dynamic>> deleteBoardPost({
+    required int postId,
+    required int expectedRevision,
+    required String accessToken,
+  }) => _boardMutation('DELETE', '/api/mobile/board/posts/$postId', {
+    'expectedRevision': expectedRevision,
+  }, accessToken);
+
+  Future<Map<String, dynamic>> fetchBoardComments({
+    required int postId,
+    String? cursor,
+    String? accessToken,
+  }) => _getJson(
+    Uri.parse(
+      '$_baseUrl/api/mobile/board/posts/$postId/comments',
+    ).replace(queryParameters: {'limit': '50', 'cursor': ?cursor}),
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> likeBoardPost({
+    required int postId,
+    required String accessToken,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/mobile/board/posts/$postId/likes'),
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> reportBoardContent({
+    required String targetType,
+    required int targetId,
+    required String reason,
+    String? detail,
+    required String accessToken,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/board/report'),
+    body: {
+      'target_type': targetType,
+      'target_id': targetId,
+      'reason': reason,
+      if (detail != null && detail.isNotEmpty) 'detail': detail,
+    },
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> reserveBoardImage({
+    required String mimeType,
+    required int byteSize,
+    required String accessToken,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/board/images/reserve'),
+    body: {'mimeType': mimeType, 'byteSize': byteSize},
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> completeBoardImage({
+    required String imageId,
+    required String accessToken,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/board/images/complete'),
+    body: {'imageId': imageId},
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> releaseBoardImages({
+    required List<String> imageIds,
+    required String accessToken,
+  }) => _postJson(
+    Uri.parse('$_baseUrl/api/board/images/release'),
+    body: {'imageIds': imageIds},
+    accessToken: accessToken,
+  );
+
+  Future<Map<String, dynamic>> _boardMutation(
+    String method,
+    String path,
+    Map<String, dynamic> body,
+    String accessToken,
+  ) async {
+    try {
+      if (accessToken.isEmpty) {
+        throw const ApiException(
+          kind: ApiErrorKind.unauthorized,
+          message: '로그인이 필요합니다.',
+        );
+      }
+      final response = await _dio.requestUri<dynamic>(
+        Uri.parse('$_baseUrl$path'),
+        data: body,
+        options: Options(
+          method: method,
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+      return _asJsonMap(response.data);
+    } catch (error) {
+      throw ApiException.from(error);
+    }
   }
 
   Future<Map<String, dynamic>> createBoardComment({
@@ -611,7 +756,11 @@ class BgmsApiClient {
     return {'Authorization': 'Bearer $token'};
   }
 
-  Future<Map<String, dynamic>> _getJson(Uri uri, {String? accessToken}) async {
+  Future<Map<String, dynamic>> _getJson(
+    Uri uri, {
+    String? accessToken,
+    Duration? receiveTimeout,
+  }) async {
     try {
       if (accessToken != null && accessToken.isEmpty) {
         throw const ApiException(
@@ -621,9 +770,15 @@ class BgmsApiClient {
       }
       final response = await _dio.getUri<dynamic>(
         uri,
-        options: accessToken == null
+        options: accessToken == null && receiveTimeout == null
             ? null
-            : Options(headers: {'Authorization': 'Bearer $accessToken'}),
+            : Options(
+                receiveTimeout: receiveTimeout,
+                headers: {
+                  if (accessToken != null)
+                    'Authorization': 'Bearer $accessToken',
+                },
+              ),
       );
       return _asJsonMap(response.data);
     } catch (error) {

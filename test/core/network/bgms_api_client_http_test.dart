@@ -31,6 +31,54 @@ void main() {
     expect(json['nickname'], 'tester');
   });
 
+  test('최신 갱신은 서버 실행 시간을 기다리고 캐시 조회는 기본 시간을 사용한다', () async {
+    adapter.stub('/api/pubg/player', {'nickname': 'KangHeeSung_'});
+    final client = buildClient();
+    await client.fetchPlayer(nickname: 'KangHeeSung_', platform: 'steam');
+    await client.fetchPlayer(
+      nickname: 'KangHeeSung_',
+      platform: 'steam',
+      autoRefresh: true,
+    );
+    expect(
+      adapter.recordedRequests.first.receiveTimeout,
+      BgmsApiClient.receiveTimeout,
+    );
+    expect(
+      adapter.recordedRequests.last.receiveTimeout,
+      const Duration(seconds: 40),
+    );
+    expect(
+      adapter.recordedRequests.last.uri.queryParameters['refresh'],
+      'auto',
+    );
+  });
+
+  test('요약 조회와 계정별 경기 수집 요청을 구분한다', () async {
+    adapter.stub('/api/pubg/matches-summary', {'summaries': {}});
+    adapter.stub('/api/pubg/player/matches', {
+      'collection': {'saved': 1},
+    });
+    final client = buildClient();
+    await client.fetchMatchesSummary(
+      matchIds: ['m'],
+      nickname: 'MiaeQ_Q',
+      platform: 'steam',
+    );
+    await client.collectPlayerMatches(nickname: 'MiaeQ_Q', platform: 'steam');
+    expect(adapter.recordedRequests.first.data, {
+      'matchIds': ['m'],
+      'nickname': 'MiaeQ_Q',
+      'platform': 'steam',
+      'collect': false,
+    });
+    expect(adapter.recordedRequests.last.method, 'POST');
+    expect(adapter.recordedRequests.last.data, {
+      'nickname': 'MiaeQ_Q',
+      'platform': 'steam',
+    });
+  });
+
   test('게시글 강제 갱신은 서버 캐시를 우회하는 refresh 계약을 전달한다', () async {
     adapter.stub('/api/mobile/board/posts/42', {
       'id': 42,

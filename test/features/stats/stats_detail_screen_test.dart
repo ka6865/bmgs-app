@@ -19,6 +19,7 @@ import 'package:bgms_mobile_app/navigation/app_router.dart';
 
 class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
   bool lastRefresh = false;
+  final List<bool> refreshRequests = [];
 
   @override
   Future<PlayerStatsBundle> fetchPlayerStats({
@@ -29,6 +30,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
     bool includeSummaries = true,
   }) {
     lastRefresh = refresh;
+    refreshRequests.add(refresh);
     final modeStats = {
       'ranked': {
         'squad': const GameModeStats(
@@ -132,6 +134,31 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
   }
 }
 
+class _RefreshFailureRepository extends MockPlayerStatsRepository {
+  @override
+  Future<PlayerStatsBundle> fetchPlayerStats({
+    required String nickname,
+    required String platform,
+    String? season,
+    bool refresh = false,
+    bool includeSummaries = true,
+  }) {
+    if (refresh) {
+      return Future.error(
+        const PlayerStatsException(
+          '호출 한도 초과',
+          retryAfter: Duration(seconds: 60),
+        ),
+      );
+    }
+    return super.fetchPlayerStats(
+      nickname: nickname,
+      platform: platform,
+      season: season,
+    );
+  }
+}
+
 class _RecordingPlayerStatsRepository extends MockPlayerStatsRepository {
   final List<String> platforms = [];
 
@@ -168,6 +195,70 @@ class _RecordingAiCoachingRepository extends Fake
   }
 }
 
+class _NoRecentMatchesRepository extends Fake implements PlayerStatsRepository {
+  @override
+  Future<PlayerStatsBundle> fetchPlayerStats({
+    required String nickname,
+    required String platform,
+    String? season,
+    bool refresh = false,
+    bool includeSummaries = true,
+  }) async => PlayerStatsBundle(
+    profile: PlayerStatsProfile.fromJson({
+      'nickname': nickname,
+      'platform': platform,
+      'recentMatches': [],
+      'stats': {},
+    }),
+    matches: const [],
+    summaryFallback: false,
+  );
+}
+
+class _UnavailableStatsRepository extends Fake
+    implements PlayerStatsRepository {
+  @override
+  Future<PlayerStatsBundle> fetchPlayerStats({
+    required String nickname,
+    required String platform,
+    String? season,
+    bool refresh = false,
+    bool includeSummaries = true,
+  }) async => PlayerStatsBundle(
+    profile: PlayerStatsProfile.fromJson({
+      'nickname': nickname,
+      'platform': platform,
+      'statsAvailability': {
+        'ranked': {'status': 'unavailable'},
+      },
+    }),
+    matches: const [],
+    summaryFallback: false,
+  );
+}
+
+class _StatusStatsRepository extends Fake implements PlayerStatsRepository {
+  _StatusStatsRepository(this.status);
+  final String status;
+  @override
+  Future<PlayerStatsBundle> fetchPlayerStats({
+    required String nickname,
+    required String platform,
+    String? season,
+    bool refresh = false,
+    bool includeSummaries = true,
+  }) async => PlayerStatsBundle(
+    profile: PlayerStatsProfile.fromJson({
+      'nickname': nickname,
+      'platform': platform,
+      'syncStatus': status,
+      'historyDiscoveryStatus': 'queued',
+    }),
+    matches: const [],
+    summaryFallback: false,
+  );
+}
+
 class _SummaryErrorRepository extends MockPlayerStatsRepository {
   @override
   Future<PlayerStatsBundle> fetchPlayerStats({
@@ -199,6 +290,80 @@ class _SummaryErrorRepository extends MockPlayerStatsRepository {
 }
 
 void main() {
+  testWidgets('최근 경기와 시즌 기록이 없어도 DB 전체 이력 진입을 유지한다', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatsDetailScreen(
+          nickname: 'PastPlayer',
+          platform: 'steam',
+          repository: _NoRecentMatchesRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final entry = find.text('DB 전체 경기 이력');
+    expect(entry, findsOneWidget);
+    await tester.ensureVisible(entry);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.ancestor(of: entry, matching: find.byType(FilledButton)),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(find.textContaining('과거에 저장된 기록은 DB 전체 경기 이력에서'), findsOneWidget);
+    expect(find.byType(MatchCard), findsNothing);
+  });
+
+  testWidgets('조회 실패를 해당 모드 플레이 기록 없음으로 안내하지 않는다', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatsDetailScreen(
+          nickname: 'Player',
+          platform: 'steam',
+          repository: _UnavailableStatsRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('시즌 지표 조회 불가'), findsOneWidget);
+    expect(find.text('해당 모드 플레이 기록 없음'), findsNothing);
+    expect(find.text('DB 전체 경기 이력'), findsOneWidget);
+  });
+
+  testWidgets('cached는 정상 DB 조회로 표시하고 partial·save_failed만 실패 안내한다', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    for (final scenario in [
+      (status: 'cached', text: 'DB에 저장된 시즌 기록을 표시합니다.'),
+      (status: 'partial', text: '일부 전적 갱신 실패 · 저장된 기록 기준 시각을 확인할 수 없습니다.'),
+      (
+        status: 'save_failed',
+        text: 'DB 저장 실패 · 새 저장이 완료되지 않았습니다. 저장된 기록 기준 시각을 확인할 수 없습니다.',
+      ),
+    ]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StatsDetailScreen(
+            key: ValueKey(scenario.status),
+            nickname: 'Player',
+            platform: 'steam',
+            repository: _StatusStatsRepository(scenario.status),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(scenario.text), findsOneWidget);
+      expect(find.textContaining('시즌 지표 새 저장 완료'), findsNothing);
+      expect(find.textContaining('시즌 기록 기준:'), findsNothing);
+      expect(find.text('DB 전체 경기 이력'), findsOneWidget);
+    }
+  });
+
   testWidgets('최근 매치 요약 오류는 시즌 전적과 별도로 표시한다', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(
@@ -377,7 +542,7 @@ void main() {
     expect(find.text('KDA'), findsOneWidget);
     expect(find.text('평균 생존 시간'), findsOneWidget);
     expect(find.text('Top 10'), findsOneWidget);
-    expect(find.text('헤드샷 비율'), findsOneWidget);
+    expect(find.text('최근 경쟁전 헤드샷'), findsOneWidget);
 
     // 5. 기록이 없는 '듀오' 모드 선택 시 Empty State 확인
     await tester.tap(find.text('듀오'));
@@ -507,7 +672,7 @@ void main() {
     expect(find.text('3시간 전'), findsOneWidget);
   });
 
-  testWidgets('경쟁전 탭 진입 시 최근 매치 데이터 기반 생존시간, 탑텐율, 헤드샷이 합산 평균으로 보완 렌더링된다', (
+  testWidgets('경쟁전 시즌 지표에 큐가 확인되지 않은 최근 경기를 섞지 않는다', (
     WidgetTester tester,
   ) async {
     final mockRepo = MockRankedStatsSupplementRepository();
@@ -525,13 +690,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 1. 경쟁전 탭(기본선택)일 때: 최근 매치 기반 실시간 보완 통계 검증
-    // 예상 평균 생존 시간: (1200 + 600) / 2 = 900초 -> 15분 0초
-    // 예상 Top 10 진입률: 1 / 2 = 50.0%
-    // 예상 헤드샷 비율: (1 + 0) / (3 + 1) = 25.0%
+    // 시즌 합계의 생존 시간·Top 10을 사용하고 큐 미확인 헤드샷은 비워 둔다.
     expect(find.text('15분 0초'), findsOneWidget);
     expect(find.text('50.0%'), findsOneWidget);
-    expect(find.text('25.0%'), findsOneWidget);
+    expect(find.text('최근 경쟁전 헤드샷'), findsOneWidget);
+    expect(find.text('-'), findsOneWidget);
+    expect(find.text('25.0%'), findsNothing);
 
     // 2. 일반전 탭으로 전환
     await tester.tap(find.text('일반전'));
@@ -543,7 +707,7 @@ void main() {
     expect(find.text('40.0%'), findsOneWidget);
   });
 
-  testWidgets('StatsDetailScreen 새로고침 탭 시 refresh: true 인자로 레포지토리 호출 검증', (
+  testWidgets('수동 갱신은 refresh:true로 요청하고 선택 모드를 유지한다', (
     WidgetTester tester,
   ) async {
     final mockRepo = MockPlayerStatsRepository();
@@ -562,17 +726,54 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // 1. 처음엔 refresh = false 로 호출됨
-    expect(mockRepo.lastRefresh, isFalse);
+    expect(mockRepo.refreshRequests, [false]);
+    expect(find.text('최근 매치 · 모든 모드'), findsOneWidget);
+    await tester.tap(find.text('일반전'));
+    await tester.pumpAndSettle();
 
-    // 2. 새로고침 아이콘 탭
+    // 새로고침 아이콘 탭
     final refreshButton = find.byTooltip('새로고침');
     expect(refreshButton, findsOneWidget);
     await tester.tap(refreshButton);
     await tester.pumpAndSettle();
 
-    // 3. refresh = true 로 다시 호출됨
+    expect(mockRepo.refreshRequests, [false, true]);
     expect(mockRepo.lastRefresh, isTrue);
+    final normalTab = find.ancestor(
+      of: find.text('일반전'),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Semantics && widget.properties.selected == true,
+      ),
+    );
+    expect(normalTab, findsOneWidget);
+  });
+
+  testWidgets('갱신 실패 시 이전 경기와 모드를 유지하고 재시도 대기를 표시한다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatsDetailScreen(
+          nickname: 'Player',
+          platform: 'steam',
+          repository: _RefreshFailureRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('일반전'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('새로고침'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('최신 갱신 실패 · 이전 기록을 유지합니다.'), findsOneWidget);
+    final coolingButton = find.byWidgetPredicate(
+      (widget) =>
+          widget is IconButton &&
+          (widget.tooltip?.contains('초 후 새로고침 가능') ?? false),
+    );
+    expect(coolingButton, findsOneWidget);
+    expect(tester.widget<IconButton>(coolingButton).onPressed, isNull);
+    expect(find.byType(MatchCard), findsNWidgets(2));
+    expect(find.text('Gold III'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('StatsDetailScreen - Miramar 맵코드 대소문자 믹스 매칭 검증', (

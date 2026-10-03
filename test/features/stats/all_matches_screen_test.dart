@@ -68,7 +68,7 @@ void main() {
       _match(matchId: 'm3', gameMode: 'solo'),
     ]);
 
-    expect(find.text('전체 매치'), findsOneWidget);
+    expect(find.text('최근 경기 목록'), findsOneWidget);
     expect(find.text('KangHeeSung_'), findsOneWidget);
     expect(find.text('3경기'), findsOneWidget);
     expect(find.byType(MatchCard), findsNWidgets(3));

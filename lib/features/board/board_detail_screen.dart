@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -5,6 +6,8 @@ import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/app_panels.dart';
 import 'board_models.dart';
 import 'board_repository.dart';
+import 'board_write_dialog.dart';
+import 'board_report_dialog.dart';
 
 class BoardDetailScreen extends StatefulWidget {
   const BoardDetailScreen({super.key, required this.postId, this.repository});
@@ -24,12 +27,225 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   String? _commentError;
   BoardComment? _replyingTo;
   final _commentFormKey = GlobalKey();
+  StreamSubscription<String?>? _auth;
+  int _generation = 0;
+  final List<BoardComment> _comments = [];
+  BoardCommentPage? _commentPage;
+  bool _loadingComments = false;
+  String? _commentsError;
+  bool _acting = false;
+  String? _observedUser;
+  bool _liked = false;
+  int? _likes;
+  String? _actionError;
+
+  Future<BoardPostDetail> _fetchPost({bool refresh = false}) async {
+    final generation = _generation;
+    final post = await _repository.fetchPost(widget.postId, refresh: refresh);
+    if (!mounted || generation != _generation) return post;
+    _likes = post.likes;
+    _comments
+      ..clear()
+      ..addAll(post.comments);
+    _commentPage = null;
+    _commentsError = null;
+    try {
+      final page = await _repository.fetchComments(widget.postId);
+      if (!mounted || generation != _generation) return post;
+      _comments
+        ..clear()
+        ..addAll(page.items);
+      _commentPage = page;
+    } on BoardException catch (error) {
+      if (generation == _generation) _commentsError = error.message;
+    }
+    return post;
+  }
+
+  Future<void> _moreComments() async {
+    if (_loadingComments) return;
+    final generation = _generation;
+    setState(() {
+      _loadingComments = true;
+      _commentsError = null;
+    });
+    try {
+      final page = await _repository.fetchComments(
+        widget.postId,
+        cursor: _commentPage?.nextCursor,
+      );
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        if (_commentPage == null) _comments.clear();
+        final ids = _comments.map((item) => item.id).toSet();
+        _comments.addAll(page.items.where((item) => ids.add(item.id)));
+        _commentPage = page;
+      });
+    } on BoardException catch (error) {
+      if (mounted && generation == _generation) {
+        setState(() => _commentsError = error.message);
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _loadingComments = false);
+      }
+    }
+  }
+
+  Future<void> _editPost(BoardPostDetail post) async {
+    final generation = _generation;
+    setState(() {
+      _acting = true;
+      _actionError = null;
+    });
+    try {
+      final original = await _repository.fetchEdit(post.id);
+      if (!mounted || generation != _generation) return;
+      final result = await showDialog<int>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) =>
+            BoardWriteDialog(repository: _repository, original: original),
+      );
+      if (!mounted || generation != _generation) return;
+      if (result != null) _reload();
+    } on BoardException catch (error) {
+      if (mounted && generation == _generation) {
+        setState(() => _actionError = error.message);
+      }
+    } finally {
+      if (mounted && generation == _generation) setState(() => _acting = false);
+    }
+  }
+
+  Future<void> _deletePost(BoardPostDetail post) async {
+    final generation = _generation;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('게시글 삭제'),
+        content: const Text('삭제한 글은 되돌릴 수 없습니다. 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || generation != _generation || confirmed != true) return;
+    setState(() {
+      _acting = true;
+      _actionError = null;
+    });
+    try {
+      await _repository.deletePost(post.id, post.revision!);
+      if (!mounted || generation != _generation) return;
+      context.go('/board');
+    } on BoardException catch (error) {
+      if (mounted && generation == _generation) {
+        setState(
+          () => _actionError = error.statusCode == 409
+              ? '다른 곳에서 수정된 글입니다. 새로고침 후 다시 확인해 주세요.'
+              : error.message,
+        );
+      }
+    } finally {
+      if (mounted && generation == _generation) setState(() => _acting = false);
+    }
+  }
+
+  Future<void> _like(int postId) async {
+    if (_acting || _liked) return;
+    final generation = _generation;
+    setState(() {
+      _acting = true;
+      _actionError = null;
+    });
+    try {
+      final count = await _repository.likePost(postId);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _likes = count;
+        _liked = true;
+      });
+    } on BoardException catch (error) {
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        if (error.statusCode == 409) _liked = true;
+        _actionError = error.message;
+      });
+    } finally {
+      if (mounted && generation == _generation) setState(() => _acting = false);
+    }
+  }
+
+  Future<void> _report(String targetType, int targetId) async {
+    final generation = _generation;
+    final actor = _repository.userId;
+    final draft = await showDialog<BoardReportDraft>(
+      context: context,
+      builder: (_) => BoardReportDialog(repository: _repository),
+    );
+    if (!mounted ||
+        generation != _generation ||
+        draft == null ||
+        actor != _repository.userId) {
+      return;
+    }
+    setState(() {
+      _acting = true;
+      _actionError = null;
+    });
+    try {
+      await _repository.reportContent(
+        targetType: targetType,
+        targetId: targetId,
+        reason: draft.reason,
+        detail: draft.detail,
+      );
+      if (!mounted || generation != _generation) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('신고가 접수되었습니다.')));
+    } on BoardException catch (error) {
+      if (mounted && generation == _generation) {
+        setState(() => _actionError = error.message);
+      }
+    } finally {
+      if (mounted && generation == _generation) setState(() => _acting = false);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _repository = widget.repository ?? BoardRepository();
-    _future = _repository.fetchPost(widget.postId);
+    _observedUser = _repository.userId;
+    _future = _fetchPost();
+    _auth = _repository.authChanges.listen((user) {
+      if (!mounted || user == _observedUser) return;
+      _observedUser = user;
+      setState(() {
+        _generation++;
+        _liked = false;
+        _likes = null;
+        _commentController.clear();
+        _replyingTo = null;
+        _commentError = null;
+        _comments.clear();
+        _commentPage = null;
+        _actionError = null;
+        _acting = false;
+        _commentSubmitting = false;
+        _loadingComments = false;
+        _future = _fetchPost(refresh: true);
+      });
+    });
   }
 
   @override
@@ -39,24 +255,41 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
       _replyingTo = null;
       _commentController.clear();
       _commentError = null;
-      _future = _repository.fetchPost(widget.postId);
+      _actionError = null;
+      _acting = false;
+      _liked = false;
+      _likes = null;
+      _commentsError = null;
+      _comments.clear();
+      _commentPage = null;
+      _generation++;
+      _commentSubmitting = false;
+      _loadingComments = false;
+      _future = _fetchPost();
     }
   }
 
   @override
   void dispose() {
+    _auth?.cancel();
     _commentController.dispose();
     super.dispose();
   }
 
   void _reload() {
     setState(() {
-      _future = _repository.fetchPost(widget.postId, refresh: true);
+      _generation++;
+      _acting = false;
+      _commentSubmitting = false;
+      _loadingComments = false;
+      _future = _fetchPost(refresh: true);
     });
   }
 
   Future<void> _submitComment() async {
     final postId = widget.postId;
+    final generation = _generation;
+    final actor = _repository.userId;
     setState(() {
       _commentSubmitting = true;
       _commentError = null;
@@ -67,16 +300,26 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         content: _commentController.text,
         parentId: _replyingTo?.id,
       );
-      if (!mounted || widget.postId != postId) return;
+      if (!mounted ||
+          widget.postId != postId ||
+          generation != _generation ||
+          actor != _repository.userId) {
+        return;
+      }
       _commentController.clear();
       _replyingTo = null;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('댓글이 등록되었습니다.')));
       _reload();
     } on BoardException catch (error) {
-      if (mounted && widget.postId == postId) {
+      if (mounted && widget.postId == postId && generation == _generation) {
         setState(() => _commentError = error.message);
       }
     } finally {
-      if (mounted) setState(() => _commentSubmitting = false);
+      if (mounted && generation == _generation) {
+        setState(() => _commentSubmitting = false);
+      }
     }
   }
 
@@ -116,9 +359,52 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              '${post.author} · ${_shortDate(post.createdAt)} · 조회 ${post.views} · 추천 ${post.likes}',
+              '${post.author} · ${_shortDate(post.createdAt)} · 조회 ${post.views} · 추천 ${_likes ?? post.likes}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            if (_actionError != null)
+              Text(
+                _actionError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            if (post.canEdit && post.revision != null && _repository.canWrite)
+              Wrap(
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: _acting ? null : () => _editPost(post),
+                    icon: const Icon(Icons.edit),
+                    label: const Text('수정'),
+                  ),
+                  TextButton.icon(
+                    onPressed: _acting ? null : () => _deletePost(post),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('삭제'),
+                  ),
+                ],
+              ),
+            FilledButton.tonalIcon(
+              onPressed: _acting || _liked
+                  ? null
+                  : () {
+                      if (!_repository.canWrite) {
+                        context.go('/my');
+                        return;
+                      }
+                      _like(post.id);
+                    },
+              icon: Icon(_liked ? Icons.thumb_up : Icons.thumb_up_outlined),
+              label: Text(_liked ? '추천 완료' : '추천'),
+            ),
+            if (_repository.canWrite)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _acting ? null : () => _report('post', post.id),
+                  icon: const Icon(Icons.flag_outlined),
+                  label: const Text('게시글 신고'),
+                ),
+              ),
             const SizedBox(height: 18),
             if (post.imageUrls.isNotEmpty) ...[
               ...post.imageUrls.map(
@@ -152,16 +438,22 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
             ),
             const SizedBox(height: 18),
             Text(
-              '댓글 ${post.comments.length}${post.commentsMayBeTruncated ? '개 이상' : '개'}',
+              '댓글 ${_commentPage?.totalCount ?? _comments.length}${_commentPage == null && post.commentsMayBeTruncated ? '개 이상' : '개'}',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
-            const Text('현재 서버는 오래된 댓글부터 최대 50개를 제공합니다.'),
-            if (post.commentsMayBeTruncated)
-              const Text('최신 댓글과 답글 일부가 표시되지 않을 수 있습니다.'),
-            if (post.comments.isEmpty)
+            if (_commentPage == null)
+              const Text('현재 서버는 오래된 댓글부터 최대 50개를 제공합니다.'),
+            if (_commentPage == null && post.commentsMayBeTruncated)
+              const Text('댓글 페이지를 불러오지 못해 일부 댓글만 표시됩니다.'),
+            if (_commentsError != null)
+              Text(
+                _commentsError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            if (_comments.isEmpty)
               const Card(
                 child: Padding(
                   padding: EdgeInsets.all(14),
@@ -169,10 +461,13 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                 ),
               )
             else
-              ...post.comments.map(
+              ..._comments.map(
                 (comment) => _CommentTile(
                   comment: comment,
-                  parentAuthor: post.comments
+                  onReport: !_repository.canWrite || _acting
+                      ? null
+                      : () => _report('comment', comment.id),
+                  parentAuthor: _comments
                       .where((item) => item.id == comment.parentId)
                       .firstOrNull
                       ?.author,
@@ -190,6 +485,11 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                           }
                         },
                 ),
+              ),
+            if ((_commentPage?.hasMore == true || _commentsError != null))
+              OutlinedButton(
+                onPressed: _loadingComments ? null : _moreComments,
+                child: Text(_loadingComments ? '불러오는 중...' : '댓글 더 보기'),
               ),
             const SizedBox(height: 14),
             Card(
@@ -257,11 +557,17 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment, this.parentAuthor, this.onReply});
+  const _CommentTile({
+    required this.comment,
+    this.parentAuthor,
+    this.onReply,
+    this.onReport,
+  });
 
   final BoardComment comment;
   final String? parentAuthor;
   final VoidCallback? onReply;
+  final VoidCallback? onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -296,8 +602,14 @@ class _CommentTile extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             Text(comment.content),
-            if (onReply != null)
-              TextButton(onPressed: onReply, child: const Text('답글')),
+            Wrap(
+              children: [
+                if (onReply != null)
+                  TextButton(onPressed: onReply, child: const Text('답글')),
+                if (onReport != null)
+                  TextButton(onPressed: onReport, child: const Text('댓글 신고')),
+              ],
+            ),
           ],
         ),
       ),

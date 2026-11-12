@@ -22,4 +22,15 @@ class PlayerMatchHistoryRepository {
     );
     return PlayerMatchHistoryPage.fromJson(json);
   }
+
+  Future<PlayerMatchCollectionResult> collect({
+    required String nickname,
+    required String platform,
+  }) async {
+    final json = await _client.collectPlayerMatches(
+      nickname: nickname,
+      platform: platform,
+    );
+    return PlayerMatchCollectionResult.fromJson(json);
+  }
 }

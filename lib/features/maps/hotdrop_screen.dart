@@ -30,6 +30,21 @@ class _HotdropScreenState extends State<HotdropScreen> {
   }
 
   void _load() => _future = _client.fetchHotdrops(_mapId);
+
+  @override
+  void didUpdateWidget(covariant HotdropScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialMapId == oldWidget.initialMapId ||
+        widget.initialMapId == null) {
+      return;
+    }
+    final mapId = _repository.resolveMap(widget.initialMapId).id;
+    if (mapId == _mapId) return;
+    _mapId = mapId;
+    _controller.value = Matrix4.identity();
+    _load();
+  }
+
   @override
   void dispose() {
     _controller.dispose();

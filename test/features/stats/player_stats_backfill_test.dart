@@ -12,6 +12,7 @@ class _EmptySummaryClient extends Fake implements BgmsApiClient {
     required String platform,
     String? season,
     bool refresh = false,
+    bool autoRefresh = false,
   }) async {
     return {
       'nickname': nickname,

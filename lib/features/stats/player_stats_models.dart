@@ -143,6 +143,34 @@ class StatsAvailability {
   }
 }
 
+enum PlayerSyncStatus {
+  saved,
+  cached,
+  partial,
+  saveFailed,
+  unknown;
+
+  static PlayerSyncStatus fromJson(Object? value) => switch (value) {
+    'saved' => saved,
+    'cached' => cached,
+    'partial' => partial,
+    'save_failed' => saveFailed,
+    _ => unknown,
+  };
+}
+
+enum HistoryDiscoveryStatus {
+  queued,
+  failed,
+  unknown;
+
+  static HistoryDiscoveryStatus fromJson(Object? value) => switch (value) {
+    'queued' => queued,
+    'failed' => failed,
+    _ => unknown,
+  };
+}
+
 class PlayerStatsProfile {
   const PlayerStatsProfile({
     required this.nickname,
@@ -160,6 +188,8 @@ class PlayerStatsProfile {
     required this.modeStats,
     this.statsAvailability = const {},
     this.retryAfterSeconds,
+    this.syncStatus = PlayerSyncStatus.unknown,
+    this.historyDiscoveryStatus = HistoryDiscoveryStatus.unknown,
   });
 
   final String nickname;
@@ -179,8 +209,21 @@ class PlayerStatsProfile {
   /// refresh 응답에서만 제공된다. 캐시 응답에는 없을 수 있다.
   final Map<String, StatsAvailability> statsAvailability;
   final int? retryAfterSeconds;
+  final PlayerSyncStatus syncStatus;
+  final HistoryDiscoveryStatus historyDiscoveryStatus;
 
   bool get hasSeasonStats => roundsPlayed > 0;
+
+  ({String queue, String mode}) get firstPlayedMode {
+    for (final queue in const ['ranked', 'normal']) {
+      for (final mode in const ['squad', 'duo', 'solo']) {
+        if ((modeStats[queue]?[mode]?.roundsPlayed ?? 0) > 0) {
+          return (queue: queue, mode: mode);
+        }
+      }
+    }
+    return (queue: 'ranked', mode: 'squad');
+  }
 
   static PlayerStatsProfile fromJson(Map<String, dynamic> json) {
     final stats = json['stats'];
@@ -275,6 +318,10 @@ class PlayerStatsProfile {
       modeStats: parsedModeStats,
       statsAvailability: availability,
       retryAfterSeconds: _positiveIntOrNull(json['retryAfterSeconds']),
+      syncStatus: PlayerSyncStatus.fromJson(json['syncStatus']),
+      historyDiscoveryStatus: HistoryDiscoveryStatus.fromJson(
+        json['historyDiscoveryStatus'],
+      ),
     );
   }
 }
@@ -453,12 +500,20 @@ class PlayerStatsBundle {
     required this.matches,
     required this.summaryFallback,
     this.summaryError,
+    this.requestedRefresh = false,
+    this.refreshError,
+    this.collectionMessage,
+    this.collectionAvailableAt,
   });
 
   final PlayerStatsProfile profile;
   final List<MatchSummary> matches;
   final bool summaryFallback;
   final String? summaryError;
+  final bool requestedRefresh;
+  final String? refreshError;
+  final String? collectionMessage;
+  final DateTime? collectionAvailableAt;
 }
 
 /// 전체 매치 화면의 모드 필터 유틸.

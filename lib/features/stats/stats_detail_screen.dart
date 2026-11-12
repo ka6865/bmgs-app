@@ -60,6 +60,11 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   bool _isFavorite = false;
   DateTime? _refreshAvailableAt;
   Timer? _refreshCooldownTimer;
+  String? _preferredQueue;
+  String? _preferredMode;
+  PlayerStatsBundle? _lastBundle;
+  int _requestGeneration = 0;
+  bool _isRequestInFlight = false;
 
   String get _normalizedPlatform => normalizePlayerPlatform(widget.platform);
 
@@ -95,6 +100,11 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     if (oldWidget.nickname != widget.nickname ||
         oldWidget.platform != widget.platform) {
       _selectedSeason = null; // 닉네임이나 플랫폼이 바뀌면 시즌 필터 초기화
+      _preferredQueue = null;
+      _preferredMode = null;
+      _lastBundle = null;
+      _refreshCooldownTimer?.cancel();
+      _refreshAvailableAt = null;
       _searchPlatform = _normalizedPlatform;
       _isFavorite = false;
       _startFetch();
@@ -179,15 +189,19 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   }
 
   void _startFetch({bool refresh = false}) {
+    final generation = ++_requestGeneration;
     final nickname = widget.nickname?.trim() ?? '';
     if (nickname.isEmpty) {
       _statsFuture = null;
+      _isRequestInFlight = false;
       return;
     }
     _statsFuture = _observeStatsRequest(
       refresh: refresh,
       nickname: nickname,
       platform: _normalizedPlatform,
+      generation: generation,
+      season: _selectedSeason,
     );
   }
 
@@ -195,21 +209,50 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     required bool refresh,
     required String nickname,
     required String platform,
+    required int generation,
+    required String? season,
   }) async {
+    _isRequestInFlight = true;
     try {
       final bundle = await _repository.fetchPlayerStats(
         nickname: nickname,
         platform: platform,
-        season: _selectedSeason,
+        season: season,
         refresh: refresh,
       );
-      if (refresh) {
+      if (!mounted || generation != _requestGeneration) return bundle;
+      _lastBundle = bundle;
+      final initial = bundle.profile.firstPlayedMode;
+      _preferredQueue ??= initial.queue;
+      _preferredMode ??= initial.mode;
+      if (bundle.refreshError == null &&
+          (bundle.requestedRefresh ||
+              refresh ||
+              bundle.profile.retryAfterSeconds != null)) {
         _setRefreshCooldownSeconds(bundle.profile.retryAfterSeconds);
       }
       return bundle;
     } on PlayerStatsException catch (error) {
+      if (!mounted || generation != _requestGeneration) rethrow;
       _setRefreshCooldown(error.retryAfter);
+      final previous = _lastBundle;
+      if (refresh && previous != null) {
+        return PlayerStatsBundle(
+          profile: previous.profile,
+          matches: previous.matches,
+          summaryFallback: previous.summaryFallback,
+          summaryError: previous.summaryError,
+          requestedRefresh: true,
+          refreshError: error.message,
+          collectionMessage: previous.collectionMessage,
+          collectionAvailableAt: previous.collectionAvailableAt,
+        );
+      }
       rethrow;
+    } finally {
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _isRequestInFlight = false);
+      }
     }
   }
 
@@ -221,8 +264,8 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   int? get _refreshRemainingSeconds {
     final availableAt = _refreshAvailableAt;
     if (availableAt == null) return null;
-    final seconds = availableAt.difference(DateTime.now()).inSeconds;
-    return seconds > 0 ? seconds : null;
+    final remaining = availableAt.difference(DateTime.now()).inMilliseconds;
+    return remaining > 0 ? (remaining / 1000).ceil() : null;
   }
 
   void _setRefreshCooldownSeconds(int? seconds) {
@@ -251,6 +294,12 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   }
 
   Future<void> _retry() async {
+    if (_isRequestInFlight) {
+      try {
+        await _statsFuture;
+      } catch (_) {}
+      return;
+    }
     if (_isRefreshCoolingDown) return;
     setState(() => _startFetch(refresh: true));
     try {
@@ -264,6 +313,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
     if (newSeason == _selectedSeason) return;
     setState(() {
       _selectedSeason = newSeason;
+      _lastBundle = null;
       _startFetch();
     });
   }
@@ -360,7 +410,9 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
                       tooltip: _isFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가',
                     ),
                     IconButton(
-                      onPressed: _isRefreshCoolingDown ? null : _retry,
+                      onPressed: _isRefreshCoolingDown || _isRequestInFlight
+                          ? null
+                          : _retry,
                       icon: const Icon(Icons.refresh, color: BgmsColors.accent),
                       tooltip: _isRefreshCoolingDown
                           ? '${_refreshRemainingSeconds ?? 1}초 후 새로고침 가능'
@@ -445,11 +497,19 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
               final profile = bundle.profile;
               final currentSeasonId = _selectedSeason ?? profile.seasonId ?? '';
               return _StatsContent(
-                key: ValueKey('${profile.nickname}_$currentSeasonId'),
+                key: ValueKey(
+                  '${profile.platform}:${profile.nickname}:$currentSeasonId',
+                ),
                 bundle: bundle,
                 selectedSeason: _selectedSeason,
                 onSeasonChanged: _onSeasonChanged,
                 refreshRemainingSeconds: _refreshRemainingSeconds,
+                preferredQueue: _preferredQueue,
+                preferredMode: _preferredMode,
+                onModeChanged: (queue, mode) {
+                  _preferredQueue = queue;
+                  _preferredMode = mode;
+                },
               );
             },
           ),
@@ -592,12 +652,18 @@ class _StatsContent extends StatefulWidget {
     required this.selectedSeason,
     required this.onSeasonChanged,
     this.refreshRemainingSeconds,
+    this.preferredQueue,
+    this.preferredMode,
+    required this.onModeChanged,
   });
 
   final PlayerStatsBundle bundle;
   final String? selectedSeason;
   final ValueChanged<String?> onSeasonChanged;
   final int? refreshRemainingSeconds;
+  final String? preferredQueue;
+  final String? preferredMode;
+  final void Function(String queue, String mode) onModeChanged;
 
   @override
   State<_StatsContent> createState() => _StatsContentState();
@@ -609,8 +675,16 @@ class _StatsContentState extends State<_StatsContent> {
   static const double _targetSurvivalSeconds = 1200.0;
   static const double _targetAvgAssists = 1.5;
 
-  String _selectedQueue = 'ranked'; // 'ranked' | 'normal'
-  String _selectedMode = 'squad'; // 'squad' | 'duo' | 'solo'
+  late String _selectedQueue;
+  late String _selectedMode;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.bundle.profile.firstPlayedMode;
+    _selectedQueue = widget.preferredQueue ?? initial.queue;
+    _selectedMode = widget.preferredMode ?? initial.mode;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -631,6 +705,38 @@ class _StatsContentState extends State<_StatsContent> {
           onSeasonChanged: widget.onSeasonChanged,
           refreshRemainingSeconds: widget.refreshRemainingSeconds,
         ),
+        if (widget.bundle.refreshError != null)
+          Text(
+            '최신 갱신 실패 · 이전 기록을 유지합니다. ${widget.bundle.refreshError}',
+            style: const TextStyle(color: BgmsColors.textSecondary),
+          )
+        else
+          Text(switch (profile.syncStatus) {
+            PlayerSyncStatus.saved =>
+              '시즌 지표 새 저장 완료 · 경기 수집 상태는 DB 이력에서 확인하세요.',
+            PlayerSyncStatus.cached => 'DB에 저장된 시즌 기록을 표시합니다.',
+            PlayerSyncStatus.partial =>
+              profile.updatedAt == null
+                  ? '일부 전적 갱신 실패 · 저장된 기록 기준 시각을 확인할 수 없습니다.'
+                  : '일부 전적 갱신 실패 · 이전 기록 기준 시간을 유지합니다.',
+            PlayerSyncStatus.saveFailed =>
+              profile.updatedAt == null
+                  ? 'DB 저장 실패 · 새 저장이 완료되지 않았습니다. 저장된 기록 기준 시각을 확인할 수 없습니다.'
+                  : 'DB 저장 실패 · 새 저장이 완료되지 않았습니다. 이전 기록 기준 시간을 유지합니다.',
+            PlayerSyncStatus.unknown => '시즌 기록의 DB 저장 상태를 확인할 수 없습니다.',
+          }, style: const TextStyle(color: BgmsColors.textSecondary)),
+        if (widget.bundle.collectionMessage != null)
+          Text(
+            widget.bundle.collectionMessage!,
+            style: const TextStyle(color: BgmsColors.textSecondary),
+          ),
+        Text(switch (profile.historyDiscoveryStatus) {
+          HistoryDiscoveryStatus.queued =>
+            '경기 수집 목록 등록 완료 · DB 전체 경기 이력에서 수집 진행을 확인하세요.',
+          HistoryDiscoveryStatus.failed =>
+            '경기 수집 목록 등록 실패 · DB 전체 경기 이력에서 기존 저장 기록을 확인하세요.',
+          HistoryDiscoveryStatus.unknown => '경기 수집 목록 등록 상태를 확인할 수 없습니다.',
+        }, style: const TextStyle(color: BgmsColors.textSecondary)),
         const SizedBox(height: 12),
 
         // 큐 선택 세그먼트 탭
@@ -676,13 +782,19 @@ class _StatsContentState extends State<_StatsContent> {
             stats: currentStats,
             recentMatches: widget.bundle.matches
                 .where(
-                  (m) => m.gameMode.toLowerCase().contains(
-                    _selectedMode.toLowerCase(),
-                  ),
+                  (m) =>
+                      MatchModeFilters.normalize(m.gameMode) == _selectedMode,
                 )
                 .take(20)
                 .toList(),
             isRanked: _selectedQueue == 'ranked',
+          ),
+        ] else if (profile.statsAvailability[_selectedQueue]?.status ==
+            StatsAvailabilityStatus.unavailable) ...[
+          const _StatePanel(
+            icon: Icons.cloud_off_outlined,
+            title: '시즌 지표 조회 불가',
+            body: '이 큐의 전적을 지금 확인할 수 없습니다. 플레이 기록이 없다는 뜻은 아닙니다.',
           ),
         ] else ...[
           _EmptyStatsPanel(
@@ -725,27 +837,33 @@ class _StatsContentState extends State<_StatsContent> {
 
   Widget _buildQueueTabItem(String queueKey, String label) {
     final isSelected = _selectedQueue == queueKey;
-    return GestureDetector(
-      onTap: () {
-        if (!isSelected) {
-          setState(() {
-            _selectedQueue = queueKey;
-          });
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? BgmsColors.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.black : BgmsColors.textSecondary,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      child: InkWell(
+        onTap: () {
+          if (!isSelected) {
+            setState(() {
+              _selectedQueue = queueKey;
+              widget.onModeChanged(_selectedQueue, _selectedMode);
+            });
+          }
+        },
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? BgmsColors.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.black : BgmsColors.textSecondary,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
           ),
         ),
       ),
@@ -766,12 +884,14 @@ class _StatsContentState extends State<_StatsContent> {
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
+              materialTapTargetSize: MaterialTapTargetSize.padded,
               label: Text(mode['label']!),
               selected: isSelected,
               onSelected: (selected) {
                 if (selected) {
                   setState(() {
                     _selectedMode = mode['key']!;
+                    widget.onModeChanged(_selectedQueue, _selectedMode);
                   });
                 }
               },
@@ -930,62 +1050,42 @@ class _MetricsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. 최근 매치 중 분석완료(fallback 아님) 매치 필터링
-    final validMatches = recentMatches.where((m) => !m.isFallback).toList();
-
-    double avgSurvivalTime = 0.0;
-    double top10Rate = 0.0;
-    double headshotRate = 0.0;
-
-    if (isRanked) {
-      if (validMatches.isNotEmpty) {
-        // top10 진입 횟수 계산 (rank가 1~10 사이)
-        final top10Count = validMatches
-            .where((m) => m.rank != null && m.rank! <= 10)
-            .length;
-        top10Rate = (top10Count / validMatches.length) * 100.0;
-
-        // 헤드샷 비율 계산
-        final totalKills = validMatches.fold<int>(
-          0,
-          (sum, match) => sum + (match.kills ?? 0),
-        );
-        final totalHeadshots = validMatches.fold<int>(
-          0,
-          (sum, m) => sum + m.headshotKills,
-        );
-        headshotRate = totalKills > 0
-            ? (totalHeadshots / totalKills * 100.0)
-            : 0.0;
-
-        // 생존 시간 계산
-        final totalSurvival = validMatches.fold<double>(
-          0,
-          (sum, m) => sum + m.timeSurvived,
-        );
-        avgSurvivalTime = totalSurvival / validMatches.length;
-      }
-    } else {
-      // 일반전일 때는 기존 PUBG API 제공값 기반
-      avgSurvivalTime = stats.roundsPlayed > 0
-          ? stats.timeSurvived / stats.roundsPlayed
-          : 0.0;
-      top10Rate = stats.top10Rate;
-      headshotRate = stats.kills > 0
-          ? (stats.headshotKills / stats.kills * 100.0)
-          : 0.0;
-    }
-
-    final survivalMinutes = (avgSurvivalTime / 60).floor();
-    final survivalSeconds = (avgSurvivalTime % 60).round();
-
-    // 생존 시간 표시 조건 (라운드 기록이 있거나 validMatches가 있을 때만 노출)
-    final hasSurvivalData = isRanked
-        ? validMatches.isNotEmpty
-        : stats.roundsPlayed > 0;
-    final survivalStr = hasSurvivalData
-        ? '$survivalMinutes분 $survivalSeconds초'
+    // 시즌 지표에 다른 큐의 최근 경기를 섞지 않는다.
+    final avgSurvivalTime = stats.roundsPlayed > 0
+        ? stats.timeSurvived / stats.roundsPlayed
+        : 0.0;
+    final top10Rate = stats.top10Rate;
+    final rankedSamples = recentMatches
+        .where(
+          (match) =>
+              !match.isFallback &&
+              match.matchType?.trim().toLowerCase() == 'competitive' &&
+              match.kills != null,
+        )
+        .toList();
+    final sampledKills = rankedSamples.fold<int>(
+      0,
+      (total, match) => total + match.kills!,
+    );
+    final sampledHeadshots = rankedSamples.fold<int>(
+      0,
+      (total, match) => total + match.headshotKills,
+    );
+    // 경쟁전 API는 헤드샷 합계를 제공하지 않는다. 확인된 경쟁전 표본만 쓴다.
+    final headshotRate = isRanked
+        ? sampledKills > 0
+              ? sampledHeadshots / sampledKills * 100.0
+              : 0.0
+        : stats.kills > 0
+        ? stats.headshotKills / stats.kills * 100.0
+        : 0.0;
+    final survivalTotalSeconds = avgSurvivalTime.round();
+    final survivalStr = stats.roundsPlayed > 0
+        ? '${survivalTotalSeconds ~/ 60}분 ${survivalTotalSeconds % 60}초'
         : '-';
+    final headshotStr = isRanked && rankedSamples.isEmpty
+        ? '-'
+        : '${headshotRate.toStringAsFixed(1)}%';
 
     final metrics = [
       _Metric('KDA', stats.kda.toStringAsFixed(2), Icons.adjust),
@@ -993,7 +1093,7 @@ class _MetricsGrid extends StatelessWidget {
       _Metric('승률', '${stats.winRate.toStringAsFixed(1)}%', Icons.emoji_events),
       _Metric('평균 생존 시간', survivalStr, Icons.hourglass_empty),
       _Metric('Top 10', '${top10Rate.toStringAsFixed(1)}%', Icons.leaderboard),
-      _Metric('헤드샷 비율', '${headshotRate.toStringAsFixed(1)}%', Icons.gps_fixed),
+      _Metric(isRanked ? '최근 경쟁전 헤드샷' : '헤드샷 비율', headshotStr, Icons.gps_fixed),
     ];
 
     return SectionBand(
@@ -1131,7 +1231,7 @@ class _MatchSummaryPanel extends StatelessWidget {
     final hasMore = matches.length > _previewCount;
 
     return SectionBand(
-      title: '최근 매치',
+      title: '최근 매치 · 모든 모드',
       icon: Icons.receipt_long_outlined,
       action: Text(
         '${matches.length}경기',
@@ -1159,6 +1259,9 @@ class _MatchSummaryPanel extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
+          const Text(
+            '최근 경기 목록은 모든 큐·모드의 최신 최대 20경기입니다. 상단 선택은 시즌 지표에 적용됩니다. DB 전체 경기 이력은 별도 조회합니다.',
+          ),
           if (matches.isEmpty)
             Container(
               width: double.infinity,
@@ -1169,7 +1272,7 @@ class _MatchSummaryPanel extends StatelessWidget {
                 border: Border.all(color: BgmsColors.border),
               ),
               child: Text(
-                '최근 매치가 없거나 서버에 저장된 경기 기록이 없습니다.',
+                '표시할 최근 경기가 없습니다. 과거에 저장된 기록은 DB 전체 경기 이력에서 확인하세요.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: BgmsColors.textSecondary,
                 ),
@@ -1234,65 +1337,67 @@ class _MatchSummaryPanel extends StatelessWidget {
               },
               icon: const Icon(Icons.list_alt, size: 18),
               label: Text(
-                hasMore ? '전체 보기 (${matches.length}경기)' : '전체 보기 · 모드별 필터',
+                hasMore ? '최근 ${matches.length}경기 보기' : '최근 경기 · 모드별 필터',
               ),
             ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (context) =>
-                        PlayerMatchHistoryScreen(profile: bundle.profile),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.history, size: 18),
-              label: const Text('전체 이력 조회'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (context) => WeaponMasteryScreen(
-                      nickname: bundle.profile.nickname,
-                      platform: bundle.profile.platform,
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.workspace_premium_outlined, size: 18),
-              label: const Text('무기 숙련도'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (context) => EncounterScreen(
-                      nickname: bundle.profile.nickname,
-                      platform: bundle.profile.platform,
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.people_outline, size: 18),
-              label: const Text('만난 상대 · 관심 등록'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (context) => const BanWatchScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.visibility_outlined, size: 18),
-              label: const Text('관심 추적 목록'),
-            ),
           ],
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => PlayerMatchHistoryScreen(
+                    profile: bundle.profile,
+                    initialCollectAvailableAt: bundle.collectionAvailableAt,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.history, size: 18),
+            label: const Text('DB 전체 경기 이력'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => WeaponMasteryScreen(
+                    nickname: bundle.profile.nickname,
+                    platform: bundle.profile.platform,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.workspace_premium_outlined, size: 18),
+            label: const Text('무기 숙련도'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => EncounterScreen(
+                    nickname: bundle.profile.nickname,
+                    platform: bundle.profile.platform,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.people_outline, size: 18),
+            label: const Text('만난 상대 · 관심 등록'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => const BanWatchScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.visibility_outlined, size: 18),
+            label: const Text('관심 추적 목록'),
+          ),
         ],
       ),
     );
@@ -1653,7 +1758,7 @@ class _ProfileHeader extends StatelessWidget {
             if (updatedAt != null) ...[
               const SizedBox(height: 12),
               Text(
-                '동기화 시간: ${updatedAt.toLocal()}'.split('.').first,
+                '시즌 기록 기준: ${updatedAt.toLocal()}'.split('.').first,
                 style: const TextStyle(
                   color: BgmsColors.textMuted,
                   fontSize: 11,
@@ -1662,8 +1767,7 @@ class _ProfileHeader extends StatelessWidget {
             ],
             _AvailabilityNotice(
               availability: profile.statsAvailability,
-              retryAfterSeconds:
-                  refreshRemainingSeconds ?? profile.retryAfterSeconds,
+              retryAfterSeconds: refreshRemainingSeconds,
             ),
           ],
         ),
@@ -1704,7 +1808,7 @@ class _AvailabilityNotice extends StatelessWidget {
     final messages = states
         .map(stateText)
         .where((message) => message.isNotEmpty)
-        .toList(growable: false);
+        .toList();
     if (retry != null && retry > 0) {
       messages.add('$retry초 후 새로고침할 수 있습니다.');
     }

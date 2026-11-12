@@ -45,6 +45,52 @@ void main() {
     expect(profile.recentMatches, ['match-1', 'match-2']);
   });
 
+  test('초기 큐·모드는 기록이 있는 항목을 선택하고 모두 없으면 경쟁 스쿼드다', () {
+    final profile = PlayerStatsProfile.fromJson({
+      'stats': {
+        'ranked': {
+          'squad': {'roundsPlayed': 0},
+        },
+        'normal': {
+          'duo': {'roundsPlayed': 3},
+        },
+      },
+    });
+    expect(profile.firstPlayedMode, (queue: 'normal', mode: 'duo'));
+    expect(PlayerStatsProfile.fromJson({}).firstPlayedMode, (
+      queue: 'ranked',
+      mode: 'squad',
+    ));
+  });
+
+  test('저장 상태와 수집 등록 상태를 보존하고 부분 실패의 이전 시각을 유지한다', () {
+    for (final entry in {
+      'saved': PlayerSyncStatus.saved,
+      'cached': PlayerSyncStatus.cached,
+      'partial': PlayerSyncStatus.partial,
+      'save_failed': PlayerSyncStatus.saveFailed,
+    }.entries) {
+      final profile = PlayerStatsProfile.fromJson({
+        'syncStatus': entry.key,
+        'historyDiscoveryStatus': 'queued',
+        'updatedAt': '2026-10-01T12:00:00Z',
+      });
+      expect(profile.syncStatus, entry.value);
+      expect(profile.historyDiscoveryStatus, HistoryDiscoveryStatus.queued);
+      expect(profile.updatedAt, DateTime.utc(2026, 10, 1, 12));
+    }
+    final partial = PlayerStatsProfile.fromJson({
+      'syncStatus': 'partial',
+      'historyDiscoveryStatus': 'failed',
+    });
+    expect(partial.updatedAt, isNull);
+    expect(partial.historyDiscoveryStatus, HistoryDiscoveryStatus.failed);
+    expect(
+      PlayerStatsProfile.fromJson({}).syncStatus,
+      PlayerSyncStatus.unknown,
+    );
+  });
+
   test('MatchSummary parses common summary fields with fallback values', () {
     final summary = MatchSummary.fromJson('match-1', {
       'matchInfo': {

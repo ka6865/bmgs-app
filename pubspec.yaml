@@ -39,6 +39,7 @@ dependencies:
   dio: ^5.10.0
   shared_preferences: ^2.5.5
   supabase_flutter: ^2.15.4
+  image_picker: 1.2.3
   url_launcher: ^6.3.2
   package_info_plus: ^10.2.1
   flutter_local_notifications: 22.2.0

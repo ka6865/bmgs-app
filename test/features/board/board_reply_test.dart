@@ -19,6 +19,16 @@ class _ReplyRepository extends BoardRepository {
         ],
       });
   @override
+  Future<BoardCommentPage> fetchComments(int postId, {String? cursor}) async {
+    final post = await fetchPost(postId);
+    return BoardCommentPage(
+      items: post.comments,
+      totalCount: post.comments.length,
+      hasMore: false,
+    );
+  }
+
+  @override
   Future<void> createComment({
     required int postId,
     required String content,
@@ -41,7 +51,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('원댓글 작성자님에게 답글'), findsOneWidget);
-    expect(find.text('현재 서버는 오래된 댓글부터 최대 50개를 제공합니다.'), findsOneWidget);
+    expect(find.text('댓글 2개'), findsOneWidget);
+    expect(find.text('현재 서버는 오래된 댓글부터 최대 50개를 제공합니다.'), findsNothing);
     await tester.ensureVisible(find.text('답글').first);
     await tester.tap(find.text('답글').first);
     await tester.pumpAndSettle();

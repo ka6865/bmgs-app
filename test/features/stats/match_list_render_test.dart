@@ -101,7 +101,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('최근 매치'), findsOneWidget);
+    expect(find.text('최근 매치 · 모든 모드'), findsOneWidget);
     expect(find.text('4경기'), findsOneWidget);
 
     // 매치 리스트에는 모드 필터를 두지 않는다. 항상 전체를 보여준다.
@@ -143,7 +143,7 @@ void main() {
     // 미리보기는 5건까지만 노출하고 나머지는 전체 보기로 넘긴다.
     expect(find.byType(MatchCard), findsNWidgets(5));
 
-    final button = find.textContaining('전체 보기');
+    final button = find.text('최근 6경기 보기');
     expect(button, findsOneWidget);
     // 버튼이 화면 아래에 있어 스크롤로 노출한 뒤 누른다.
     await tester.scrollUntilVisible(
@@ -156,7 +156,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 전체 매치 화면으로 이동해 6건과 모드 필터가 보인다.
-    expect(find.text('전체 매치'), findsOneWidget);
+    expect(find.text('최근 경기 목록'), findsOneWidget);
     expect(find.byType(MatchCard), findsNWidgets(6));
     expect(find.widgetWithText(ChoiceChip, '전체'), findsOneWidget);
   });

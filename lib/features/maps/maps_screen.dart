@@ -36,6 +36,22 @@ class _MapsScreenState extends State<MapsScreen> {
     _markerFuture = _loadMarkers();
   }
 
+  @override
+  void didUpdateWidget(covariant MapsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialMapId == oldWidget.initialMapId ||
+        widget.initialMapId == null) {
+      return;
+    }
+    final map = _repository.resolveMap(widget.initialMapId);
+    if (map.id == _selectedMap.id) return;
+    _selectedMap = map;
+    _layers.clear();
+    _adminSettings = {};
+    _showFilters = false;
+    _markerFuture = _loadMarkers();
+  }
+
   Future<MapMarkerLayer> _loadMarkers() async {
     final generation = ++_loadGeneration;
     final mapId = _selectedMap.id;
@@ -531,8 +547,14 @@ class MapTileMosaic extends StatelessWidget {
                     color: BgmsColors.bgBase,
                     border: Border.all(color: BgmsColors.border),
                   ),
-                  child: const Center(child: Icon(Icons.broken_image_outlined,
-                    size: 18, color: BgmsColors.textMuted, semanticLabel: '지도 타일을 불러오지 못했습니다')),
+                  child: const Center(
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      size: 18,
+                      color: BgmsColors.textMuted,
+                      semanticLabel: '지도 타일을 불러오지 못했습니다',
+                    ),
+                  ),
                 );
               },
             );

@@ -8,6 +8,9 @@ import '../maps/map_models.dart';
 import 'match_detail_models.dart';
 import 'match_detail_repository.dart';
 import 'player_stats_models.dart';
+import 'match_ai_repository.dart';
+import 'widgets/match_team_and_ai.dart';
+import '../../core/widgets/share_button.dart';
 
 class MatchDetailScreen extends StatefulWidget {
   const MatchDetailScreen({
@@ -17,6 +20,7 @@ class MatchDetailScreen extends StatefulWidget {
     required this.platform,
     required this.summary,
     this.repository,
+    this.aiRepository,
   });
 
   final String matchId;
@@ -24,6 +28,9 @@ class MatchDetailScreen extends StatefulWidget {
   final String platform;
   final MatchSummary summary;
   final MatchDetailRepository? repository;
+
+  /// 단일 경기 AI 분석 요청. 테스트에서 주입한다.
+  final MatchAiRepository? aiRepository;
 
   @override
   State<MatchDetailScreen> createState() => _MatchDetailScreenState();
@@ -59,7 +66,9 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
   }
 
   void _retry() {
-    setState(() => _detailFuture = _loadDetail());
+    setState(() {
+      _detailFuture = _loadDetail();
+    });
   }
 
   @override
@@ -68,15 +77,6 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
       future: _detailFuture,
       builder: (context, snapshot) {
         final detail = snapshot.data;
-        final normalizedMap = normalizeBgmsMapId(
-          detail?.mapId ??
-              widget.summary.mapId ??
-              detail?.mapName ??
-              widget.summary.mapName,
-        );
-        final supportedMap = bgmsMapCatalog
-            .where((map) => map.id.toLowerCase() == normalizedMap)
-            .firstOrNull;
         return Scaffold(
           appBar: AppBar(
             backgroundColor: BgmsColors.bgBase,
@@ -99,61 +99,23 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                 subtitle: detail == null
                     ? widget.matchId
                     : '${bgmsMapDisplayName(detail.mapName)} · ${detail.gameMode}',
-                trailing: IconButton(
-                  onPressed: _retry,
-                  icon: const Icon(Icons.refresh, color: BgmsColors.accent),
-                  tooltip: '새로고침',
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      onPressed: _retry,
+                      icon: const Icon(Icons.refresh, color: BgmsColors.accent),
+                      tooltip: '새로고침',
+                    ),
+                    ShareButton(
+                      title: '${widget.nickname} 매치 분석 - BGMS',
+                      path:
+                          '/stats/${widget.platform}/${Uri.encodeComponent(widget.nickname)}/matches/${Uri.encodeComponent(widget.matchId)}',
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.map_outlined),
-                    label: const Text('이 경기 전술 지도'),
-                    onPressed: supportedMap == null
-                        ? null
-                        : () => context.push(
-                            Uri(
-                              path: '/maps',
-                              queryParameters: {'mapId': supportedMap.id},
-                            ).toString(),
-                          ),
-                  ),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.local_fire_department_outlined),
-                    label: const Text('이 맵 핫드랍'),
-                    onPressed: supportedMap == null
-                        ? null
-                        : () => context.push(
-                            Uri(
-                              path: '/hotdrop',
-                              queryParameters: {'mapId': supportedMap.id},
-                            ).toString(),
-                          ),
-                  ),
-                ],
-              ),
-              if (supportedMap == null)
-                const Text('이 경기의 전술 지도·핫드랍·리플레이 맵은 현재 지원하지 않습니다.'),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.play_circle_outline),
-                label: const Text('경기 2D 리플레이'),
-                onPressed: supportedMap == null
-                    ? null
-                    : () => context.push(
-                        Uri(
-                          path: '/replay/${widget.matchId}',
-                          queryParameters: {
-                            'nickname': widget.nickname,
-                            'platform': widget.platform,
-                            'mapId': supportedMap.id,
-                          },
-                        ).toString(),
-                      ),
-              ),
-              const SizedBox(height: 12),
               if (snapshot.connectionState == ConnectionState.waiting &&
                   detail == null)
                 const _LoadingCard()
@@ -166,10 +128,63 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                         nickname: widget.nickname,
                       ),
                 ),
+              const SizedBox(height: 12),
+              if (detail != null && !detail.isFallback)
+                MatchAiSection(
+                  matchId: widget.matchId,
+                  nickname: widget.nickname,
+                  platform: widget.platform,
+                  repository: widget.aiRepository,
+                ),
+              const SizedBox(height: 16),
+              _ReplayButton(
+                matchId: widget.matchId,
+                nickname: widget.nickname,
+                platform: widget.platform,
+                mapName:
+                    detail?.mapId ?? detail?.mapName ?? widget.summary.mapName,
+              ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _ReplayButton extends StatelessWidget {
+  const _ReplayButton({
+    required this.matchId,
+    required this.nickname,
+    required this.platform,
+    required this.mapName,
+  });
+
+  final String matchId, nickname, platform;
+  final String? mapName;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = normalizeBgmsMapId(mapName);
+    final map = bgmsMapCatalog
+        .where((map) => map.id.toLowerCase() == normalized)
+        .firstOrNull;
+    if (map == null) {
+      return const Text('이 맵은 2D 리플레이를 지원하지 않습니다.');
+    }
+    return FilledButton.icon(
+      icon: const Icon(Icons.play_circle_outline),
+      label: const Text('2D 리플레이 보기'),
+      onPressed: () => context.push(
+        Uri(
+          path: '/replay/$matchId',
+          queryParameters: {
+            'nickname': nickname,
+            'platform': platform,
+            'mapId': map.id,
+          },
+        ).toString(),
+      ),
     );
   }
 }
@@ -191,6 +206,11 @@ class _DetailContent extends StatelessWidget {
         // 2. 기본 지표 격자 (순위, 킬, 데미지 등)
         _MetricGrid(detail: detail),
         const SizedBox(height: 12),
+
+        if (detail.team.isNotEmpty) ...[
+          MatchTeamCard(team: detail.team, nickname: detail.nickname),
+          const SizedBox(height: 12),
+        ],
 
         if (!detail.isFallback && !detail.hasTacticalAnalysis)
           const BgmsCard(
@@ -356,10 +376,10 @@ class _MetricGrid extends StatelessWidget {
       _DetailMetric('가한 피해량', detail.damage?.toStringAsFixed(0) ?? '-'),
       _DetailMetric('생존 시간', detail.survivalText),
       _DetailMetric(
-        '스쿼드 총 킬',
+        '팀 총 킬',
         detail.teamKills > 0 ? '${detail.teamKills}' : '-',
       ),
-      _DetailMetric('맵 코드', detail.mapId ?? detail.mapName),
+      _DetailMetric('맵', bgmsMapDisplayName(detail.mapName)),
     ];
 
     return LayoutBuilder(

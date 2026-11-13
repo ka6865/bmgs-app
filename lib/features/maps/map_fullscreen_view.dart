@@ -83,7 +83,7 @@ class _MapFullscreenViewState extends State<MapFullscreenView> {
         child: InteractiveViewer(
           transformationController: _transformationController,
           minScale: 1.0,
-          maxScale: 6.0,
+          maxScale: 10.0,
           child: AspectRatio(
             aspectRatio: 1,
             child: Stack(

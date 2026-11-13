@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/network/api_exception.dart';
-import '../../../core/theme/bgms_theme.dart';
+import '../network/api_exception.dart';
+import '../player/player_suggestion_controller.dart';
+import '../theme/bgms_theme.dart';
 
 /// 검색 입력 아래에 뜨는 닉네임 후보 목록.
 ///
@@ -109,6 +110,80 @@ class _SuggestionRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 닉네임 입력([child]) 아래에 서버 닉네임 후보를 붙인다.
+///
+/// [fetcher]가 없으면(위젯 테스트 등) 입력만 그린다.
+class PlayerSuggestionField extends StatefulWidget {
+  const PlayerSuggestionField({
+    super.key,
+    required this.controller,
+    required this.fetcher,
+    required this.onSelected,
+    required this.child,
+  });
+
+  final TextEditingController controller;
+  final PlayerSuggestionFetcher? fetcher;
+  final ValueChanged<PlayerSuggestion> onSelected;
+  final Widget child;
+
+  @override
+  State<PlayerSuggestionField> createState() => _PlayerSuggestionFieldState();
+}
+
+class _PlayerSuggestionFieldState extends State<PlayerSuggestionField> {
+  PlayerSuggestionController? _suggestions;
+
+  /// 후보를 골라 입력이 바뀐 경우엔 같은 후보를 다시 띄우지 않는다.
+  String? _chosen;
+
+  @override
+  void initState() {
+    super.initState();
+    final fetcher = widget.fetcher;
+    if (fetcher == null) return;
+    _suggestions = PlayerSuggestionController(fetch: fetcher)
+      ..onChanged = () {
+        if (mounted) setState(() {});
+      };
+    widget.controller.addListener(_onText);
+  }
+
+  void _onText() {
+    final text = widget.controller.text;
+    if (text == _chosen) return;
+    _chosen = null;
+    _suggestions?.onQueryChanged(text);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onText);
+    _suggestions?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final suggestions = _suggestions;
+    if (suggestions == null) return widget.child;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        widget.child,
+        PlayerSuggestionList(
+          suggestions: suggestions.suggestions,
+          onSelected: (suggestion) {
+            _chosen = suggestion.nickname;
+            suggestions.clear();
+            widget.onSelected(suggestion);
+          },
+        ),
+      ],
     );
   }
 }

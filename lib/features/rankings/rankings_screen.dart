@@ -110,6 +110,8 @@ class _RankingsScreenState extends State<RankingsScreen> {
     });
   }
 
+  bool _showFilters = false;
+
   bool get _hasActiveFilters =>
       _mode != 'all' || _perspective != 'all' || _matchType != 'all';
 
@@ -156,14 +158,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          ScreenHeader(
-            title: '랭킹',
-            trailing: IconButton(
-              tooltip: '새로고침',
-              onPressed: _reload,
-              icon: const Icon(Icons.refresh),
-            ),
-          ),
+          const ScreenHeader(title: '랭킹'),
           const SizedBox(height: BgmsSpacing.lg),
           SegmentedButton<String>(
             segments: [
@@ -179,20 +174,35 @@ class _RankingsScreenState extends State<RankingsScreen> {
               });
             },
           ),
-          const SizedBox(height: BgmsSpacing.md),
-          for (final axis in axes) ...[
-            _FilterChipRow(axis: axis),
-            const SizedBox(height: BgmsSpacing.sm),
-          ],
-          if (_hasActiveFilters)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _resetFilters,
-                icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
-                label: const Text('필터 초기화'),
+          const SizedBox(height: BgmsSpacing.sm),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: () => setState(() => _showFilters = !_showFilters),
+                icon: Icon(
+                  _showFilters ? Icons.expand_less : Icons.tune,
+                  size: 18,
+                ),
+                label: Text(
+                  _hasActiveFilters
+                      ? '필터 · ${[for (final axis in axes)
+                          if (axis.value != 'all') axis.options[axis.value]].join(' · ')}'
+                      : '필터',
+                ),
               ),
-            ),
+              const Spacer(),
+              if (_hasActiveFilters)
+                TextButton(
+                  onPressed: _resetFilters,
+                  child: const Text('필터 초기화'),
+                ),
+            ],
+          ),
+          if (_showFilters)
+            for (final axis in axes) ...[
+              _FilterChipRow(axis: axis),
+              const SizedBox(height: BgmsSpacing.sm),
+            ],
           const SizedBox(height: BgmsSpacing.sm),
           FutureBuilder<RankingBoard>(
             future: _boardFuture,
@@ -306,19 +316,71 @@ class _RankingBoardView extends StatelessWidget {
       );
     }
 
-    return SectionCard(
-      title: _title(board.query.tab),
-      subtitle: board.displayMessage,
-      action: Chip(
-        label: Text(board.displaySourceLabel),
-        visualDensity: VisualDensity.compact,
-      ),
-      child: Column(
-        children: [
-          for (final entry in board.entries)
-            _RankingTile(entry: entry, tab: board.query.tab),
+    final entries = board.entries;
+    // 동점·누락으로 1~3위가 온전하지 않으면 시상대 없이 목록만 보여준다.
+    final podium =
+        entries.length >= 3 &&
+            [for (final entry in entries.take(3)) entry.rank].join() == '123'
+        ? entries.take(3).toList()
+        : const <RankingEntry>[];
+    final rest = entries.skip(podium.length).toList();
+    final tab = board.query.tab;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          _title(tab),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        Text(
+          [
+            board.displayMessage,
+            board.displaySourceLabel,
+          ].where((text) => text.isNotEmpty).join(' · '),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: BgmsColors.textMuted),
+        ),
+        const SizedBox(height: BgmsSpacing.md),
+        if (podium.isNotEmpty) ...[
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // 가운데가 1위가 되도록 2-1-3 순서로 놓는다.
+                for (final entry in [podium[1], podium[0], podium[2]])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: _PodiumCard(entry: entry, tab: tab),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: BgmsSpacing.md),
         ],
-      ),
+        if (rest.isNotEmpty)
+          Material(
+            color: BgmsColors.surface,
+            shape: BgmsShape.panel(
+              side: const BorderSide(color: BgmsColors.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (final (index, entry) in rest.indexed) ...[
+                  if (index > 0)
+                    const Divider(height: 1, color: BgmsColors.border),
+                  _RankingTile(entry: entry, tab: tab),
+                ],
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -337,37 +399,12 @@ class _RankingTile extends StatelessWidget {
   final RankingEntry entry;
   final String tab;
 
-  /// 1~3위는 메달 색으로 강조하고 나머지는 기본 표면색을 쓴다.
-  Color get _rankColor => switch (entry.rank) {
-    1 => const Color(0xFFFFD54F),
-    2 => const Color(0xFFCFD8DC),
-    3 => const Color(0xFFD98A55),
-    _ => BgmsColors.textSecondary,
-  };
-
-  String get _valueText {
-    return switch (tab) {
-      'kills' => '${entry.value.toStringAsFixed(0)} 킬',
-      'tier' => '${entry.value.toStringAsFixed(1)} 점',
-      _ => '${entry.value.toStringAsFixed(0)} 딜',
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isTopThree = entry.rank <= 3;
-
     return InkWell(
-      borderRadius: BgmsRadius.md,
-      onTap: () {
-        final destination = PlayerSearchDestination(
-          nickname: entry.nickname,
-          platform: normalizePlayerPlatform(entry.platform),
-        );
-        context.go(destination.location);
-      },
+      onTap: () => _openPlayer(context, entry),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: BgmsSpacing.sm),
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
         child: Row(
           children: [
             SizedBox(
@@ -375,10 +412,7 @@ class _RankingTile extends StatelessWidget {
               child: Text(
                 '${entry.rank}',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: _rankColor,
-                  fontWeight: isTopThree ? FontWeight.w900 : FontWeight.w700,
-                ),
+                style: BgmsText.number(20, color: BgmsColors.textSecondary),
               ),
             ),
             const SizedBox(width: BgmsSpacing.sm),
@@ -386,25 +420,33 @@ class _RankingTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    entry.nickname,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          entry.nickname,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        entry.platform.toUpperCase(),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: BgmsColors.textMuted,
+                        ),
+                      ),
+                      if (entry.label.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          entry.label,
+                          style: const TextStyle(color: BgmsColors.accent),
+                        ),
+                      ],
+                    ],
                   ),
-                  Text(
-                    entry.platform.toUpperCase(),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: BgmsColors.textMuted,
-                    ),
-                  ),
-                  if (entry.label.isNotEmpty)
-                    Text(
-                      entry.label,
-                      style: const TextStyle(color: BgmsColors.accent),
-                    ),
                   if (entry.mapName != null || entry.gameMode != null)
                     Text(
                       [
@@ -415,42 +457,123 @@ class _RankingTile extends StatelessWidget {
                           .whereType<String>()
                           .where((value) => value.isNotEmpty)
                           .join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                  if (entry.createdAt != null)
-                    Text(
-                      entry.createdAt!.toLocal().toString().substring(0, 16),
-                      style: Theme.of(context).textTheme.bodySmall,
+                  DefaultTextStyle.merge(
+                    style: const TextStyle(
+                      color: BgmsColors.textSecondary,
+                      fontSize: 12,
                     ),
-                  if (entry.secondary != null)
-                    Text(
-                      tab == 'damage'
-                          ? '${entry.secondary!.toStringAsFixed(0)} 킬'
-                          : '${entry.secondary!.toStringAsFixed(0)} 딜',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    child: Wrap(
+                      spacing: 8,
+                      children: [
+                        if (entry.secondary != null)
+                          Text(
+                            tab == 'damage'
+                                ? '${entry.secondary!.toStringAsFixed(0)} 킬'
+                                : '${entry.secondary!.toStringAsFixed(0)} 딜',
+                          ),
+                      ],
                     ),
-                  if (entry.matchCount != null)
-                    Text(
-                      '${entry.matchCount}경기',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: BgmsSpacing.sm),
-            Text(
-              _valueText,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: isTopThree ? BgmsColors.accent : BgmsColors.textPrimary,
-              ),
-            ),
+            Text(_valueText(entry, tab), style: BgmsText.number(20)),
             const Icon(
               Icons.chevron_right,
               size: 18,
               color: BgmsColors.textMuted,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+String _valueText(RankingEntry entry, String tab) => switch (tab) {
+  'kills' => '${entry.value.toStringAsFixed(0)} 킬',
+  'tier' => '${entry.value.toStringAsFixed(1)} 점',
+  _ => '${entry.value.toStringAsFixed(0)} 딜',
+};
+
+void _openPlayer(BuildContext context, RankingEntry entry) {
+  final destination = PlayerSearchDestination(
+    nickname: entry.nickname,
+    platform: normalizePlayerPlatform(entry.platform),
+  );
+  context.go(destination.location);
+}
+
+/// 1~3위 시상대. 1위만 골드, 높이로 순위를 보여준다.
+class _PodiumCard extends StatelessWidget {
+  const _PodiumCard({required this.entry, required this.tab});
+
+  final RankingEntry entry;
+  final String tab;
+
+  @override
+  Widget build(BuildContext context) {
+    final first = entry.rank == 1;
+    final theme = Theme.of(context);
+    return Material(
+      color: first ? BgmsColors.elevated : BgmsColors.surface,
+      shape: BgmsShape.panel(
+        side: BorderSide(color: first ? BgmsColors.accent : BgmsColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openPlayer(context, entry),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(8, first ? 18 : 10, 8, 12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                '${entry.rank}',
+                style: BgmsText.number(
+                  first ? 40 : 30,
+                  color: first ? BgmsColors.accent : BgmsColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                entry.nickname,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                [
+                  entry.platform.toUpperCase(),
+                  if (entry.label.isNotEmpty) entry.label,
+                ].join(' · '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: BgmsColors.textMuted,
+                ),
+              ),
+              const SizedBox(height: 6),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  _valueText(entry, tab),
+                  style: BgmsText.number(
+                    first ? 24 : 20,
+                    color: first ? BgmsColors.accent : BgmsColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

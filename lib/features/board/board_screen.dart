@@ -8,6 +8,7 @@ import 'board_models.dart';
 import 'board_categories.dart';
 import 'board_repository.dart';
 import 'board_write_dialog.dart';
+import '../../core/widgets/cached_image.dart';
 
 class BoardScreen extends StatefulWidget {
   const BoardScreen({super.key});
@@ -92,7 +93,7 @@ class _BoardScreenState extends State<BoardScreen> {
           content: const Text('글쓰기는 로그인 후 이용할 수 있습니다.'),
           action: SnackBarAction(
             label: '로그인',
-            onPressed: () => context.go('/my'),
+            onPressed: () => context.push('/my'),
           ),
         ),
       );
@@ -118,13 +119,12 @@ class _BoardScreenState extends State<BoardScreen> {
         children: [
           ScreenHeader(
             title: '커뮤니티',
-            trailing: IconButton(
-              onPressed: _openWriteDialog,
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: '글쓰기',
-              style: IconButton.styleFrom(
-                backgroundColor: BgmsColors.accent,
-                foregroundColor: BgmsColors.bgBase,
+            trailing: Tooltip(
+              message: '글쓰기',
+              child: FilledButton.icon(
+                onPressed: _openWriteDialog,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('글쓰기'),
               ),
             ),
           ),
@@ -195,7 +195,22 @@ class _BoardScreenState extends State<BoardScreen> {
                   : '이 조건에 맞는 글이 없습니다. 다른 분류를 선택해 보세요.',
             )
           else
-            ..._posts.map((post) => _PostTile(post: post)),
+            Material(
+              color: BgmsColors.surface,
+              shape: BgmsShape.panel(
+                side: const BorderSide(color: BgmsColors.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  for (final (index, post) in _posts.indexed) ...[
+                    if (index > 0)
+                      const Divider(height: 1, color: BgmsColors.border),
+                    _PostTile(post: post),
+                  ],
+                ],
+              ),
+            ),
           if (_hasMore && !_loading)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -210,6 +225,7 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 }
 
+/// 웹 모바일 게시판(components/board/PostItem.tsx)과 같은 한 줄 구성.
 class _PostTile extends StatelessWidget {
   const _PostTile({required this.post});
 
@@ -217,83 +233,114 @@ class _PostTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.labelSmall?.copyWith(
+      color: BgmsColors.textMuted,
+    );
+    final category = post.isNotice
+        ? '공지'
+        : BoardCategories.canonical(post.category);
+
+    return Material(
+      color: post.isNotice
+          ? BgmsColors.accent.withValues(alpha: 0.05)
+          : Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
         onTap: () => context.push('/board/${post.id}'),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (post.imageUrl != null) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Image.network(
-                    post.imageUrl!,
-                    width: 72,
-                    height: 72,
-                    fit: BoxFit.cover,
-                    // 실패해도 72px 자리를 유지해 목록 행 높이가 흔들리지 않게 한다.
-                    errorBuilder: (_, _, _) => const _ThumbnailPlaceholder(),
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return const _ThumbnailPlaceholder();
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        if (post.isNotice)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 6),
-                            child: Icon(
-                              Icons.campaign,
-                              size: 16,
-                              color: BgmsColors.accent,
-                            ),
-                          ),
-                        Expanded(
-                          child: Text(
-                            post.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w800),
-                          ),
+                        _CategoryLabel(
+                          text: category,
+                          highlight: post.isNotice,
                         ),
+                        const Spacer(),
+                        Text(_timeAgo(post.createdAt), style: muted),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${post.author} · ${_shortDate(post.createdAt)}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    const SizedBox(height: 6),
+                    Text.rich(
+                      TextSpan(
+                        text: post.title,
+                        children: [
+                          if (post.imageUrl != null)
+                            const WidgetSpan(
+                              alignment: PlaceholderAlignment.middle,
+                              child: Padding(
+                                padding: EdgeInsets.only(left: 5),
+                                child: Icon(
+                                  Icons.image_outlined,
+                                  size: 14,
+                                  color: BgmsColors.success,
+                                ),
+                              ),
+                            ),
+                          if (post.commentCount > 0)
+                            TextSpan(
+                              text: ' [${post.commentCount}]',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: BgmsColors.accent.withValues(alpha: 0.7),
+                              ),
+                            ),
+                        ],
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: post.isNotice
+                            ? FontWeight.w700
+                            : FontWeight.w600,
+                        color: post.isNotice
+                            ? BgmsColors.accent
+                            : BgmsColors.textPrimary,
+                        height: 1.3,
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
+                    const SizedBox(height: 6),
+                    Row(
                       children: [
-                        _MetaChip(
-                          icon: Icons.forum,
-                          text: '${post.commentCount}',
+                        Expanded(
+                          child: Text(
+                            post.author,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: BgmsColors.textSecondary,
+                            ),
+                          ),
                         ),
-                        _MetaChip(
-                          icon: Icons.visibility,
-                          text: '${post.views}',
+                        Text(
+                          '조회 ${post.views} · 추천 ${post.likes}',
+                          style: muted,
                         ),
-                        _MetaChip(icon: Icons.thumb_up, text: '${post.likes}'),
                       ],
                     ),
                   ],
                 ),
               ),
+              if (post.imageUrl != null) ...[
+                const SizedBox(width: 12),
+                ClipRRect(
+                  borderRadius: BgmsRadius.md,
+                  child: Image(
+                    image: cachedImageProvider(post.imageUrl!),
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        const SizedBox.square(dimension: 56),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -302,52 +349,43 @@ class _PostTile extends StatelessWidget {
   }
 }
 
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.icon, required this.text});
+class _CategoryLabel extends StatelessWidget {
+  const _CategoryLabel({required this.text, required this.highlight});
 
-  final IconData icon;
   final String text;
+  final bool highlight;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: Theme.of(context).colorScheme.outline),
-        const SizedBox(width: 3),
-        Text(text, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-  }
-}
-
-String _shortDate(String value) {
-  if (value.length >= 10) return value.substring(0, 10);
-  return value;
-}
-
-/// 게시글 썸네일 자리를 지키는 대체 박스.
-///
-/// 로딩 중과 실패 상황 모두 같은 크기를 차지해 목록 행 높이가 변하지 않는다.
-class _ThumbnailPlaceholder extends StatelessWidget {
-  const _ThumbnailPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 72,
-      height: 72,
-      alignment: Alignment.center,
+    final color = highlight ? BgmsColors.accent : BgmsColors.textSecondary;
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: BgmsColors.surface,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: BgmsColors.border),
+        color: color.withValues(alpha: highlight ? 0.2 : 0.08),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BgmsRadius.sm,
       ),
-      child: const Icon(
-        Icons.image_outlined,
-        size: 20,
-        color: BgmsColors.textMuted,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Text(
+          text,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
+}
+
+/// 웹 formatTimeAgo처럼 하루 안은 상대 시간, 그 뒤는 날짜만 보여준다.
+String _timeAgo(String value) {
+  final date = DateTime.tryParse(value)?.toLocal();
+  if (date == null) return value.length >= 10 ? value.substring(0, 10) : value;
+  final diff = DateTime.now().difference(date);
+  if (diff.inMinutes < 1) return '방금 전';
+  if (diff.inHours < 1) return '${diff.inMinutes}분 전';
+  if (diff.inDays < 1) return '${diff.inHours}시간 전';
+  if (diff.inDays < 7) return '${diff.inDays}일 전';
+  return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
 }

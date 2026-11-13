@@ -1,3 +1,5 @@
+import 'package:bgms_mobile_app/features/stats/player_match_history_models.dart';
+import 'package:bgms_mobile_app/features/stats/player_match_history_repository.dart';
 import 'package:bgms_mobile_app/features/stats/player_stats_models.dart';
 import 'package:bgms_mobile_app/features/stats/player_stats_repository.dart';
 import 'package:bgms_mobile_app/features/stats/stats_detail_screen.dart';
@@ -23,6 +25,7 @@ class _SingleModeRepository extends Fake implements PlayerStatsRepository {
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) {
     return SynchronousFuture(
       PlayerStatsBundle(
@@ -66,6 +69,41 @@ class _SingleModeRepository extends Fake implements PlayerStatsRepository {
   }
 }
 
+class _HistoryRepository extends PlayerMatchHistoryRepository {
+  final requestedPages = <int>[];
+  final requestedFilters = <String>[];
+
+  @override
+  Future<PlayerMatchHistoryPage> fetchPage({
+    required String nickname,
+    required String platform,
+    int page = 1,
+    String filter = 'all',
+  }) async {
+    requestedPages.add(page);
+    requestedFilters.add(filter);
+    return PlayerMatchHistoryPage.fromJson({
+      'page': page,
+      'totalPages': 2,
+      'totalCount': 3,
+      'matches': [
+        for (final id in page == 1 ? ['db-1', 'db-2'] : ['db-3'])
+          {
+            'match_id': id,
+            'map_name': 'Baltic_Main',
+            'game_mode': 'squad',
+            'kills': 2,
+            'damage': 150,
+            'win_place': 5,
+          },
+      ],
+      'performanceSummaries': {
+        'db-1': {'deathPhase': 4},
+      },
+    });
+  }
+}
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -85,23 +123,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.text('매치'));
+    await tester.pumpAndSettle();
   }
 
   testWidgets('필터 없이 모든 매치 카드를 렌더링한다', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: StatsDetailScreen(
-            nickname: 'KangHeeSung_',
-            platform: 'steam',
-            repository: _SingleModeRepository(),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await pump(tester, _SingleModeRepository());
 
-    expect(find.text('최근 매치 · 모든 모드'), findsOneWidget);
+    expect(find.text('최근 매치'), findsOneWidget);
     expect(find.text('4경기'), findsOneWidget);
 
     // 매치 리스트에는 모드 필터를 두지 않는다. 항상 전체를 보여준다.
@@ -126,38 +155,82 @@ void main() {
     final cards = find.byType(MatchCard);
     expect(cards, findsNWidgets(5));
 
-    // 상단 지표용 모드 칩(솔로/듀오/스쿼드) 3개만 있고,
-    // 매치 리스트를 좁히는 '전체' 칩은 없다.
-    expect(find.byType(ChoiceChip), findsNWidgets(3));
+    // 매치 구역에는 시즌 지표용 모드 칩도, 목록을 좁히는 칩도 없다.
+    expect(find.byType(ChoiceChip), findsNothing);
     expect(find.widgetWithText(ChoiceChip, '전체'), findsNothing);
   });
 
-  testWidgets('전체 보기 버튼으로 전체 매치 화면을 연다', (tester) async {
-    await pump(
-      tester,
-      _SingleModeRepository(
-        modes: const ['squad', 'duo-fpp', 'solo', 'squad-fpp', 'duo', 'solo'],
+  testWidgets('매치 탭은 DB 저장 경기를 20경기씩 더 불러온다', (tester) async {
+    final history = _HistoryRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'KangHeeSung_',
+            platform: 'steam',
+            repository: _SingleModeRepository(),
+            historyRepository: history,
+          ),
+        ),
       ),
     );
+    await tester.pumpAndSettle();
 
-    // 미리보기는 5건까지만 노출하고 나머지는 전체 보기로 넘긴다.
-    expect(find.byType(MatchCard), findsNWidgets(5));
+    expect(find.text('전체 매치'), findsOneWidget);
+    expect(find.text('총 3경기'), findsOneWidget);
+    expect(find.byType(MatchCard), findsNWidgets(2));
+    final more = find.text('20경기 더 보기 (2/3)');
+    await tester.ensureVisible(more);
+    await tester.pumpAndSettle();
+    await tester.tap(more);
+    await tester.pumpAndSettle();
 
-    final button = find.text('최근 6경기 보기');
-    expect(button, findsOneWidget);
-    // 버튼이 화면 아래에 있어 스크롤로 노출한 뒤 누른다.
-    await tester.scrollUntilVisible(
-      button,
-      400,
-      scrollable: find.byType(Scrollable).first,
+    expect(history.requestedPages, [1, 2]);
+    expect(find.byType(MatchCard, skipOffstage: false), findsNWidgets(3));
+    expect(find.textContaining('더 보기 ('), findsNothing);
+  });
+
+  test('DB 경기 이력은 분석 요약의 사망 페이즈를 붙인다', () {
+    final page = PlayerMatchHistoryPage.fromJson({
+      'matches': [
+        {'match_id': 'a', 'win_place': 3},
+        {'match_id': 'b', 'win_place': 9},
+      ],
+      'performanceSummaries': {
+        'a': {'deathPhase': 6},
+      },
+    });
+    expect(page.matches.first.deathPhase, 6);
+    expect(page.matches.last.deathPhase, isNull);
+  });
+
+  testWidgets('매치 탭 상단 필터는 서버에 다시 요청해 첫 페이지부터 보여준다', (tester) async {
+    final history = _HistoryRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatsDetailScreen(
+            nickname: 'KangHeeSung_',
+            platform: 'steam',
+            repository: _SingleModeRepository(),
+            historyRepository: history,
+          ),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(button);
+    final ranked = find.widgetWithText(ChoiceChip, '경쟁전');
+    await tester.ensureVisible(ranked);
+    await tester.tap(ranked);
     await tester.pumpAndSettle();
 
-    // 전체 매치 화면으로 이동해 6건과 모드 필터가 보인다.
-    expect(find.text('최근 경기 목록'), findsOneWidget);
-    expect(find.byType(MatchCard), findsNWidgets(6));
-    expect(find.widgetWithText(ChoiceChip, '전체'), findsOneWidget);
+    expect(history.requestedFilters, ['all', 'ranked']);
+    expect(history.requestedPages, [1, 1]);
+    expect(
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '경쟁전'))
+          .selected,
+      isTrue,
+    );
   });
 }

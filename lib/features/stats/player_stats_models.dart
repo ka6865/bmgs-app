@@ -341,6 +341,7 @@ class MatchSummary {
     this.matchType,
     this.headshotKills = 0,
     this.timeSurvived = 0.0,
+    this.deathPhase,
   });
 
   final String matchId;
@@ -360,6 +361,9 @@ class MatchSummary {
   final String? matchType;
   final int headshotKills;
   final double timeSurvived;
+
+  /// 사망 시점 자기장 페이즈(0은 첫 자기장 전). 서버 분석이 없으면 null이다.
+  final int? deathPhase;
 
   String get tierName {
     if (tier == null) return '';
@@ -453,6 +457,7 @@ class MatchSummary {
         player?['timeSurvived'],
         stats?['timeSurvived'],
       ]),
+      deathPhase: _nullableInt([json['deathPhase']]),
     );
   }
 

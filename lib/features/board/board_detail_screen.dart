@@ -5,9 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/app_panels.dart';
 import 'board_models.dart';
+import 'board_post_body.dart';
 import 'board_repository.dart';
 import 'board_write_dialog.dart';
 import 'board_report_dialog.dart';
+import '../../core/widgets/cached_image.dart';
+import '../../core/widgets/share_button.dart';
 
 class BoardDetailScreen extends StatefulWidget {
   const BoardDetailScreen({super.key, required this.postId, this.repository});
@@ -38,12 +41,15 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   bool _liked = false;
   int? _likes;
   String? _actionError;
+  String? _contentHtml;
 
   Future<BoardPostDetail> _fetchPost({bool refresh = false}) async {
     final generation = _generation;
     final post = await _repository.fetchPost(widget.postId, refresh: refresh);
     if (!mounted || generation != _generation) return post;
     _likes = post.likes;
+    _contentHtml = await _repository.fetchContentHtml(widget.postId);
+    if (!mounted || generation != _generation) return post;
     _comments
       ..clear()
       ..addAll(post.comments);
@@ -383,18 +389,30 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                   ),
                 ],
               ),
-            FilledButton.tonalIcon(
-              onPressed: _acting || _liked
-                  ? null
-                  : () {
-                      if (!_repository.canWrite) {
-                        context.go('/my');
-                        return;
-                      }
-                      _like(post.id);
-                    },
-              icon: Icon(_liked ? Icons.thumb_up : Icons.thumb_up_outlined),
-              label: Text(_liked ? '추천 완료' : '추천'),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: _acting || _liked
+                        ? null
+                        : () {
+                            if (!_repository.canWrite) {
+                              context.push('/my');
+                              return;
+                            }
+                            _like(post.id);
+                          },
+                    icon: Icon(
+                      _liked ? Icons.thumb_up : Icons.thumb_up_outlined,
+                    ),
+                    label: Text(_liked ? '추천 완료' : '추천'),
+                  ),
+                ),
+                ShareButton(
+                  title: '${post.title} - BGMS 커뮤니티',
+                  path: '/board/${post.id}',
+                ),
+              ],
             ),
             if (_repository.canWrite)
               Align(
@@ -412,8 +430,8 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      url,
+                    child: Image(
+                      image: cachedImageProvider(url),
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => const Card(
                         child: Padding(
@@ -427,15 +445,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
               ),
               const SizedBox(height: 8),
             ],
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  post.contentText.isEmpty ? '내용이 없습니다.' : post.contentText,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ),
-            ),
+            BoardPostBody(html: _contentHtml, text: post.contentText),
             const SizedBox(height: 18),
             Text(
               '댓글 ${_commentPage?.totalCount ?? _comments.length}${_commentPage == null && post.commentsMayBeTruncated ? '개 이상' : '개'}',
@@ -510,7 +520,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                     ],
                     // 입력 후 401을 받는 대신 로그인 필요를 먼저 알린다.
                     if (!_repository.canWrite)
-                      _CommentLoginNotice(onLogin: () => context.go('/my'))
+                      _CommentLoginNotice(onLogin: () => context.push('/my'))
                     else ...[
                       if (_replyingTo != null)
                         Row(

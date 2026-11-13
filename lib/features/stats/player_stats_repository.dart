@@ -16,17 +16,15 @@ class PlayerStatsRepository {
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) async {
-    // 화면 진입의 기본 시즌만 서버의 15분 기준 자동 갱신 대상으로 삼는다.
-    // 알림은 includeSummaries:false를 사용하며 과거 시즌은 저장 기록만 읽는다.
-    final autoRefresh = !refresh && includeSummaries && season == null;
+    // 웹처럼 평소엔 DB 저장 전적만 읽고, PUBG API 갱신은 사용자가 새로고침을 누를 때만 한다.
     try {
       final playerJson = await _client.fetchPlayer(
         nickname: nickname,
         platform: platform,
         season: season,
         refresh: refresh,
-        autoRefresh: autoRefresh,
       );
       final profile = PlayerStatsProfile.fromJson(playerJson);
       String? collectionMessage;
@@ -47,13 +45,13 @@ class PlayerStatsRepository {
           );
           final pending = result.historyIngest?.pendingCount;
           collectionMessage = collection == null
-              ? '경기 수집 결과를 확인할 수 없습니다. DB 전체 경기 이력에서 확인하세요.'
+              ? '경기 수집 결과를 확인할 수 없습니다. 매치 탭에서 확인하세요.'
               : '경기 수집 DB 저장 확인 ${collection.saved ?? '?'}경기'
                     '${collection.newSaved == null ? ' (신규 저장 구분 불가)' : ' · 신규 ${collection.newSaved}경기'}'
                     ' · ${pending == null ? '대기 상태 불명' : '수집 대기 $pending경기'}'
                     '${collection.rateLimited == true ? ' · 호출 한도 도달' : ''}'
                     '${(collection.retry ?? 0) > 0 ? ' · 재시도 대기 ${collection.retry}경기' : ''}'
-                    '${(collection.unavailable ?? 0) > 0 ? ' · 만료·조회 불가 ${collection.unavailable}경기' : ''}. DB 전체 경기 이력에서 확인하세요.';
+                    '${(collection.unavailable ?? 0) > 0 ? ' · 만료·조회 불가 ${collection.unavailable}경기' : ''}. 매치 탭에서 확인하세요.';
         } catch (error) {
           final apiError = ApiException.from(error);
           if (apiError.kind == ApiErrorKind.rateLimited) {
@@ -62,10 +60,10 @@ class PlayerStatsRepository {
             );
           }
           collectionMessage =
-              '경기 수집 실패 · 시즌 기록은 유지합니다. ${apiError.message} DB 전체 경기 이력에서 다시 수집할 수 있습니다.';
+              '경기 수집 실패 · 시즌 기록은 유지합니다. ${apiError.message} 새로고침으로 다시 수집할 수 있습니다.';
         }
       }
-      final matchIds = profile.recentMatches.take(20).toList();
+      final matchIds = profile.recentMatches.take(summaryLimit).toList();
 
       if (matchIds.isEmpty || !includeSummaries) {
         return PlayerStatsBundle(

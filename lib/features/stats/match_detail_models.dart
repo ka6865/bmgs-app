@@ -264,6 +264,41 @@ class BenchmarkBreakdown {
   }
 }
 
+/// 팀원 한 명의 경기 기록. 값이 없으면 null로 두어 0으로 꾸미지 않는다.
+class MatchTeamMember {
+  const MatchTeamMember({
+    required this.name,
+    this.kills,
+    this.assists,
+    this.knocks,
+    this.damage,
+    this.revives,
+  });
+
+  final String name;
+  final int? kills;
+  final int? assists;
+  final int? knocks;
+  final double? damage;
+  final int? revives;
+
+  static MatchTeamMember fromJson(Map member) {
+    int? count(Object? value) =>
+        value is num && value.isFinite && value >= 0 ? value.round() : null;
+    final damage = member['damageDealt'];
+    return MatchTeamMember(
+      name: member['name'].toString(),
+      kills: count(member['kills']),
+      assists: count(member['assists']),
+      knocks: count(member['DBNOs']),
+      damage: damage is num && damage.isFinite && damage >= 0
+          ? damage.toDouble()
+          : null,
+      revives: count(member['revives']),
+    );
+  }
+}
+
 /// 매치 상세 전체 데이터 모델
 class MatchDetail {
   const MatchDetail({
@@ -288,7 +323,11 @@ class MatchDetail {
     required this.combatPressure,
     required this.vehicleCombat,
     required this.benchmark,
+    this.team = const [],
   });
+
+  /// 나를 포함한 팀원 기록. 서버 `team` 배열 그대로다.
+  final List<MatchTeamMember> team;
 
   final String matchId;
   final String mapName;
@@ -404,6 +443,10 @@ class MatchDetail {
         player?['timeSurvived'],
         stats?['timeSurvived'],
       ]).round(),
+      team: [
+        for (final member in teamMembers)
+          if (member['name'] is String) MatchTeamMember.fromJson(member),
+      ],
       teamKills: _firstNum([
         json['teamKills'],
         teamKillsFromMembers,
@@ -509,7 +552,9 @@ class MatchDetail {
 
   static double? _nullableNum(List<Object?> values) {
     for (final value in values) {
-      final parsed = value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '');
+      final parsed = value is num
+          ? value.toDouble()
+          : double.tryParse(value?.toString() ?? '');
       if (parsed != null && parsed.isFinite) return parsed;
     }
     return null;

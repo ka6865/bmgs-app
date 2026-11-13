@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/app_panels.dart';
 import '../../core/widgets/bgms_brand_header.dart';
@@ -8,6 +9,7 @@ import 'crate_models.dart';
 import 'crate_rarity_style.dart';
 import 'crates_repository.dart';
 import 'widgets/crate_reveal_card.dart';
+import '../../core/widgets/cached_image.dart';
 
 /// 상자깡 시뮬레이터.
 ///
@@ -475,6 +477,19 @@ class _ProbabilityRow extends StatelessWidget {
       child: Row(
         children: [
           Icon(crateRarityIcon(item.rarity), size: 13, color: color),
+          const SizedBox(width: 8),
+          SizedBox.square(
+            dimension: 32,
+            child: item.imageUrl == null
+                ? null
+                : Image(
+                    image: cachedImageProvider(
+                      AppConfig.local.resolveUrl(item.imageUrl!),
+                    ),
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

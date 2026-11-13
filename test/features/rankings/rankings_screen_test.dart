@@ -35,6 +35,29 @@ Future<void> _pumpRankings(WidgetTester tester, FakeHttpAdapter adapter) async {
 }
 
 void main() {
+  testWidgets('1~3위가 모두 있으면 시상대에, 나머지는 목록에 둔다', (tester) async {
+    final adapter = FakeHttpAdapter();
+    adapter.stub('/api/rankings', {
+      'entries': [
+        for (final (i, name) in ['alpha', 'beta', 'gamma', 'delta'].indexed)
+          {
+            'rank': i + 1,
+            'nickname': name,
+            'platform': 'steam',
+            'damage': 800.0 - i * 100,
+          },
+      ],
+    });
+
+    await _pumpRankings(tester, adapter);
+
+    for (final name in ['alpha', 'beta', 'gamma', 'delta']) {
+      expect(find.text(name), findsOneWidget);
+    }
+    expect(find.text('800 딜'), findsOneWidget);
+    expect(find.text('500 딜'), findsOneWidget);
+  });
+
   testWidgets('랭킹 응답을 순위 목록으로 렌더링한다', (tester) async {
     final adapter = FakeHttpAdapter();
     adapter.stub('/api/rankings', _rankingsResponse());
@@ -87,8 +110,8 @@ void main() {
     expect(find.text('92.5 점'), findsOneWidget);
     expect(find.text('Master'), findsOneWidget);
     expect(find.text('에란겔 · squad-fpp'), findsOneWidget);
-    expect(find.textContaining('2026-10-01'), findsOneWidget);
-    expect(find.text('4경기'), findsOneWidget);
+    expect(find.textContaining('2026-10-01'), findsNothing);
+    expect(find.text('4경기'), findsNothing);
     expect(find.text('9 딜'), findsOneWidget);
     expect(find.textContaining('PUBG 시즌 RP'), findsOneWidget);
   });
@@ -99,7 +122,10 @@ void main() {
 
     await _pumpRankings(tester, adapter);
     expect(find.text('필터 초기화'), findsNothing);
+    expect(find.widgetWithText(ChoiceChip, '스쿼드'), findsNothing);
 
+    await tester.tap(find.text('필터'));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ChoiceChip, '스쿼드'));
     await tester.pumpAndSettle();
 

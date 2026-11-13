@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:bgms_mobile_app/features/maps/map_models.dart';
 import 'package:bgms_mobile_app/features/rankings/ranking_models.dart';
+import 'package:bgms_mobile_app/features/squad/squad_models.dart';
 import 'package:bgms_mobile_app/features/stats/match_detail_models.dart';
 import 'package:bgms_mobile_app/features/stats/player_stats_models.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -218,6 +219,37 @@ void main() {
       expect(detail.isolationData.teammateCount, greaterThanOrEqualTo(0));
       expect(detail.benchmark.combat, greaterThanOrEqualTo(0));
       expect(detail.vehicleCombat.roadKills, greaterThanOrEqualTo(0));
+    });
+  });
+
+  group('운영 GET /api/pubg/squad-analyze 응답', () {
+    test('groupKey 없이 받은 팀 묶음 목록을 읽는다', () {
+      final groups = SquadGroup.listFromJson(
+        _fixture('squad_groups_response.json'),
+      );
+      expect(groups, isNotEmpty);
+      for (final group in groups) {
+        expect(group.groupKey, isNotEmpty);
+        expect(group.members, isNotEmpty);
+        expect(group.matchCount, greaterThan(0));
+        expect(['듀오', '스쿼드'], contains(group.modeLabel));
+      }
+    });
+
+    test('한 묶음의 등급·5개 축·역할·장면을 읽는다', () {
+      final analysis = SquadAnalysis.fromJson(
+        _fixture('squad_analysis_response.json'),
+      );
+      expect(analysis.groupKey, isNotEmpty);
+      expect(analysis.grade, isNotNull);
+      expect(analysis.scores.keys, squadScoreAxes.map((axis) => axis.$1));
+      for (final score in analysis.scores.values.whereType<int>()) {
+        expect(score, inInclusiveRange(0, 100));
+      }
+      expect(analysis.roles, isNotEmpty);
+      expect(analysis.roles.first.role, isNotEmpty);
+      expect(analysis.scenes, isNotEmpty);
+      expect(analysis.scenes.first.title, isNotEmpty);
     });
   });
 }

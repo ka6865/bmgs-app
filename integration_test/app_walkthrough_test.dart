@@ -47,8 +47,19 @@ void main() {
     }
   }
 
+  // 기기별 캡처를 구분한다. 예: --dart-define=SHOT_SUFFIX=_ipad
+  const shotSuffix = String.fromEnvironment('SHOT_SUFFIX');
+
   Future<void> shoot(String name) async {
-    await binding.takeScreenshot(name);
+    await binding.takeScreenshot('$name$shotSuffix');
+  }
+
+  /// 첫 화면 증거는 스크롤 0에서 찍는다.
+  Future<void> scrollToTop(WidgetTester tester) async {
+    final list = find.byType(Scrollable);
+    if (list.evaluate().isEmpty) return;
+    await tester.drag(list.first, const Offset(0, 4000));
+    await settle(tester, seconds: 2);
   }
 
   /// 스크롤 가능한 목록이 있을 때만 드래그한다.
@@ -81,11 +92,29 @@ void main() {
     expect(find.byKey(const Key('player_search_submit')), findsOneWidget);
     await shoot('02_stats_hub');
 
-    // 랭킹: 운영 /api/rankings 실데이터
-    await openTab(tester, '랭킹');
+    // 랭킹: 홈의 주간 랭킹 섹션에서 전체 화면으로 들어간다.
+    await openTab(tester, '홈');
+    await settle(tester);
+    final rankingSection = find.text('이번 주 딜량 랭킹');
+    await tester.scrollUntilVisible(
+      rankingSection,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await settle(tester, seconds: 1);
+    await tester.tap(
+      find.descendant(
+        of: find
+            .ancestor(of: rankingSection, matching: find.byType(Column))
+            .first,
+        matching: find.widgetWithText(TextButton, '전체'),
+      ),
+    );
     await settle(tester);
     expect(find.text('딜량'), findsOneWidget);
     await shoot('03_rankings');
+    await tester.pageBack();
+    await settle(tester, seconds: 1);
 
     // 지도: 운영 타일 + 마커
     await openTab(tester, '지도');
@@ -112,33 +141,36 @@ void main() {
     await settle(tester, seconds: 3);
     await shoot('05_maps_layers');
 
-    // 게시판: 운영 커뮤니티 목록
-    await openTab(tester, '게시판');
+    // 커뮤니티: 운영 게시판 목록
+    await openTab(tester, '커뮤니티');
     await settle(tester);
     await shoot('06_board');
 
-    // 마이: 로그인/저장 목록 상태
-    await openTab(tester, '마이');
-    await shoot('07_my');
-
-    // 공개 DB/API 도구와 고객센터 읽기 경로만 확인한다.
+    // 내 정보: 홈 오른쪽 위 프로필에서 들어가 고객센터까지 확인한다.
     await openTab(tester, '홈');
-    await tester.ensureVisible(find.text('BGMS 도구 보기'));
-    await tester.tap(find.text('BGMS 도구 보기'));
-    await settle(tester, seconds: 2);
-    expect(find.text('BGMS 도구'), findsOneWidget);
-    await tester.tap(find.text('무기 도감·비교'));
+    await tester.ensureVisible(find.byTooltip('내 정보'));
+    await settle(tester, seconds: 1);
+    await tester.tap(find.byTooltip('내 정보'));
+    await settle(tester, seconds: 3);
+    await shoot('07_my');
+    await tester.tap(find.text('고객센터'));
     await settle(tester, seconds: 8);
-    expect(find.text('무기 이름 검색'), findsOneWidget);
-    expect(find.byType(CheckboxListTile), findsWidgets);
-    await shoot('11_weapons');
+    expect(find.text('내 문의'), findsOneWidget);
+    await shoot('14_support');
     await tester.pageBack();
     await settle(tester, seconds: 1);
-    await tester.tap(find.text('가방 계산'));
-    await settle(tester, seconds: 10);
-    expect(find.text('조끼 착용 (+50)'), findsOneWidget);
-    expect(find.text('가방 레벨'), findsOneWidget);
-    await shoot('12_backpack');
+    await tester.pageBack();
+    await settle(tester, seconds: 1);
+
+    // 도감: 공개 DB/API 도구 읽기 경로만 확인한다.
+    await openTab(tester, '도감');
+    expect(find.text('무기 도감'), findsOneWidget);
+    await shoot('19_codex');
+    await tester.tap(find.text('무기 도감'));
+    await settle(tester, seconds: 8);
+    expect(find.text('무기 이름 검색'), findsOneWidget);
+    expect(find.text('M416'), findsOneWidget);
+    await shoot('11_weapons');
     await tester.pageBack();
     await settle(tester, seconds: 1);
     await tester.tap(find.text('총기 메타'));
@@ -152,15 +184,6 @@ void main() {
     await settle(tester, seconds: 8);
     expect(find.textContaining('수집 지점'), findsOneWidget);
     await shoot('15_hotdrop');
-    await tester.pageBack();
-    await settle(tester, seconds: 1);
-    await tester.tap(find.text('고객센터'));
-    await settle(tester, seconds: 8);
-    expect(find.text('내 문의'), findsOneWidget);
-    await shoot('14_support');
-    await tester.pageBack();
-    await settle(tester, seconds: 1);
-    expect(find.text('BGMS 도구'), findsOneWidget);
     await tester.pageBack();
     await settle(tester, seconds: 1);
 
@@ -196,8 +219,12 @@ void main() {
       await scrollDown(tester, 600);
       await settle(tester, seconds: 3);
       await shoot(account.shots[1]);
-      await scrollDown(tester, 900);
-      await settle(tester, seconds: 3);
+      await tester.ensureVisible(find.text('매치'));
+      await settle(tester, seconds: 1);
+      await tester.tap(find.text('매치'));
+      await settle(tester, seconds: 2);
+      await scrollToTop(tester);
+      await shoot('${account.shots[2]}_top');
       final cards = find.byType(MatchCard);
       expect(cards, findsWidgets);
       expect(
@@ -218,6 +245,26 @@ void main() {
         findsNothing,
       );
       await shoot(account.shots[2]);
+      if (account.nickname == 'KangHeeSung_') {
+        // 스쿼드 분석: 전적 AI 분석 구역에서 들어간다.
+        await tester.ensureVisible(find.text('AI 분석'));
+        await settle(tester, seconds: 1);
+        await tester.tap(find.text('AI 분석'));
+        await settle(tester, seconds: 2);
+        await tester.tap(find.text('스쿼드 분석'));
+        await settle(tester, seconds: 15);
+        expect(find.text('팀원 역할'), findsOneWidget);
+        await shoot('21_squad');
+        await tester.pageBack();
+        await settle(tester, seconds: 1);
+      }
     }
+
+    // 검색 후 홈: 마지막으로 본 플레이어 패널과 페이즈 스트립
+    await openTab(tester, '홈');
+    await settle(tester, seconds: 10);
+    await scrollToTop(tester);
+    expect(find.byKey(const Key('home_continue_player')), findsOneWidget);
+    await shoot('20_home_player');
   });
 }

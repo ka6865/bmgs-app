@@ -5,6 +5,7 @@ import 'board_categories.dart';
 import 'board_models.dart';
 import 'board_repository.dart';
 import 'board_image_picker.dart';
+import '../../core/widgets/cached_image.dart';
 
 class BoardWriteDialog extends StatefulWidget {
   const BoardWriteDialog({
@@ -317,8 +318,8 @@ class _BoardWriteDialogState extends State<BoardWriteDialog> {
               ..._images.map(
                 (image) => ListTile(
                   title: const Text('첨부 사진'),
-                  leading: Image.network(
-                    image.url,
+                  leading: Image(
+                    image: cachedImageProvider(image.url),
                     width: 44,
                     height: 44,
                     errorBuilder: (_, _, _) => const Icon(Icons.image),

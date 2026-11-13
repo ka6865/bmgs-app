@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../config/app_config.dart';
 import '../theme/bgms_theme.dart';
+import 'cached_image.dart';
 
 /// 웹과 동일한 랭크 티어 아이콘을 서버에서 내려받아 표시한다.
 ///
@@ -23,11 +24,13 @@ class TierIcon extends StatelessWidget {
       height: size,
       child: Semantics(
         label: '${tier ?? '랭크 없음'} 티어 아이콘',
-        child: Image.network(
-          url,
-          fit: BoxFit.contain,
+        child: Image(
           // 표시 크기에 맞춰 디코딩해 목록에서 아이콘이 반복될 때 메모리를 줄인다.
-          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+          image: cachedImageProvider(
+            url,
+            cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+          ),
+          fit: BoxFit.contain,
           errorBuilder: (context, error, stackTrace) =>
               Icon(Icons.shield_outlined, size: size * 0.8, color: color),
           loadingBuilder: (context, child, progress) {

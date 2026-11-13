@@ -13,7 +13,6 @@ import '../../core/network/bgms_api_client.dart';
 import '../../core/player/player_search_flow.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/widgets/bgms_brand_header.dart';
-import '../../navigation/shell_scaffold.dart';
 import '../notifications/notification_settings_card.dart';
 
 class MyScreen extends StatefulWidget {
@@ -25,22 +24,11 @@ class MyScreen extends StatefulWidget {
 
 class _MyScreenState extends State<MyScreen> {
   late Future<_MyScreenStateData> _stateFuture;
-  bool? _wasActive;
 
   @override
   void initState() {
     super.initState();
     _stateFuture = _loadState();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final isActive = ShellTabScope.maybeOf(context)?.currentIndex == 5;
-    if (isActive && _wasActive == false) {
-      _refresh();
-    }
-    _wasActive = isActive;
   }
 
   Future<_MyScreenStateData> _loadState() async {
@@ -127,12 +115,6 @@ class _MyScreenState extends State<MyScreen> {
           title: const Text('고객센터'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => context.push('/support'),
-        ),
-        ListTile(
-          leading: const Icon(Icons.apps),
-          title: const Text('BGMS 도구'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/tools'),
         ),
         const SizedBox(height: 16),
         // Supabase 초기화 여부에 따라 인증 섹션 분기
@@ -279,11 +261,8 @@ class _SupabaseAuthCardState extends State<_SupabaseAuthCard> {
 
     try {
       final user = session.user;
-      final rawProfile = await _supabase
-          .from('profiles')
-          .select()
-          .eq('id', user.id)
-          .maybeSingle();
+      // profiles 전체 칸은 열 권한으로 막혀 있어 웹과 같은 본인 조회 RPC를 쓴다.
+      final rawProfile = await _supabase.rpc('get_my_profile').maybeSingle();
 
       final metadata = user.userMetadata ?? const <String, dynamic>{};
       final profile = rawProfile == null

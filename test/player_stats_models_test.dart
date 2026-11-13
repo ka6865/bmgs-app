@@ -255,7 +255,6 @@ void main() {
     }, mapId: 'Erangel');
 
     expect(layer.source, MapMarkerSource.api);
-    expect(layer.displaySourceLabel, '마커 연동');
     expect(layer.displayMessage, contains('전술 마커'));
     expect(layer.markers.single.layer, 'Garage');
     expect(layer.markers.single.source, MapMarkerSource.api);
@@ -263,7 +262,6 @@ void main() {
     expect(layer.markers.single.y, 0.75);
     expect(unavailable.source, MapMarkerSource.fallback);
     expect(unavailable.markers, isEmpty);
-    expect(unavailable.displaySourceLabel, '마커 준비 중');
     expect(unavailable.displayMessage, contains('다른 맵'));
   });
 

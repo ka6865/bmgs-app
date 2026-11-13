@@ -143,6 +143,22 @@ class BoardRepository {
     }
   }
 
+  /// 모바일 API는 태그를 지운 본문만 줘서 웹의 제목·목록·카드 구조가 사라진다.
+  /// 웹처럼 공개 게시글 HTML을 직접 읽고, 실패하면 null(텍스트 본문으로 표시).
+  Future<String?> fetchContentHtml(int postId) async {
+    try {
+      final row = await Supabase.instance.client
+          .from('posts')
+          .select('content')
+          .eq('id', postId)
+          .maybeSingle();
+      final html = row?['content']?.toString().trim() ?? '';
+      return html.isEmpty ? null : html;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<BoardPostEdit> fetchEdit(int postId) => _authorized(
     (token) async => BoardPostEdit.fromJson(
       await _client.fetchBoardEdit(postId: postId, accessToken: token),

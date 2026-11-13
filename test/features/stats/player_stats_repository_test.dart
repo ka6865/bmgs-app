@@ -79,11 +79,11 @@ void main() {
       },
     );
 
-    test('기본 시즌 화면 조회만 자동 갱신하고 알림·과거 시즌은 DB만 읽는다', () async {
+    test('웹처럼 새로고침 전에는 자동 갱신 없이 DB만 읽는다', () async {
       final client = MockBgmsApiClient();
       final repository = PlayerStatsRepository(client: client);
       await repository.fetchPlayerStats(nickname: 'Player', platform: 'steam');
-      expect(client.lastAutoRefresh, isTrue);
+      expect(client.lastAutoRefresh, isFalse);
       await repository.fetchPlayerStats(
         nickname: 'Player',
         platform: 'steam',
@@ -233,7 +233,7 @@ void main() {
       expect(bundle.profile.syncStatus, PlayerSyncStatus.saved);
       expect(bundle.matches.single.kills, 2);
       expect(bundle.collectionMessage, contains('경기 수집 실패'));
-      expect(bundle.collectionMessage, contains('DB 전체 경기 이력'));
+      expect(bundle.collectionMessage, contains('새로고침으로 다시 수집'));
     });
 
     test('요약 API 503은 시즌 전적을 유지하고 상세 자동 조회 없이 fallback을 표시한다', () async {

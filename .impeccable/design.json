@@ -1,0 +1,436 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-13T00:00:00Z",
+  "title": "Design System: BGMS",
+  "extensions": {
+    "colorMeta": {
+      "pubg-gold": {
+        "role": "primary",
+        "displayName": "배그 골드",
+        "tonalRamp": [
+          "oklch(15% 0.081 78)",
+          "oklch(25% 0.101 78)",
+          "oklch(35% 0.12 78)",
+          "oklch(48% 0.146 78)",
+          "oklch(60% 0.17 78)",
+          "oklch(72% 0.146 78)",
+          "oklch(84% 0.122 78)",
+          "oklch(95% 0.101 78)"
+        ]
+      },
+      "on-gold": {
+        "role": "primary",
+        "displayName": "골드 위 글자",
+        "tonalRamp": [
+          "oklch(15% 0.01 85)",
+          "oklch(25% 0.012 85)",
+          "oklch(35% 0.014 85)",
+          "oklch(48% 0.017 85)",
+          "oklch(60% 0.02 85)",
+          "oklch(72% 0.017 85)",
+          "oklch(84% 0.014 85)",
+          "oklch(95% 0.012 85)"
+        ]
+      },
+      "olive-charcoal": {
+        "role": "neutral",
+        "displayName": "올리브 숯색 바탕",
+        "tonalRamp": [
+          "oklch(15% 0.003 150)",
+          "oklch(25% 0.004 150)",
+          "oklch(35% 0.004 150)",
+          "oklch(48% 0.005 150)",
+          "oklch(60% 0.006 150)",
+          "oklch(72% 0.005 150)",
+          "oklch(84% 0.004 150)",
+          "oklch(95% 0.004 150)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "표면",
+        "tonalRamp": [
+          "oklch(15% 0.004 150)",
+          "oklch(25% 0.005 150)",
+          "oklch(35% 0.006 150)",
+          "oklch(48% 0.007 150)",
+          "oklch(60% 0.008 150)",
+          "oklch(72% 0.007 150)",
+          "oklch(84% 0.006 150)",
+          "oklch(95% 0.005 150)"
+        ]
+      },
+      "elevated": {
+        "role": "neutral",
+        "displayName": "상승 표면",
+        "tonalRamp": [
+          "oklch(15% 0.006 140)",
+          "oklch(25% 0.007 140)",
+          "oklch(35% 0.008 140)",
+          "oklch(48% 0.01 140)",
+          "oklch(60% 0.012 140)",
+          "oklch(72% 0.01 140)",
+          "oklch(84% 0.009 140)",
+          "oklch(95% 0.007 140)"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "헤어라인(흰색 12%)",
+        "tonalRamp": [
+          "oklch(15% 0.0 0)",
+          "oklch(25% 0.0 0)",
+          "oklch(35% 0.0 0)",
+          "oklch(48% 0.0 0)",
+          "oklch(60% 0.0 0)",
+          "oklch(72% 0.0 0)",
+          "oklch(84% 0.0 0)",
+          "oklch(95% 0.0 0)"
+        ]
+      },
+      "glass-bar": {
+        "role": "neutral",
+        "displayName": "유리 막대",
+        "tonalRamp": [
+          "oklch(15% 0.003 150)",
+          "oklch(25% 0.004 150)",
+          "oklch(35% 0.004 150)",
+          "oklch(48% 0.005 150)",
+          "oklch(60% 0.006 150)",
+          "oklch(72% 0.005 150)",
+          "oklch(84% 0.004 150)",
+          "oklch(95% 0.004 150)"
+        ]
+      },
+      "text-primary": {
+        "role": "neutral",
+        "displayName": "본문 글자",
+        "tonalRamp": [
+          "oklch(15% 0.003 100)",
+          "oklch(25% 0.004 100)",
+          "oklch(35% 0.004 100)",
+          "oklch(48% 0.005 100)",
+          "oklch(60% 0.006 100)",
+          "oklch(72% 0.005 100)",
+          "oklch(84% 0.004 100)",
+          "oklch(95% 0.004 100)"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "보조 글자(70%)",
+        "tonalRamp": [
+          "oklch(15% 0.003 100)",
+          "oklch(25% 0.004 100)",
+          "oklch(35% 0.004 100)",
+          "oklch(48% 0.005 100)",
+          "oklch(60% 0.006 100)",
+          "oklch(72% 0.005 100)",
+          "oklch(84% 0.004 100)",
+          "oklch(95% 0.004 100)"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "메타 글자(50%)",
+        "tonalRamp": [
+          "oklch(15% 0.003 100)",
+          "oklch(25% 0.004 100)",
+          "oklch(35% 0.004 100)",
+          "oklch(48% 0.005 100)",
+          "oklch(60% 0.006 100)",
+          "oklch(72% 0.005 100)",
+          "oklch(84% 0.004 100)",
+          "oklch(95% 0.004 100)"
+        ]
+      },
+      "top10-green": {
+        "role": "secondary",
+        "displayName": "탑10 그린",
+        "tonalRamp": [
+          "oklch(15% 0.062 155)",
+          "oklch(25% 0.077 155)",
+          "oklch(35% 0.092 155)",
+          "oklch(48% 0.112 155)",
+          "oklch(60% 0.13 155)",
+          "oklch(72% 0.112 155)",
+          "oklch(84% 0.094 155)",
+          "oklch(95% 0.077 155)"
+        ]
+      },
+      "kill-red": {
+        "role": "secondary",
+        "displayName": "킬 레드",
+        "tonalRamp": [
+          "oklch(15% 0.09 25)",
+          "oklch(25% 0.112 25)",
+          "oklch(35% 0.135 25)",
+          "oklch(48% 0.163 25)",
+          "oklch(60% 0.19 25)",
+          "oklch(72% 0.163 25)",
+          "oklch(84% 0.137 25)",
+          "oklch(95% 0.112 25)"
+        ]
+      },
+      "knock-orange": {
+        "role": "secondary",
+        "displayName": "기절 오렌지",
+        "tonalRamp": [
+          "oklch(15% 0.076 58)",
+          "oklch(25% 0.095 58)",
+          "oklch(35% 0.113 58)",
+          "oklch(48% 0.138 58)",
+          "oklch(60% 0.16 58)",
+          "oklch(72% 0.138 58)",
+          "oklch(84% 0.115 58)",
+          "oklch(95% 0.095 58)"
+        ]
+      },
+      "defeat-gray": {
+        "role": "secondary",
+        "displayName": "탈락 회색",
+        "tonalRamp": [
+          "oklch(15% 0.007 150)",
+          "oklch(25% 0.009 150)",
+          "oklch(35% 0.011 150)",
+          "oklch(48% 0.013 150)",
+          "oklch(60% 0.015 150)",
+          "oklch(72% 0.013 150)",
+          "oklch(84% 0.011 150)",
+          "oklch(95% 0.009 150)"
+        ]
+      },
+      "item-slot": {
+        "role": "neutral",
+        "displayName": "아이템 칸",
+        "tonalRamp": [
+          "oklch(15% 0.01 120)",
+          "oklch(25% 0.012 120)",
+          "oklch(35% 0.014 120)",
+          "oklch(48% 0.017 120)",
+          "oklch(60% 0.02 120)",
+          "oklch(72% 0.017 120)",
+          "oklch(84% 0.014 120)",
+          "oklch(95% 0.012 120)"
+        ]
+      },
+      "tier-master": {
+        "role": "tertiary",
+        "displayName": "티어 Master"
+      },
+      "tier-survivor": {
+        "role": "tertiary",
+        "displayName": "티어 Survivor"
+      },
+      "tier-diamond": {
+        "role": "tertiary",
+        "displayName": "티어 Diamond"
+      },
+      "tier-crystal": {
+        "role": "tertiary",
+        "displayName": "티어 Crystal"
+      },
+      "tier-platinum": {
+        "role": "tertiary",
+        "displayName": "티어 Platinum"
+      },
+      "tier-gold": {
+        "role": "tertiary",
+        "displayName": "티어 Gold"
+      },
+      "tier-silver": {
+        "role": "tertiary",
+        "displayName": "티어 Silver"
+      },
+      "tier-bronze": {
+        "role": "tertiary",
+        "displayName": "티어 Bronze"
+      }
+    },
+    "typographyMeta": {
+      "number-hero": {
+        "displayName": "Number hero",
+        "purpose": "스쿼드 분석 등급 한 곳."
+      },
+      "number-lg": {
+        "displayName": "Number large",
+        "purpose": "홈 내 계정 패널 시즌 숫자 3개."
+      },
+      "number-md": {
+        "displayName": "Number medium",
+        "purpose": "매치 순위(24), 무기 피해(22), 랭킹 값(20~22). 실사용 20~28px."
+      },
+      "number-sm": {
+        "displayName": "Number small",
+        "purpose": "홈 최근 경기 순위, 홈 랭킹 값."
+      },
+      "number-xs": {
+        "displayName": "Number xs",
+        "purpose": "홈 최근 경기 킬·딜."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "화면 제목, 닉네임."
+      },
+      "title-sm": {
+        "displayName": "Title small",
+        "purpose": "섹션·패널 제목, 맵 이름."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "설명, 오류 메시지."
+      },
+      "body-sm": {
+        "displayName": "Body small",
+        "purpose": "보조 문구, 부제."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "섹션 밴드 제목, 지표 이름. 자간 0."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "skeleton-pulse",
+        "value": "1100ms, reverse repeat, opacity 0.35→0.70",
+        "purpose": "SkeletonBox 로딩 맥동."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "match-card-stack",
+        "value": "352px",
+        "purpose": "이보다 좁거나 글자 확대 시 매치 카드 킬·딜을 아래 줄로."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "골드 면 주요 행동 버튼, 6px 사선 커팅.",
+      "html": "<button class=\"ds-btn-primary\">다시 시도</button>",
+      "css": ".ds-btn-primary { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', Roboto, sans-serif; background: #F2A900; color: #14110A; font-weight: 800; font-size: 14px; min-height: 48px; padding: 0 20px; border: none; clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px); cursor: pointer; transition: filter .15s; } .ds-btn-primary:hover { filter: brightness(1.08); } .ds-btn-primary:focus-visible { outline: 2px solid #F4F3EE; outline-offset: 2px; } .ds-btn-primary:active { filter: brightness(.92); }"
+    },
+    {
+      "name": "Outlined Button",
+      "kind": "button",
+      "refersTo": "button-outlined",
+      "description": "헤어라인 테두리 보조 버튼.",
+      "html": "<button class=\"ds-btn-outlined\">최신 랭킹</button>",
+      "css": ".ds-btn-outlined { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', Roboto, sans-serif; background: #161917; color: #F4F3EE; font-size: 14px; font-weight: 600; min-height: 48px; padding: 0 20px; border: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px); cursor: pointer; } .ds-btn-outlined:hover { background: #20241F; } .ds-btn-outlined:focus-visible { outline: 2px solid #F2A900; outline-offset: 2px; }"
+    },
+    {
+      "name": "Choice Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "4px 커팅 필터 칩, 선택 시 골드.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip ds-chip-on\">전체</button><button class=\"ds-chip\">스쿼드</button><button class=\"ds-chip\">듀오</button></div>",
+      "css": ".ds-chips { display: flex; gap: 8px; } .ds-chip { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', Roboto, sans-serif; background: #161917; color: #F4F3EE; font-size: 14px; padding: 8px 16px; border: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px); cursor: pointer; } .ds-chip:hover { background: #20241F; } .ds-chip-on { background: #F2A900; color: #14110A; font-weight: 700; box-shadow: none; } .ds-chip:focus-visible { outline: 2px solid #F2A900; outline-offset: 2px; }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "표면 채움 입력창, 4px 반경, 포커스 시 골드 테두리.",
+      "html": "<label class=\"ds-input\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"M20 20l-4-4\"/></svg><input placeholder=\"PUBG 플레이어 검색\"></label>",
+      "css": ".ds-input { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', Roboto, sans-serif; display: flex; align-items: center; gap: 12px; background: #161917; color: #F4F3EEB3; border: 1px solid rgba(255,255,255,.12); border-radius: 4px; padding: 0 16px; height: 52px; } .ds-input:focus-within { border-color: #F2A900; } .ds-input input { flex: 1; background: transparent; border: none; outline: none; color: #F4F3EE; font-size: 16px; } .ds-input input::placeholder { color: #F4F3EE80; }"
+    },
+    {
+      "name": "Bottom Navigation",
+      "kind": "nav",
+      "refersTo": "nav-bar",
+      "description": "5탭 유리 막대, 선택 탭 골드.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-on\">홈</a><a>전적</a><a>지도</a><a>도감</a><a>커뮤니티</a></nav>",
+      "css": ".ds-nav { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', Roboto, sans-serif; display: flex; justify-content: space-around; background: #121513F2; backdrop-filter: blur(16px); border-top: 1px solid rgba(255,255,255,.12); padding: 12px 0 16px; } .ds-nav a { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: #F4F3EEB3; cursor: pointer; } .ds-nav a::before { content: ''; width: 22px; height: 22px; border: 2px solid currentColor; border-radius: 3px; } .ds-nav a:hover { color: #F4F3EE; } .ds-nav-on { color: #F2A900 !important; font-weight: 800 !important; }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "기본 베벨 패널(BgmsCard). 상태는 테두리 색으로만.",
+      "html": "<div class=\"ds-panel\"><div class=\"ds-panel-inner\"><b>주간 딜량 랭킹</b><p>최근 7일 내 단일 경기 최고 기록입니다.</p></div></div>",
+      "css": ".ds-panel { background: rgba(255,255,255,.12); padding: 1px; clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px); } .ds-panel-inner { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', Roboto, sans-serif; background: #161917; color: #F4F3EE; padding: 16px; clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px); } .ds-panel-inner b { font-size: 16px; font-weight: 800; } .ds-panel-inner p { margin: 4px 0 0; font-size: 12px; color: #F4F3EEB3; }"
+    },
+    {
+      "name": "Match Card",
+      "kind": "custom",
+      "refersTo": "match-card",
+      "description": "한 경기 카드: 순위 블록, 맵·모드, 페이즈 스트립, 킬·딜. 테두리는 순위 의미 색.",
+      "html": "<div class=\"ds-match\"><div class=\"ds-match-in\"><span class=\"ds-rank\">#8</span><div class=\"ds-mid\"><b>론도</b><small>스쿼드 · 3일 전</small><div class=\"ds-strip\"><i class=\"f\"></i><i class=\"f\"></i><i class=\"f\"></i><i class=\"f\"></i><i></i><i></i><i></i><i></i><i></i></div></div><span class=\"ds-n\">3<small>킬</small></span><span class=\"ds-n\">669<small>딜량</small></span></div></div>",
+      "css": ".ds-match { background: rgba(87,199,133,.55); padding: 1px; clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px); } .ds-match-in { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', Roboto, sans-serif; display: flex; align-items: center; gap: 14px; background: #161917; color: #F4F3EE; padding: 12px 14px; clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px); } .ds-rank { font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; font-size: 24px; color: #57C785; width: 48px; } .ds-mid { flex: 1; display: flex; flex-direction: column; gap: 4px; } .ds-mid b { font-size: 14px; font-weight: 800; } .ds-mid small { font-size: 11px; color: #F4F3EE80; } .ds-strip { display: flex; gap: 2px; height: 6px; margin-top: 4px; } .ds-strip i { flex: 1; background: #20241F; } .ds-strip i.f { background: #57C785; } .ds-n { font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; font-size: 20px; display: flex; flex-direction: column; align-items: center; } .ds-n small { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', Roboto, sans-serif; font-size: 11px; font-weight: 400; color: #F4F3EEB3; }"
+    },
+    {
+      "name": "Survival Phase Strip",
+      "kind": "custom",
+      "refersTo": "phase-cell-empty",
+      "description": "시그니처. 9칸(고정, shortcut), 탈락 페이즈까지 채움. 치킨 골드 / 탑10 그린 / 탈락 회색 / 정보 없음은 테두리만.",
+      "html": "<div class=\"ds-strips\"><div class=\"ds-ps\" data-k=\"c\"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class=\"ds-ps\" data-k=\"t\"><i></i><i></i><i></i><i></i><i></i><b></b><b></b><b></b><b></b></div><div class=\"ds-ps\" data-k=\"d\"><i></i><i></i><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class=\"ds-ps\" data-k=\"u\"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div></div>",
+      "css": ".ds-strips { display: flex; flex-direction: column; gap: 10px; width: 280px; } .ds-ps { display: flex; gap: 2px; height: 6px; } .ds-ps > * { flex: 1; } .ds-ps b { background: #20241F; } .ds-ps[data-k=c] i { background: #F2A900; } .ds-ps[data-k=t] i { background: #57C785; } .ds-ps[data-k=d] i { background: #8B958C; } .ds-ps[data-k=u] b { background: transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }"
+    },
+    {
+      "name": "Weapon Row",
+      "kind": "custom",
+      "refersTo": "weapon-slot",
+      "description": "밝은 아이템 칸 위 무기 렌더 + 이름·분류 + Barlow 피해 숫자.",
+      "html": "<div class=\"ds-wr\"><span class=\"ds-slot\"><svg width=\"40\" height=\"40\" viewBox=\"0 0 24 24\" fill=\"#14110A\"><path d=\"M2 10h14l2-2h4v3h-3l-2 2H9l-1 5H5l1-5H2z\"/></svg></span><div class=\"ds-wm\"><b>베릴 M762</b><small>AR · 7.62mm</small></div><span class=\"ds-wd\">46<small>피해</small></span></div>",
+      "css": ".ds-wr { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', Roboto, sans-serif; display: flex; align-items: center; gap: 16px; background: #161917; color: #F4F3EE; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.12); } .ds-slot { width: 56px; height: 56px; background: #B4B8AC; display: grid; place-items: center; clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px); } .ds-wm { flex: 1; display: flex; flex-direction: column; gap: 4px; } .ds-wm b { font-size: 16px; font-weight: 800; } .ds-wm small { font-size: 13px; color: #F4F3EEB3; } .ds-wd { font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; font-size: 22px; display: flex; flex-direction: column; align-items: flex-end; } .ds-wd small { font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', Roboto, sans-serif; font-size: 11px; font-weight: 400; color: #F4F3EEB3; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "전술 HUD (Operate 모드)",
+    "overview": "BGMS는 전적 앱의 \"둥근 카드 더미\" 대신 배그 인게임 화면의 문법으로 기록을 읽게 한다. 화면의 주인공은 카드 테두리가 아니라 압축된 숫자와 생존 페이즈다. 올리브 기운이 도는 숯색 바탕 위에 표면 3단을 쌓고, 신호색은 배그 골드 하나만 쓴다. 판과 판 사이에 한 손으로, 어두운 방에서 짧게 확인하는 사용 장면에 맞춰 밀도는 촘촘하고 장식은 없다.\n\n모양 언어는 사선으로 잘린 모서리(베벨)다. 패널·버튼·칩·스낵바가 모두 테마 단계에서 베벨 모양을 받는다. 큰 숫자는 Barlow Condensed 탭룰러 숫자로 자릿수를 맞추고, 그 외 글은 OS 시스템 서체(한국어 기준)를 그대로 쓴다. 깊이는 그림자가 아니라 표면 명도 단계와 1px 헤어라인으로 만든다.\n\n이 체계는 아직 절반만 이식됐다. 홈·전적(요약/매치)·도감 진입·무기 도감·스쿼드 분석·랭킹·공통 패널은 새 문법을 따르지만, 지도·게시판·메타·핫드랍·상자깡 화면과 전적 상세 내부 일부는 이전 웹 이식 스타일(둥근 모서리, 원시 Container 장식)을 그대로 쓴다. 다크 테마 하나만 있다(라이트 모드 미결).",
+    "keyCharacteristics": [
+      "다크 전용, 올리브 숯색 바탕과 3단 표면(바탕 → 표면 → 상승)",
+      "신호색은 골드 하나, 데이터 색은 순위 의미가 있을 때만",
+      "둥글림 대신 4~6px 사선 커팅",
+      "큰 숫자는 Barlow Condensed 700 탭룰러, 본문은 시스템 서체",
+      "시그니처: 생존 페이즈 스트립(경기마다 9칸, 탈락 페이즈까지 채움)",
+      "그림자 없음, 1px 헤어라인과 표면 명도로 깊이 표현"
+    ],
+    "rules": [
+      {
+        "name": "The One Signal Rule",
+        "body": "신호색은 골드 하나다. 선택·주요 행동·치킨만 골드를 받는다. 새 강조색을 만들지 않는다.",
+        "section": "colors"
+      },
+      {
+        "name": "The Data-Only Color Rule",
+        "body": "그린·레드·오렌지·탈락 회색은 순위·킬·기절이라는 데이터 의미가 있을 때만 쓴다. 장식이나 섹션 구분용으로 쓰지 않는다.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Number Rule",
+        "body": "비교되는 숫자(순위, 킬, 딜, K/D, 피해, 점수)는 BgmsText.number로 쓴다. 시스템 서체로 큰 숫자를 쓰지 않는다. 기존 StatCell은 아직 시스템 서체 titleLarge 900을 쓴다(미이식).",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat HUD Rule",
+        "body": "그림자를 쓰지 않는다. 강조가 필요하면 테두리 색(골드·그린·탈락 회색)을 바꾼다. 상자깡 결과 카드의 희귀도 발광 그림자는 이 규칙 밖의 구 스타일이다.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Cut Corner Rule",
+        "body": "새 표면은 BgmsShape.panel()로 만든다. BorderRadius.circular로 새 카드·칩·버튼을 만들지 않는다.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do 새 표면은 `BgmsCard` 또는 `BgmsShape.panel()`(6px 커팅, 작은 요소 4px)로 만든다.",
+      "Do 비교되는 숫자는 `BgmsText.number`(Barlow Condensed 700, 탭룰러)로 쓴다.",
+      "Do 경기 결과는 페이즈 스트립과 순위 의미 색(골드/그린/탈락 회색)으로 같은 문법을 반복한다.",
+      "Do 강조는 그림자 대신 테두리 색과 표면 명도 단계로 한다.",
+      "Do 무기 렌더는 item-slot 칸 위에 올린다.",
+      "Do 로딩·빈 상태·오류는 LoadingCard / InfoPanel / ErrorPanel로 모든 화면에서 같게 다루고, 측정하지 않은 값은 \"-\"나 \"정보 없음\"으로 둔다."
+    ],
+    "donts": [
+      "Don't 골드 외의 강조색을 새로 만들거나, 브랜드 골드를 다른 노랑(예: 랭킹 1위 #FFD54F)으로 대체하지 않는다.",
+      "Don't 그린·레드·오렌지를 데이터 의미 없이 장식으로 쓰지 않는다.",
+      "Don't `BorderRadius.circular`로 새 카드·칩·버튼을 만들지 않는다. 남은 58곳은 이식 대상이지 선례가 아니다.",
+      "Don't 카드 안에 카드를 넣지 않는다. 반복 항목 섹션은 SectionBand를 쓴다.",
+      "Don't 그림자로 깊이를 만들지 않는다."
+    ]
+  }
+}

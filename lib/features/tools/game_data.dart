@@ -121,54 +121,6 @@ class GameWeapon {
   );
 }
 
-class BackpackItem {
-  const BackpackItem({
-    required this.id,
-    required this.name,
-    required this.weight,
-    required this.category,
-    this.canBeInBackpack = true,
-  });
-  final String id;
-  final String name;
-  final double weight;
-  final String category;
-  final bool canBeInBackpack;
-}
-
-class GameVehicle {
-  const GameVehicle({
-    required this.id,
-    required this.name,
-    required this.capacity,
-  });
-  final String id;
-  final String name;
-  final double capacity;
-}
-
-class BackpackData {
-  const BackpackData({required this.items, required this.vehicles});
-  final List<BackpackItem> items;
-  final List<GameVehicle> vehicles;
-}
-
-double backpackCapacity({required bool hasVest, required int level}) =>
-    70 +
-    (hasVest ? 50 : 0) +
-    switch (level) {
-      1 => 150,
-      2 => 200,
-      3 => 250,
-      _ => 0,
-    };
-
-double inventoryWeight(List<BackpackItem> items, Map<String, int> quantities) =>
-    items.fold(
-      0,
-      (sum, item) => sum + item.weight * (quantities[item.id] ?? 0),
-    );
-
 /// 웹의 공개 SELECT 정책을 사용한다. 관리 API나 서버 키는 사용하지 않는다.
 class GameDataRepository {
   const GameDataRepository();
@@ -202,52 +154,5 @@ class GameDataRepository {
     final parts = rows.map(GameAttachment.fromJson).toList();
     if (parts.isEmpty) throw StateError('공개 부착물 데이터가 없습니다.');
     return parts;
-  }
-
-  Future<BackpackData> fetchBackpackData() async {
-    final items = <BackpackItem>[];
-    // 공개 테이블만 읽고 제거된 항목과 무게 미제공 항목은 계산에서 제외한다.
-    for (final table in const [
-      'consumables',
-      'throwables',
-      'attachments',
-      'ammo',
-      'weapons',
-    ]) {
-      final rows = await _client
-          .from(table)
-          .select('id, name, weight, can_be_in_backpack')
-          .isFilter('removed_at', null)
-          .order('name');
-      for (final row in rows) {
-        final weight = gameNumber(row['weight']);
-        if (weight == null) continue;
-        items.add(
-          BackpackItem(
-            id: '$table:${row['id']}',
-            name: row['name'].toString(),
-            category: table,
-            weight: weight,
-            canBeInBackpack: row['can_be_in_backpack'] != false,
-          ),
-        );
-      }
-    }
-    final rows = await _client
-        .from('vehicles')
-        .select('id, name, trunk_capacity')
-        .isFilter('removed_at', null)
-        .order('name');
-    final vehicles = <GameVehicle>[
-      for (final row in rows)
-        if (gameNumber(row['trunk_capacity']) != null)
-          GameVehicle(
-            id: row['id'].toString(),
-            name: row['name'].toString(),
-            capacity: gameNumber(row['trunk_capacity'])!,
-          ),
-    ];
-    if (items.isEmpty) throw StateError('공개 아이템 무게 데이터가 없습니다.');
-    return BackpackData(items: items, vehicles: vehicles);
   }
 }

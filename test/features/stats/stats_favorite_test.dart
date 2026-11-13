@@ -17,6 +17,7 @@ class _EmptyStatsRepository extends Fake implements PlayerStatsRepository {
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) {
     return SynchronousFuture(
       PlayerStatsBundle(

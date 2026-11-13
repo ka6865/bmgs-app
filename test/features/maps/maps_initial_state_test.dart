@@ -99,7 +99,7 @@ void main() {
     expect(selected?.id, '오른쪽');
   });
 
-  testWidgets('DB 설정 이후에도 필터와 마커는 처음에 숨기며 이전 맵 응답을 무시한다', (tester) async {
+  testWidgets('맵을 열면 허용된 마커를 모두 켜고 이전 맵 응답은 무시한다', (tester) async {
     final repository = _Repository();
     await tester.pumpWidget(
       MaterialApp(
@@ -107,31 +107,35 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.byType(FilterChip), findsNothing);
     expect(find.byType(MapMarkerWidget), findsNothing);
     await tester.tap(find.text('미라마'));
     await tester.pumpAndSettle();
     expect(find.byType(FilterChip), findsNothing);
-    expect(find.byType(MapMarkerWidget), findsNothing);
+    expect(find.byType(MapMarkerWidget), findsOneWidget);
     await tester.tap(find.text('마커 필터'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(FilterChip, '보트'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilterChip, '보트'));
-    await tester.pumpAndSettle();
-    expect(find.byType(MapMarkerWidget), findsOneWidget);
+    expect(
+      tester.widget<FilterChip>(find.widgetWithText(FilterChip, '보트')).selected,
+      isTrue,
+    );
     repository.firstSettings.complete({
       'Erangel': ['Garage'],
     });
     await tester.pumpAndSettle();
     expect(find.widgetWithText(FilterChip, '보트'), findsOneWidget);
-    expect(find.widgetWithText(FilterChip, '차량'), findsNothing);
+    expect(find.widgetWithText(FilterChip, '차고지'), findsNothing);
     final mapRect = tester.getRect(find.byType(MapTileMosaic));
     final center = tester.getCenter(find.byType(MapMarkerWidget));
     expect(center.dx, closeTo(mapRect.left + mapRect.width * 0.1, 0.01));
     expect(center.dy, closeTo(mapRect.top + mapRect.height * 0.5, 0.01));
+
+    // 사용자가 끈 필터는 새로고침 뒤에도 유지한다.
+    await tester.tap(find.widgetWithText(FilterChip, '보트'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MapMarkerWidget), findsNothing);
   });
 
-  testWidgets('열려 있던 지도에 다른 경기 맵을 전달하면 지도와 필터를 초기화한다', (tester) async {
+  testWidgets('열려 있던 지도에 다른 경기 맵을 전달하면 필터를 기본값(전부 켬)으로 되돌린다', (tester) async {
     final repository = _Repository();
     repository.firstSettings.complete({
       'Erangel': ['Garage'],
@@ -143,11 +147,12 @@ void main() {
     );
     await tester.pumpWidget(screen('Erangel'));
     await tester.pumpAndSettle();
+    expect(find.byType(MapMarkerWidget), findsOneWidget);
     await tester.tap(find.text('마커 필터'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilterChip, '차량'));
+    await tester.tap(find.widgetWithText(FilterChip, '차고지'));
     await tester.pumpAndSettle();
-    expect(find.byType(MapMarkerWidget), findsOneWidget);
+    expect(find.byType(MapMarkerWidget), findsNothing);
 
     await tester.pumpWidget(screen('Desert_Main'));
     await tester.pumpAndSettle();
@@ -158,6 +163,6 @@ void main() {
       isTrue,
     );
     expect(find.byType(FilterChip), findsNothing);
-    expect(find.byType(MapMarkerWidget), findsNothing);
+    expect(find.byType(MapMarkerWidget), findsOneWidget);
   });
 }

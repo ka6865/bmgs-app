@@ -8,6 +8,7 @@ import 'map_models.dart';
 import 'map_marker_overlay.dart';
 import 'map_view_helpers.dart';
 import 'maps_repository.dart';
+import '../../core/widgets/cached_image.dart';
 
 class MapsScreen extends StatefulWidget {
   const MapsScreen({super.key, this.initialMapId, this.repository});
@@ -23,6 +24,9 @@ class _MapsScreenState extends State<MapsScreen> {
   late final MapsRepository _repository;
   late BgmsMap _selectedMap;
   final Set<String> _layers = {};
+
+  /// 맵을 처음 열면 모든 마커를 켜고, 이후 새로고침에서는 사용자가 고른 필터를 유지한다.
+  bool _layersChosen = false;
   bool _showFilters = false;
   int _loadGeneration = 0;
   late Future<MapMarkerLayer> _markerFuture;
@@ -47,6 +51,7 @@ class _MapsScreenState extends State<MapsScreen> {
     if (map.id == _selectedMap.id) return;
     _selectedMap = map;
     _layers.clear();
+    _layersChosen = false;
     _adminSettings = {};
     _showFilters = false;
     _markerFuture = _loadMarkers();
@@ -68,19 +73,23 @@ class _MapsScreenState extends State<MapsScreen> {
     final layer = allowed.isEmpty
         ? MapMarkerLayer.unavailable(
             mapId: mapId,
-            message: '웹 DB의 지도 설정이 없거나 불러오지 못했습니다. 새로고침해 주세요.',
+            message: '이 맵의 마커 정보를 불러오지 못했습니다. 아래로 당겨 다시 시도해 주세요.',
           )
         : await _repository.fetchMarkers(mapId: mapId, layers: allowed);
     if (mounted && generation == _loadGeneration) {
       setState(() {
         _adminSettings = settings;
-        _layers.retainAll(
-          _repository.filterActiveLayers(
-            mapId,
-            layer.markers.map((marker) => marker.layer).toSet().toList(),
-            settings,
-          ),
+        final allowedLayers = _repository.filterActiveLayers(
+          mapId,
+          layer.markers.map((marker) => marker.layer).toSet().toList(),
+          settings,
         );
+        if (_layersChosen) {
+          _layers.retainAll(allowedLayers);
+        } else if (layer.markers.isNotEmpty) {
+          _layers.addAll(allowedLayers);
+          _layersChosen = true;
+        }
       });
     }
     return layer;
@@ -165,6 +174,7 @@ class _MapsScreenState extends State<MapsScreen> {
                             setState(() {
                               _selectedMap = _repository.resolveMap(map.id);
                               _layers.clear();
+                              _layersChosen = false;
                               _adminSettings = {};
                               _showFilters = false;
                               _markerFuture = _loadMarkers();
@@ -375,19 +385,14 @@ class _MapPanelState extends State<_MapPanel> {
               ],
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Chip(label: Text(widget.layer.displaySourceLabel)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    widget.layer.source == MapMarkerSource.api &&
-                            widget.activeLayers.isEmpty
-                        ? '마커 필터에서 원하는 항목을 켜 주세요.'
-                        : widget.layer.displayMessage,
-                  ),
-                ),
-              ],
+            Text(
+              widget.layer.source == MapMarkerSource.api &&
+                      widget.activeLayers.isEmpty
+                  ? '마커 필터에서 원하는 항목을 켜 주세요.'
+                  : widget.layer.displayMessage,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: BgmsColors.textSecondary),
             ),
             const SizedBox(height: 12),
             if (widget.loading) const LinearProgressIndicator(),
@@ -399,7 +404,7 @@ class _MapPanelState extends State<_MapPanel> {
                     child: InteractiveViewer(
                       transformationController: _transformationController,
                       minScale: 0.8,
-                      maxScale: 3,
+                      maxScale: 10,
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           return Stack(
@@ -528,14 +533,13 @@ class MapTileMosaic extends StatelessWidget {
               row: row,
             );
 
-            return Image.network(
-              url,
+            return Image(
+              // 타일 원본이 화면 표시 크기보다 크므로 디코딩 폭을 제한해
+              // 메모리와 디코딩 비용을 줄인다.
+              image: cachedImageProvider(url, cacheWidth: _tileCacheWidth),
               fit: BoxFit.cover,
               gaplessPlayback: true,
               filterQuality: FilterQuality.medium,
-              // 타일 원본이 화면 표시 크기보다 크므로 디코딩 폭을 제한해
-              // 메모리와 디코딩 비용을 줄인다.
-              cacheWidth: _tileCacheWidth,
               loadingBuilder: (context, child, progress) {
                 if (progress == null) return child;
                 // 로딩 중 빈 화면 대신 배경을 채워 깜빡임을 줄인다.
@@ -566,7 +570,10 @@ class MapTileMosaic extends StatelessWidget {
               valueListenable: controller!,
               builder: (context, matrix, child) {
                 final scale = matrix.getMaxScaleOnViewport();
-                final zoom = scale >= 4
+                // 확대할수록 서버의 더 촘촘한 타일 단계(최대 5)를 받아 선명하게 그린다.
+                final zoom = scale >= 6
+                    ? 5
+                    : scale >= 4
                     ? 4
                     : scale >= 2
                     ? 3
@@ -599,16 +606,18 @@ class MapTileMosaic extends StatelessWidget {
                           top: y * tileHeight,
                           width: tileWidth,
                           height: tileHeight,
-                          child: Image.network(
-                            config.mapTileUrl(
-                              mapId: map.tilePath,
-                              zoom: zoom,
-                              column: x,
-                              row: y,
+                          child: Image(
+                            image: cachedImageProvider(
+                              config.mapTileUrl(
+                                mapId: map.tilePath,
+                                zoom: zoom,
+                                column: x,
+                                row: y,
+                              ),
+                              cacheWidth: _tileCacheWidth,
                             ),
                             key: ValueKey('${map.id}/$zoom/$x/$y'),
                             fit: BoxFit.cover,
-                            cacheWidth: _tileCacheWidth,
                             errorBuilder: (_, _, _) => const SizedBox.shrink(),
                             loadingBuilder: (_, child, progress) =>
                                 progress == null

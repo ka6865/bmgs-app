@@ -140,7 +140,7 @@ class _SupportScreenState extends State<SupportScreen> {
       const SizedBox(height: 8),
       if (_tickets == null)
         OutlinedButton(
-          onPressed: () => context.go('/my'),
+          onPressed: () => context.push('/my'),
           child: const Text('로그인 후 문의하기'),
         )
       else ...[

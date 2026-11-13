@@ -27,7 +27,7 @@ void main() {
     expect(weapons.first.label, 'M24');
     expect(weapons.first.totalKills, 16);
     expect(weapons.first.totalDamage, 1300);
-    expect(weapons.last.label, 'AK47');
+    expect(weapons.last.label, 'AKM');
     expect(weapons.last.totalKills, 15);
   });
 }

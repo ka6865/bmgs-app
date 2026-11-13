@@ -22,7 +22,7 @@ void main() {
       modeStats: const {},
     );
 
-    testWidgets('치킨(#1) 매치는 승리 엠블럼과 골드 하이라이트를 표시한다', (tester) async {
+    testWidgets('치킨(#1) 매치는 치킨 표시와 한 문장 낭독 라벨을 가진다', (tester) async {
       final chickenMatch = MatchSummary(
         matchId: 'match-1',
         mapName: 'Baltic_Main',
@@ -47,8 +47,9 @@ void main() {
       expect(find.text('#1'), findsOneWidget);
       expect(find.text('에란겔'), findsOneWidget);
       expect(find.text('7'), findsOneWidget);
-      expect(find.byIcon(Icons.emoji_events), findsOneWidget);
-      expect(find.text('WIN'), findsOneWidget);
+      expect(find.text('치킨'), findsOneWidget);
+      expect(find.bySemanticsLabel('치킨, 마지막 페이즈까지 생존'), findsNothing);
+      expect(find.bySemanticsLabel(RegExp('^치킨, 에란겔')), findsOneWidget);
     });
 
     testWidgets('일반 순위 매치를 올바른 정보로 렌더링한다', (tester) async {

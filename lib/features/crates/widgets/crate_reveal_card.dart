@@ -2,10 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/bgms_theme.dart';
 import '../crate_draw.dart';
 import '../crate_models.dart';
 import '../crate_rarity_style.dart';
+import '../../../core/widgets/cached_image.dart';
 
 /// 뽑기 결과 카드. 탭하거나 자동으로 뒤집혀 내용을 공개한다.
 ///
@@ -197,10 +199,24 @@ class _CardFront extends StatelessWidget {
                   ),
               ],
             ),
-            const Spacer(),
+            Expanded(
+              child: item.imageUrl == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Image(
+                        image: cachedImageProvider(
+                          AppConfig.local.resolveUrl(item.imageUrl!),
+                        ),
+                        fit: BoxFit.contain,
+                        semanticLabel: item.name,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+            ),
             Text(
               item.name,
-              maxLines: 3,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.w700,

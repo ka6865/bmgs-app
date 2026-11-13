@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bgms_mobile_app/features/stats/match_detail_screen.dart';
 import 'package:bgms_mobile_app/features/stats/match_detail_models.dart';
@@ -41,23 +40,24 @@ void main() {
     expect(find.text('리플레이 지도에서 동선 확인'), findsNothing);
   });
 
-  testWidgets('지원 맵 별칭은 같은 맵 지도·핫드랍으로 전달하고 미지원 맵은 차단한다', (tester) async {
-    MatchSummary summary(String map) => MatchSummary(
-      matchId: 'map-match',
-      createdAt: null,
-      mapName: map,
-      gameMode: 'squad',
-      kills: 0,
-      damage: 0,
-      rank: 20,
-      isFallback: false,
-    );
-    final match = summary('Desert_Main');
-    final router = GoRouter(
-      routes: [
-        GoRoute(
-          path: '/',
-          builder: (_, _) => MatchDetailScreen(
+  testWidgets('지원 맵만 맨 아래에 2D 리플레이 버튼을 보여준다', (tester) async {
+    for (final (map, expected) in [
+      ('Desert_Main', '2D 리플레이 보기'),
+      ('Savage_Main', '이 맵은 2D 리플레이를 지원하지 않습니다.'),
+    ]) {
+      final match = MatchSummary(
+        matchId: 'replay-$map',
+        createdAt: null,
+        mapName: map,
+        gameMode: 'duo',
+        kills: 0,
+        damage: 0,
+        rank: 20,
+        isFallback: false,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MatchDetailScreen(
             matchId: match.matchId,
             nickname: 'Player',
             platform: 'steam',
@@ -67,52 +67,16 @@ void main() {
             ),
           ),
         ),
-        GoRoute(
-          path: '/maps',
-          builder: (_, state) =>
-              Text('지도:${state.uri.queryParameters['mapId']}'),
-        ),
-        GoRoute(
-          path: '/hotdrop',
-          builder: (_, state) =>
-              Text('핫드랍:${state.uri.queryParameters['mapId']}'),
-        ),
-      ],
-    );
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('이 경기 전술 지도'));
-    await tester.pumpAndSettle();
-    expect(find.text('지도:Miramar'), findsOneWidget);
-    router.pop();
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('이 맵 핫드랍'));
-    await tester.pumpAndSettle();
-    expect(find.text('핫드랍:Miramar'), findsOneWidget);
-    await tester.pumpWidget(const SizedBox());
-    router.dispose();
-
-    final unsupported = summary('Savage_Main');
-    await tester.pumpWidget(
-      MaterialApp(
-        home: MatchDetailScreen(
-          matchId: unsupported.matchId,
-          nickname: 'Player',
-          platform: 'steam',
-          summary: unsupported,
-          repository: _DetailRepository(
-            MatchDetail.fromSummary(unsupported, nickname: 'Player'),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    for (final label in ['이 경기 전술 지도', '이 맵 핫드랍', '경기 2D 리플레이']) {
-      final button = find.ancestor(
-        of: find.text(label),
-        matching: find.byType(OutlinedButton),
       );
-      expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
+      await tester.pumpAndSettle();
+      await tester.dragUntilVisible(
+        find.text(expected),
+        find.byType(ListView).first,
+        const Offset(0, -300),
+      );
+      expect(find.text(expected), findsOneWidget);
+      expect(find.text('팀 총 킬'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
     }
   });
 

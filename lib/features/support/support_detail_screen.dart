@@ -149,7 +149,7 @@ class _SupportDetailScreenState extends State<SupportDetailScreen> {
         children: [
           const Text('문의 상세는 로그인 후 확인할 수 있습니다.'),
           OutlinedButton(
-            onPressed: () => context.go('/my'),
+            onPressed: () => context.push('/my'),
             child: const Text('로그인'),
           ),
         ],

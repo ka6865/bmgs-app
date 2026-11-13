@@ -1,10 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/guide/guide_screen.dart';
 import '../features/tools/weapons_screen.dart';
-import '../features/tools/backpack_screen.dart';
 import '../features/meta/weapon_meta_screen.dart';
 import '../features/maps/hotdrop_screen.dart';
 import '../features/maps/replay/match_replay_screen.dart';
@@ -51,12 +51,18 @@ GoRouter createAppRouter({
   return GoRouter(
     initialLocation: '/',
     routes: [
-      GoRoute(path: '/tools', builder: (_, _) => const GuideScreen()),
-      GoRoute(path: '/tools/weapons', builder: (_, _) => const WeaponsScreen()),
+      // 예전 도구 허브 주소는 도감 탭으로 보낸다.
+      GoRoute(path: '/tools', redirect: (_, _) => '/codex'),
+      // 랭킹과 내 정보는 탭이 아니라 홈·전적에서 들어가는 상세 화면이다.
       GoRoute(
-        path: '/tools/backpack',
-        builder: (_, _) => const BackpackScreen(),
+        path: '/rankings',
+        builder: (_, _) => const _PushedScreen(child: RankingsScreen()),
       ),
+      GoRoute(
+        path: '/my',
+        builder: (_, _) => const _PushedScreen(child: MyScreen()),
+      ),
+      GoRoute(path: '/tools/weapons', builder: (_, _) => const WeaponsScreen()),
       GoRoute(path: '/meta', builder: (_, _) => const WeaponMetaScreen()),
       GoRoute(
         path: '/hotdrop',
@@ -110,6 +116,7 @@ GoRouter createAppRouter({
                 builder: (context, state) => HomeScreen(
                   preferencesLoader: homePreferencesLoader,
                   suggestionFetcher: resolvedSuggestionFetcher,
+                  statsRepository: statsRepository,
                 ),
               ),
             ],
@@ -126,6 +133,7 @@ GoRouter createAppRouter({
                   ),
                   repository: statsRepository,
                   preferencesLoader: statsPreferencesLoader,
+                  suggestionFetcher: resolvedSuggestionFetcher,
                 ),
                 routes: [
                   GoRoute(
@@ -172,16 +180,7 @@ GoRouter createAppRouter({
               ),
             ],
           ),
-          // 2. 랭킹 탭 브랜치
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/rankings',
-                builder: (context, state) => const RankingsScreen(),
-              ),
-            ],
-          ),
-          // 3. 지도 탭 브랜치
+          // 2. 지도 탭 브랜치
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -192,7 +191,16 @@ GoRouter createAppRouter({
               ),
             ],
           ),
-          // 4. 게시판 탭 브랜치
+          // 3. 도감 탭 브랜치: 무기·메타·핫드랍·아이템 도구
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/codex',
+                builder: (context, state) => const GuideScreen(),
+              ),
+            ],
+          ),
+          // 4. 커뮤니티 탭 브랜치
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -211,17 +219,19 @@ GoRouter createAppRouter({
               ),
             ],
           ),
-          // 5. 마이 탭 브랜치
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/my',
-                builder: (context, state) => const MyScreen(),
-              ),
-            ],
-          ),
         ],
       ),
     ],
   );
+}
+
+/// 셸 밖에서 열리는 화면에 뒤로가기 막대를 붙인다. 제목은 화면 자체 헤더가 맡는다.
+class _PushedScreen extends StatelessWidget {
+  const _PushedScreen({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      Scaffold(appBar: AppBar(toolbarHeight: 44), body: child);
 }

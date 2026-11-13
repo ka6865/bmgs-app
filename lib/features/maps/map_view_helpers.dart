@@ -46,18 +46,21 @@ Color getMarkerColor(String layer) {
 
 String getCategoryLabel(String layer) {
   return switch (layer) {
-    'Garage' => '차량',
-    'SecretRoom' => '비밀방',
-    'Esports' => '이스포츠',
+    // 웹 lib/map_config.ts CATEGORY_INFO와 같은 이름을 쓴다.
+    'Garage' => '차고지',
+    'SecretRoom' => '비밀의 방',
+    'Esports' => '고정 차량',
     'HotDrop' => '핫드랍',
     'Glider' => '글라이더',
+    'EsportsGlider' => '고정 글라이더',
     'Boat' => '보트',
-    'EsportsBoat' => '대회 보트',
+    'EsportsBoat' => '고정 보트',
     'GoldenMirado' => '황금 미라도',
-    'EsportsMirado' => '대회 미라도',
-    'EsportsPickup' => '대회 픽업',
+    'EsportsMirado' => 'e스포츠 미라도',
+    'EsportsPickup' => 'e스포츠 픽업',
     'Porter' => '포터',
     'PoliceCar' => '경찰차',
+    'SecurityCard' => '보안 키카드',
     'Snowmobile' => '스노우모빌',
     'BearCave' => '곰 동굴',
     'GasPump' => '주유소',

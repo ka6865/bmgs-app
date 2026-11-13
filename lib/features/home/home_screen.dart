@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/network/api_exception.dart';
 import '../../core/observability/app_logger.dart';
@@ -12,14 +13,24 @@ import '../../core/widgets/bgms_brand_header.dart';
 import '../../core/widgets/player_search_bar.dart';
 import '../../navigation/shell_scaffold.dart';
 import '../notifications/notification_bell.dart';
+import '../stats/player_stats_repository.dart';
 import 'widgets/home_dashboard_sections.dart';
-import 'widgets/home_live_banner.dart';
-import 'widgets/player_suggestion_list.dart';
+import 'widgets/home_feed_sections.dart';
+import 'widgets/home_player_panel.dart';
+import '../../core/widgets/player_suggestion_list.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.preferencesLoader, this.suggestionFetcher});
+  const HomeScreen({
+    super.key,
+    this.preferencesLoader,
+    this.suggestionFetcher,
+    this.statsRepository,
+  });
 
   final Future<SharedPreferences> Function()? preferencesLoader;
+
+  /// 홈 플레이어 패널의 전적 조회. 지정하지 않으면 기본 API 클라이언트를 쓴다.
+  final PlayerStatsRepository? statsRepository;
 
   /// 닉네임 자동완성 조회. 지정하지 않으면 자동완성을 비활성한다.
   ///
@@ -37,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   LocalPlayerStore? _store;
   List<StoredPlayer> _recentPlayers = const [];
   List<StoredPlayer> _favoritePlayers = const [];
+  StoredPlayer? _myPlayer;
   bool _loadingStore = true;
   bool _searching = false;
   String? _nicknameError;
@@ -114,11 +126,37 @@ class _HomeScreenState extends State<HomeScreen> {
     if (store == null) return;
     final recent = await store.getRecentPlayers();
     final favorites = await store.getFavoritePlayers();
+    final myPlayer = await _loadMyPlayer();
     if (!mounted) return;
     setState(() {
       _recentPlayers = recent;
       _favoritePlayers = favorites;
+      _myPlayer = myPlayer;
     });
+  }
+
+  /// 로그인했고 프로필에 배그 닉네임을 연결했으면 그 플레이어를 홈 주인공으로 쓴다.
+  Future<StoredPlayer?> _loadMyPlayer() async {
+    try {
+      final client = Supabase.instance.client;
+      if (client.auth.currentSession == null) return null;
+      final row = await client.rpc('get_my_profile').maybeSingle();
+      final nickname = row?['pubg_nickname']?.toString().trim() ?? '';
+      if (nickname.isEmpty) return null;
+      return StoredPlayer(
+        nickname: nickname,
+        platform: row?['pubg_platform']?.toString() ?? 'steam',
+      );
+    } catch (error, stackTrace) {
+      // Supabase 미초기화(테스트·dart-define 없음)나 조회 실패면 최근 검색으로 대신한다.
+      AppObservability.logger.warning(
+        '홈 내 플레이어를 불러오지 못했습니다.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'feature': 'home', 'operation': 'load_my_player'},
+      );
+      return null;
+    }
   }
 
   /// 서버 후보와 로컬 기록을 합친다.
@@ -259,8 +297,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final latestPlayer = _recentPlayers.isEmpty ? null : _recentPlayers.first;
-    final remainingRecent = _recentPlayers.skip(1).toList();
+    final latestPlayer =
+        _myPlayer ?? (_recentPlayers.isEmpty ? null : _recentPlayers.first);
+    final remainingRecent = _recentPlayers
+        .where((player) => player.id != latestPlayer?.id)
+        .toList();
 
     // 셸이 Scaffold를 제공하지만, 홈을 단독으로 띄우는 경우에도
     // TextField와 InkWell이 요구하는 Material 기반을 보장한다.
@@ -271,7 +312,24 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const BgmsBrandHeader(title: 'BGMS', trailing: NotificationBell()),
+            BgmsBrandHeader(
+              title: 'BGMS',
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const NotificationBell(),
+                  IconButton(
+                    onPressed: () async {
+                      await context.push('/my');
+                      // 내 정보에서 최근 검색·즐겨찾기를 지웠을 수 있다.
+                      await _refreshPlayers();
+                    },
+                    icon: const Icon(Icons.account_circle_outlined),
+                    tooltip: '내 정보',
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 14),
             PlayerSearchBar(
               controller: _nicknameController,
@@ -292,39 +350,36 @@ class _HomeScreenState extends State<HomeScreen> {
                   platform: suggestion.platform,
                 ),
               ),
-            if (latestPlayer != null) ...[
-              const SizedBox(height: 16),
-              ContinuePlayerCard(
+            const SizedBox(height: 16),
+            if (latestPlayer != null)
+              HomePlayerPanel(
                 player: latestPlayer,
+                repository: widget.statsRepository,
                 isFavorite: _favoritePlayers.any(
                   (player) => player.id == latestPlayer.id,
                 ),
-                onTap: () => _search(
+                onOpen: () => _search(
                   nickname: latestPlayer.nickname,
                   platform: latestPlayer.platform,
                 ),
                 onFavoriteTap: () => _toggleFavorite(latestPlayer),
+              )
+            else if (!_loadingStore)
+              Text(
+                '닉네임을 검색하면 다음부터 여기에서 최근 경기를 바로 볼 수 있습니다.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: BgmsColors.textSecondary,
+                ),
               ),
-            ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             FavoritePlayersSection(
               players: _favoritePlayers,
               loading: _loadingStore,
               onTap: (player) =>
                   _search(nickname: player.nickname, platform: player.platform),
             ),
-            const SizedBox(height: 20),
-            HomeLiveBanner(onTap: () => context.go('/maps')),
-            const SizedBox(height: 16),
-            CrateSimBanner(onTap: () => context.push('/crates')),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => context.push('/tools'),
-              icon: const Icon(Icons.apps),
-              label: const Text('BGMS 도구 보기'),
-            ),
             if (_loadingStore || remainingRecent.isNotEmpty) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               RecentActivitySection(
                 players: remainingRecent,
                 loading: _loadingStore,
@@ -334,6 +389,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 24),
+            HomeRankingSection(
+              onOpenAll: () => context.push('/rankings'),
+              onPlayerTap: (entry) =>
+                  _search(nickname: entry.nickname, platform: entry.platform),
+            ),
+            const SizedBox(height: 24),
+            HomeCommunitySection(
+              onOpenAll: () => context.go('/board'),
+              onPostTap: (postId) => context.go('/board/$postId'),
+            ),
           ],
         ),
       ),

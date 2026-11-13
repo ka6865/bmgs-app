@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/config/app_config.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/bgms_api_client.dart';
+import '../../core/theme/bgms_theme.dart';
+import 'weapon_meta_trend.dart';
 
 class WeaponMetaScreen extends StatefulWidget {
   const WeaponMetaScreen({super.key, this.client});
@@ -18,6 +20,7 @@ class _WeaponMetaScreenState extends State<WeaponMetaScreen> {
   String _matchType = 'all';
   String? _patch;
   String _category = '전체';
+  String? _trendWeapon;
   @override
   void initState() {
     super.initState();
@@ -76,6 +79,7 @@ class _WeaponMetaScreenState extends State<WeaponMetaScreen> {
                         setState(() {
                           _matchType = choice.key;
                           _category = '전체';
+                          _trendWeapon = null;
                           _load();
                         });
                       }
@@ -118,10 +122,59 @@ class _WeaponMetaScreenState extends State<WeaponMetaScreen> {
                       FilterChip(
                         label: Text(category),
                         selected: category == _category,
-                        onSelected: (_) => setState(() => _category = category),
+                        onSelected: (_) => setState(() {
+                          _category = category;
+                          _trendWeapon = null;
+                        }),
                       ),
                   ],
                 ),
+              const SizedBox(height: 16),
+              Text(
+                '일별 채용률 추세',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              Text(
+                _category == '전체'
+                    ? '총기 종류별로 피해가 기록된 경기 비율입니다. 점선은 패치 적용 시점입니다.'
+                    : '선택한 종류나 총기의 피해가 기록된 경기 비율입니다. 점선은 패치 적용 시점입니다.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: BgmsColors.textSecondary,
+                ),
+              ),
+              if (_category != '전체')
+                DropdownButton<String?>(
+                  value: _trendWeapon,
+                  isExpanded: true,
+                  items: [
+                    DropdownMenuItem(value: null, child: Text('$_category 전체')),
+                    for (final weapon in filtered)
+                      if (weapon['weapon_name'] is String)
+                        DropdownMenuItem(
+                          value: weapon['weapon_name'] as String,
+                          child: Text(weapon['weapon_name'] as String),
+                        ),
+                  ],
+                  onChanged: (value) => setState(() => _trendWeapon = value),
+                ),
+              const SizedBox(height: 12),
+              MetaTrendChart(
+                lines: metaTrendLines(
+                  data ?? const {},
+                  category: _category == '전체' ? null : _category,
+                  weapon: _trendWeapon,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                '패치 전후 총기별 지표',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
               for (final weapon in filtered)
                 Card(
                   child: Padding(

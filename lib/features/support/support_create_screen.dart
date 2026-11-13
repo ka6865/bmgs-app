@@ -128,7 +128,7 @@ class _SupportCreateScreenState extends State<SupportCreateScreen> {
         ),
       if (!_repository.canReadPrivate)
         OutlinedButton(
-          onPressed: () => context.go('/my'),
+          onPressed: () => context.push('/my'),
           child: const Text('로그인 후 문의 작성'),
         )
       else ...[

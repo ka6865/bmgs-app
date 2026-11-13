@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/bgms_theme.dart';
+import '../../core/widgets/bgms_card.dart';
 import 'ai_coaching_models.dart';
 import 'ai_coaching_repository.dart';
 import 'player_stats_models.dart';
@@ -57,7 +58,7 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
   Widget build(BuildContext context) {
     if (_summaryFuture == null) {
       return _AiCardShell(
-        title: 'BGMS AI COACH',
+        title: 'AI 코치',
         statusLabel: '대기',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,14 +72,6 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: _retry,
-                style: FilledButton.styleFrom(
-                  backgroundColor: BgmsColors.accent,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
                 icon: const Icon(Icons.psychology_alt, size: 20),
                 label: const Text(
                   '최근 경기 AI 코칭 받기',
@@ -96,7 +89,7 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const _AiCardShell(
-            title: 'BGMS AI COACH',
+            title: 'AI 코치',
             statusLabel: '전술 분석 중',
             child: Column(
               children: [
@@ -123,72 +116,56 @@ class _AiCoachingCardState extends State<AiCoachingCard> {
             AiCoachingSummary.unavailable('AI 코칭 상태를 불러오지 못했습니다.');
 
         return _AiCardShell(
-          title: 'BGMS AI COACH',
+          title: 'AI 코치',
           statusLabel: _statusLabel(summary.status),
           onRetry: _retry,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (summary.grade != null) ...[
+                    _GradeBadge(grade: summary.grade!),
+                    const SizedBox(width: BgmsSpacing.md),
+                  ],
                   Expanded(
-                    child: Text(
-                      summary.title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: BgmsColors.accent,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          summary.title,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        if (summary.subtitle != null &&
+                            summary.subtitle!.isNotEmpty)
+                          Text(
+                            summary.subtitle!,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: BgmsColors.textSecondary),
+                          ),
+                      ],
                     ),
                   ),
-                  if (summary.grade != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: Colors.purpleAccent,
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Text(
-                        summary.grade!,
-                        style: const TextStyle(
-                          color: Colors.purpleAccent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
                 ],
               ),
-              if (summary.subtitle != null && summary.subtitle!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(summary.subtitle!),
-              ],
               const SizedBox(height: 12),
               // AI 코칭 핵심 본문에 부드러운 타이핑 효과 적용
-              _TypingText(
-                text: summary.summary,
-                style: const TextStyle(
-                  color: BgmsColors.textPrimary,
-                  fontSize: 14,
-                  height: 1.5,
+              _Quote(
+                child: _TypingText(
+                  text: summary.summary,
+                  style: const TextStyle(
+                    color: BgmsColors.textPrimary,
+                    fontSize: 15,
+                    height: 1.5,
+                  ),
                 ),
               ),
               if (summary.cards.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text('서버 경기 지표와 AI 해석'),
+                const SizedBox(height: 20),
                 ...summary.cards.map((card) => _FactCard(card: card)),
-                _InsightGroup(
-                  title: '추천 액션',
-                  items: summary.improvements,
-                  color: BgmsColors.accent,
-                  icon: Icons.track_changes,
-                ),
+                _ActionList(items: summary.improvements),
               ],
               if (summary.hasActionableItems && summary.cards.isEmpty) ...[
                 const SizedBox(height: 16),
@@ -252,69 +229,40 @@ class _AiCardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: BgmsColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: BgmsColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.psychology_alt_outlined,
-                  size: 22,
+    return BgmsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: BgmsColors.accent,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: BgmsColors.textPrimary,
-                  ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                statusLabel,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
+              ),
+              const Spacer(),
+              if (onRetry != null)
+                IconButton(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  color: BgmsColors.textSecondary,
+                  tooltip: '다시 분석',
                 ),
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: BgmsColors.border,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: BgmsColors.textSecondary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                if (onRetry != null)
-                  IconButton(
-                    onPressed: onRetry,
-                    icon: const Icon(
-                      Icons.refresh,
-                      size: 18,
-                      color: BgmsColors.textSecondary,
-                    ),
-                    tooltip: '다시 분석',
-                    visualDensity: VisualDensity.compact,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            child,
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
       ),
     );
   }
@@ -447,46 +395,331 @@ class _TypingTextState extends State<_TypingText> {
   }
 }
 
-class _FactCard extends StatelessWidget {
-  const _FactCard({required this.card});
-  final AiCoachingFactCard card;
+class _GradeBadge extends StatelessWidget {
+  const _GradeBadge({required this.grade});
+  final String grade;
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(card.topic, style: Theme.of(context).textTheme.titleSmall),
-        if (card.question.isNotEmpty) Text(card.question),
-        Text('${card.gameMode} · ${card.matchType} · 선택 ${card.matchCount}경기'),
-        if (card.evidence.isEmpty) const Text('확인된 지표가 없습니다.'),
-        ...card.evidence.map(
-          (row) => Padding(
-            padding: const EdgeInsets.only(top: 6),
+  Widget build(BuildContext context) => Material(
+    color: BgmsColors.elevated,
+    shape: BgmsShape.panel(side: const BorderSide(color: BgmsColors.accent)),
+    child: SizedBox(
+      width: 64,
+      height: 64,
+      child: Center(
+        child: FittedBox(
+          child: Padding(
+            padding: const EdgeInsets.all(6),
             child: Text(
-              '${row.label}: ${row.userValue ?? "미제공"}'
-              '${row.benchmarkValue == null ? " · 비교 자료 없음" : " · ${row.benchmarkLabel}: ${row.benchmarkValue}"}'
-              '${row.userMatchCount == null ? "" : " · 기록 확인 ${row.userMatchCount}경기"}'
-              '${row.sampleCount == null ? "" : " · 비교 표본 ${row.sampleCount}"}'
-              '${row.unavailableReason == null ? "" : "\n${row.unavailableReason}"}',
+              grade,
+              style: BgmsText.number(36, color: BgmsColors.accent),
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        if (card.analysisReady) ...[
-          if (card.kindOpinion.isNotEmpty) Text('코치 의견: ${card.kindOpinion}'),
-          if (card.spicyOpinion.isNotEmpty) Text('다른 관점: ${card.spicyOpinion}'),
-          if (card.reason.isNotEmpty) Text('근거 해석: ${card.reason}'),
-          if (card.evaluation.isNotEmpty) Text('평가: ${card.evaluation}'),
-        ] else
-          Text(
-            card.analysisStatus == 'pending'
-                ? 'AI 해석이 완료되지 않았습니다.'
-                : 'AI 해석을 표시할 수 없습니다.',
-          ),
-        if (!card.analysisReady && card.analysisReason.isNotEmpty)
-          Text(card.analysisReason),
-      ],
+      ),
     ),
   );
+}
+
+/// 왼쪽 골드 선으로 AI 해석 문장을 지표와 구분한다.
+class _Quote extends StatelessWidget {
+  const _Quote({required this.child, this.label});
+  final Widget child;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
+      color: BgmsColors.elevated,
+      border: Border(left: BorderSide(color: BgmsColors.accent, width: 3)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (label != null)
+            Text(
+              label!,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: BgmsColors.accent,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          child,
+        ],
+      ),
+    ),
+  );
+}
+
+class _ActionList extends StatelessWidget {
+  const _ActionList({required this.items});
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('추천 액션', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        for (final (index, item) in items.indexed)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 28,
+                  child: Text(
+                    '${index + 1}',
+                    style: BgmsText.number(20, color: BgmsColors.accent),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(item),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+String _modeLabel(String mode) {
+  final lower = mode.toLowerCase();
+  final team = lower.startsWith('solo')
+      ? '솔로'
+      : lower.startsWith('duo')
+      ? '듀오'
+      : lower.startsWith('squad')
+      ? '스쿼드'
+      : mode;
+  return lower.contains('fpp') ? '$team FPP' : team;
+}
+
+String _matchTypeLabel(String type) => switch (type) {
+  'competitive' => '경쟁전',
+  'official' || 'normal' => '일반전',
+  _ => type,
+};
+
+class _FactCard extends StatelessWidget {
+  const _FactCard({required this.card});
+  final AiCoachingFactCard card;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final context_ = [
+      if (card.gameMode.isNotEmpty) _modeLabel(card.gameMode),
+      if (card.matchType.isNotEmpty) _matchTypeLabel(card.matchType),
+      '${card.matchCount}경기',
+    ].join(' · ');
+    final details = [
+      if (card.spicyOpinion.isNotEmpty) ('다른 관점', card.spicyOpinion),
+      if (card.reason.isNotEmpty) ('근거 해석', card.reason),
+      if (card.evaluation.isNotEmpty) ('평가', card.evaluation),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                card.topic,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  context_,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: BgmsColors.textMuted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (card.question.isNotEmpty)
+            Text(
+              card.question,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: BgmsColors.textSecondary,
+              ),
+            ),
+          const SizedBox(height: 10),
+          if (card.evidence.isEmpty)
+            Text(
+              '확인된 지표가 없습니다.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: BgmsColors.textMuted,
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 8) / 2;
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final row in card.evidence)
+                      SizedBox(
+                        width: width,
+                        child: _EvidenceTile(row: row),
+                      ),
+                  ],
+                );
+              },
+            ),
+          const SizedBox(height: 10),
+          if (card.analysisReady) ...[
+            if (card.kindOpinion.isNotEmpty)
+              _Quote(label: '코치 의견', child: Text(card.kindOpinion)),
+            if (details.isNotEmpty)
+              Theme(
+                data: theme.copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(bottom: 8),
+                  title: Text(
+                    '자세히 보기',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: BgmsColors.textSecondary,
+                    ),
+                  ),
+                  children: [
+                    for (final (label, text) in details)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: BgmsColors.textMuted,
+                              ),
+                            ),
+                            Text(text),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ] else
+            Text(
+              card.analysisStatus == 'pending'
+                  ? 'AI 해석이 완료되지 않았습니다.'
+                  : 'AI 해석을 표시할 수 없습니다.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: BgmsColors.textMuted,
+              ),
+            ),
+          if (!card.analysisReady && card.analysisReason.isNotEmpty)
+            Text(
+              card.analysisReason,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: BgmsColors.textMuted,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 지표 하나. 내 값을 크게, 비교값이 있으면 막대로 같이 보여준다.
+class _EvidenceTile extends StatelessWidget {
+  const _EvidenceTile({required this.row});
+  final AiCoachingEvidence row;
+
+  static double? _numeric(String? value) => value == null
+      ? null
+      : double.tryParse(value.replaceAll(RegExp(r'[^0-9.\-]'), ''));
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final mine = _numeric(row.userValue);
+    final benchmark = _numeric(row.benchmarkValue);
+    final hasBar = mine != null && benchmark != null && benchmark > 0;
+    final better = hasBar && mine >= benchmark;
+
+    return Material(
+      color: BgmsColors.elevated,
+      shape: BgmsShape.panel(size: BgmsShape.cutSmall),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              row.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: BgmsColors.textSecondary,
+              ),
+            ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                row.userValue ?? '-',
+                style: BgmsText.number(
+                  24,
+                  color: hasBar
+                      ? (better ? BgmsColors.top10 : BgmsColors.knock)
+                      : BgmsColors.textPrimary,
+                ),
+              ),
+            ),
+            if (hasBar) ...[
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BgmsRadius.sm,
+                child: LinearProgressIndicator(
+                  value: (mine / (benchmark * 2)).clamp(0, 1),
+                  minHeight: 4,
+                  color: better ? BgmsColors.top10 : BgmsColors.knock,
+                  backgroundColor: BgmsColors.border,
+                ),
+              ),
+            ],
+            const SizedBox(height: 4),
+            Text(
+              [
+                row.benchmarkValue == null
+                    ? (row.unavailableReason ?? '비교 자료 없음')
+                    : '${row.benchmarkLabel} ${row.benchmarkValue}',
+                if (row.userMatchCount != null) '${row.userMatchCount}경기 기준',
+                if (row.sampleCount != null) '비교 표본 ${row.sampleCount}',
+              ].join(' · '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: BgmsColors.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

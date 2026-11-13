@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
+import '../../core/player/player_suggestion_controller.dart';
 import '../../core/theme/bgms_theme.dart';
+import '../../core/widgets/player_suggestion_list.dart';
 import 'battle_models.dart';
 import 'battle_repository.dart';
 
@@ -11,11 +13,13 @@ class BattleScreen extends StatefulWidget {
     required this.initialNickname,
     required this.initialPlatform,
     this.repository,
+    this.suggestionFetcher,
   });
 
   final String initialNickname;
   final String initialPlatform;
   final BattleRepository? repository;
+  final PlayerSuggestionFetcher? suggestionFetcher;
 
   @override
   State<BattleScreen> createState() => _BattleScreenState();
@@ -154,27 +158,37 @@ class _BattleScreenState extends State<BattleScreen> {
     String label,
     String platform,
     ValueChanged<String> onPlatformChanged,
-  ) => Row(
-    children: [
-      Expanded(
-        child: TextField(
-          controller: controller,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(labelText: label),
+  ) => PlayerSuggestionField(
+    controller: controller,
+    fetcher: widget.suggestionFetcher,
+    onSelected: (suggestion) {
+      controller.text = suggestion.nickname;
+      if (const ['steam', 'kakao'].contains(suggestion.platform)) {
+        onPlatformChanged(suggestion.platform);
+      }
+    },
+    child: Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: controller,
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(labelText: label),
+          ),
         ),
-      ),
-      const SizedBox(width: 8),
-      DropdownButton<String>(
-        value: platform,
-        items: const [
-          DropdownMenuItem(value: 'steam', child: Text('Steam')),
-          DropdownMenuItem(value: 'kakao', child: Text('Kakao')),
-        ],
-        onChanged: (value) {
-          if (value != null) onPlatformChanged(value);
-        },
-      ),
-    ],
+        const SizedBox(width: 8),
+        DropdownButton<String>(
+          value: platform,
+          items: const [
+            DropdownMenuItem(value: 'steam', child: Text('Steam')),
+            DropdownMenuItem(value: 'kakao', child: Text('Kakao')),
+          ],
+          onChanged: (value) {
+            if (value != null) onPlatformChanged(value);
+          },
+        ),
+      ],
+    ),
   );
 }
 

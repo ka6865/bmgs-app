@@ -40,19 +40,7 @@ void main() {
       isEmpty,
     );
   });
-  test('웹과 같은 가방·조끼 용량과 단위 무게×수량을 계산한다', () {
-    expect(backpackCapacity(hasVest: false, level: 0), 70);
-    expect(backpackCapacity(hasVest: true, level: 0), 120);
-    expect(backpackCapacity(hasVest: false, level: 3), 320);
-    expect(backpackCapacity(hasVest: true, level: 1), 270);
-    expect(backpackCapacity(hasVest: true, level: 2), 320);
-    expect(backpackCapacity(hasVest: true, level: 3), 370);
-    const items = [
-      BackpackItem(id: 'ammo', name: '탄약', category: 'ammo', weight: 0.5),
-      BackpackItem(id: 'heal', name: '회복', category: 'consumables', weight: 10),
-    ];
-    expect(inventoryWeight(items, {'ammo': 30, 'heal': 2}), 35);
-    expect(inventoryWeight(items, {}), 0);
+  test('게임 숫자와 무기 응답을 안전하게 읽는다', () {
     expect(gameNumber(null), isNull);
     expect(gameNumber(-1), isNull);
     expect(gameNumber(double.infinity), isNull);

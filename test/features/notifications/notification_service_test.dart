@@ -26,6 +26,7 @@ class _FakeStatsRepository extends PlayerStatsRepository {
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) async {
     callCount++;
     final failure = error;

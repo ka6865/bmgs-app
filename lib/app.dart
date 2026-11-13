@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/platform/orientation_policy.dart';
 import 'core/theme/app_theme.dart';
 import 'features/notifications/notification_providers.dart';
 import 'navigation/app_router.dart';
@@ -76,6 +77,9 @@ class _BgmsAppViewState extends ConsumerState<_BgmsAppView>
       theme: AppTheme.dark(),
       routerConfig: _router,
       builder: (context, child) {
+        OrientationPolicy.setWide(
+          MediaQuery.sizeOf(context).shortestSide >= 600,
+        );
         return GestureDetector(
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
           child: child,

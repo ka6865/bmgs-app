@@ -28,6 +28,7 @@ class MockPlayerStatsRepository extends Fake implements PlayerStatsRepository {
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) {
     lastRefresh = refresh;
     refreshRequests.add(refresh);
@@ -142,6 +143,7 @@ class _RefreshFailureRepository extends MockPlayerStatsRepository {
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) {
     if (refresh) {
       return Future.error(
@@ -169,6 +171,7 @@ class _RecordingPlayerStatsRepository extends MockPlayerStatsRepository {
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) {
     platforms.add(platform);
     return super.fetchPlayerStats(
@@ -203,6 +206,7 @@ class _NoRecentMatchesRepository extends Fake implements PlayerStatsRepository {
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) async => PlayerStatsBundle(
     profile: PlayerStatsProfile.fromJson({
       'nickname': nickname,
@@ -224,6 +228,7 @@ class _UnavailableStatsRepository extends Fake
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) async => PlayerStatsBundle(
     profile: PlayerStatsProfile.fromJson({
       'nickname': nickname,
@@ -247,6 +252,7 @@ class _StatusStatsRepository extends Fake implements PlayerStatsRepository {
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) async => PlayerStatsBundle(
     profile: PlayerStatsProfile.fromJson({
       'nickname': nickname,
@@ -267,6 +273,7 @@ class _SummaryErrorRepository extends MockPlayerStatsRepository {
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) async {
     final bundle = await super.fetchPlayerStats(
       nickname: nickname,
@@ -289,8 +296,19 @@ class _SummaryErrorRepository extends MockPlayerStatsRepository {
   }
 }
 
+/// 전적 화면의 '매치' 구역을 연다. 기본 구역은 '요약'이다.
+Future<void> _openSummary(WidgetTester tester) async {
+  await tester.tap(find.text('요약'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openMatches(WidgetTester tester) async {
+  await tester.tap(find.text('매치'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  testWidgets('최근 경기와 시즌 기록이 없어도 DB 전체 이력 진입을 유지한다', (tester) async {
+  testWidgets('최근 경기와 시즌 기록이 없으면 저장된 경기 없음 안내를 보여준다', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(
       MaterialApp(
@@ -302,18 +320,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final entry = find.text('DB 전체 경기 이력');
-    expect(entry, findsOneWidget);
-    await tester.ensureVisible(entry);
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.ancestor(of: entry, matching: find.byType(FilledButton)),
-          )
-          .onPressed,
-      isNotNull,
-    );
-    expect(find.textContaining('과거에 저장된 기록은 DB 전체 경기 이력에서'), findsOneWidget);
+    await _openMatches(tester);
+    expect(find.textContaining('저장된 경기가 없습니다'), findsOneWidget);
     expect(find.byType(MatchCard), findsNothing);
   });
 
@@ -329,17 +337,19 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openSummary(tester);
     expect(find.text('시즌 지표 조회 불가'), findsOneWidget);
     expect(find.text('해당 모드 플레이 기록 없음'), findsNothing);
-    expect(find.text('DB 전체 경기 이력'), findsOneWidget);
+    await _openMatches(tester);
+    expect(find.text('무기 숙련도'), findsOneWidget);
   });
 
-  testWidgets('cached는 정상 DB 조회로 표시하고 partial·save_failed만 실패 안내한다', (
+  testWidgets('cached는 안내 없이 표시하고 partial·save_failed만 실패 안내한다', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
     for (final scenario in [
-      (status: 'cached', text: 'DB에 저장된 시즌 기록을 표시합니다.'),
+      (status: 'cached', text: null),
       (status: 'partial', text: '일부 전적 갱신 실패 · 저장된 기록 기준 시각을 확인할 수 없습니다.'),
       (
         status: 'save_failed',
@@ -357,10 +367,16 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text(scenario.text), findsOneWidget);
+      final text = scenario.text;
+      if (text == null) {
+        expect(find.textContaining('실패'), findsNothing);
+      } else {
+        expect(find.text(text), findsOneWidget);
+      }
       expect(find.textContaining('시즌 지표 새 저장 완료'), findsNothing);
       expect(find.textContaining('시즌 기록 기준:'), findsNothing);
-      expect(find.text('DB 전체 경기 이력'), findsOneWidget);
+      await _openMatches(tester);
+      expect(find.text('무기 숙련도'), findsOneWidget);
     }
   });
 
@@ -378,7 +394,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openSummary(tester);
     expect(find.text('Gold III'), findsOneWidget);
+    await _openMatches(tester);
     final error = find.text('최근 매치 요약을 불러오지 못했습니다. 요약 서버가 일시적으로 응답하지 않습니다.');
     await tester.scrollUntilVisible(
       error,
@@ -386,10 +404,7 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(error, findsOneWidget);
-    expect(
-      find.text('일부 매치의 서버 기록을 찾지 못했습니다. 자동 분석이 진행 중인 상태는 아닙니다.'),
-      findsNothing,
-    );
+    expect(find.text('일부 매치의 서버 기록을 찾지 못했습니다.'), findsNothing);
     expect(find.byType(MatchCard), findsNWidgets(2));
   });
 
@@ -492,7 +507,7 @@ void main() {
       await tester.tap(find.byKey(const Key('player_search_submit')));
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.map).last);
+      await tester.tap(find.byIcon(Icons.map_outlined).last);
       await tester.pumpAndSettle();
       expect(router.routeInformationProvider.value.uri.path, '/maps');
 
@@ -522,6 +537,7 @@ void main() {
 
     // 로딩 대기
     await tester.pumpAndSettle();
+    await _openSummary(tester);
 
     // 1. 큐 세그먼트 필터 및 모드 칩 렌더링 확인
     expect(find.text('경쟁전'), findsOneWidget);
@@ -570,6 +586,7 @@ void main() {
 
     // 로딩 대기
     await tester.pumpAndSettle();
+    await _openMatches(tester);
 
     // 1. 우승 카드 하이라이트 검증
     // 리본 문구 대신 순위와 트로피 아이콘으로 1등을 표시한다.
@@ -578,10 +595,7 @@ void main() {
         .ancestor(of: find.text('#1'), matching: find.byType(MatchCard))
         .first;
     expect(
-      find.descendant(
-        of: winnerCard,
-        matching: find.byIcon(Icons.emoji_events),
-      ),
+      find.descendant(of: winnerCard, matching: find.text('치킨')),
       findsOneWidget,
     );
 
@@ -612,6 +626,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openSummary(tester);
 
     // 기본적으로 '스쿼드'가 선택되어 있으므로 Gold III 티어 노출됨
     expect(find.text('Gold III'), findsOneWidget);
@@ -641,6 +656,7 @@ void main() {
     // 닉네임이 변경되었을 때 key가 바르게 작동한다면,
     // _StatsContent의 State가 새로 생성되어 다시 기본 모드인 '스쿼드'가 선택되어야 함.
     // 따라서 다시 'Gold III' 티어가 노출되어야 하고, '해당 모드 플레이 기록 없음'은 사라져야 함.
+    await _openSummary(tester);
     expect(find.text('Gold III'), findsOneWidget);
     expect(find.text('해당 모드 플레이 기록 없음'), findsNothing);
   });
@@ -664,6 +680,7 @@ void main() {
 
     // 로딩 대기
     await tester.pumpAndSettle();
+    await _openMatches(tester);
 
     // match-1의 경과 시간(5분 전) 표시 검증
     expect(find.text('5분 전'), findsOneWidget);
@@ -689,6 +706,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openSummary(tester);
 
     // 시즌 합계의 생존 시간·Top 10을 사용하고 큐 미확인 헤드샷은 비워 둔다.
     expect(find.text('15분 0초'), findsOneWidget);
@@ -727,7 +745,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(mockRepo.refreshRequests, [false]);
-    expect(find.text('최근 매치 · 모든 모드'), findsOneWidget);
+    expect(find.text('요약'), findsOneWidget);
+    await _openSummary(tester);
     await tester.tap(find.text('일반전'));
     await tester.pumpAndSettle();
 
@@ -759,8 +778,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await _openSummary(tester);
     await tester.tap(find.text('일반전'));
     await tester.pumpAndSettle();
+    await _openMatches(tester);
     await tester.tap(find.byTooltip('새로고침'));
     await tester.pumpAndSettle();
     expect(find.textContaining('최신 갱신 실패 · 이전 기록을 유지합니다.'), findsOneWidget);
@@ -771,7 +792,10 @@ void main() {
     );
     expect(coolingButton, findsOneWidget);
     expect(tester.widget<IconButton>(coolingButton).onPressed, isNull);
+    // 새로고침 뒤에도 보던 매치 구역과 일반전 선택을 유지한다.
     expect(find.byType(MatchCard), findsNWidgets(2));
+    await tester.tap(find.text('요약'));
+    await tester.pumpAndSettle();
     expect(find.text('Gold III'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
@@ -794,6 +818,7 @@ void main() {
     );
 
     await tester.pumpAndSettle();
+    await _openMatches(tester);
 
     final matchCards = find.byType(MatchCard);
     expect(matchCards, findsNWidgets(3));
@@ -826,6 +851,7 @@ class MockMiramarMapNameStatsRepository extends Fake
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) {
     final modeStats = {
       'ranked': {
@@ -918,6 +944,7 @@ class MockRankedStatsSupplementRepository extends Fake
     String? season,
     bool refresh = false,
     bool includeSummaries = true,
+    int summaryLimit = 20,
   }) {
     final modeStats = {
       'ranked': {

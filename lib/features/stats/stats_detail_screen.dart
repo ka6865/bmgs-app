@@ -7,24 +7,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/observability/app_logger.dart';
 import '../../core/player/player_search_flow.dart';
+import '../../core/player/player_suggestion_controller.dart';
 import '../../core/storage/local_player_store.dart';
 import '../../core/theme/bgms_theme.dart';
 import '../../core/widgets/app_panels.dart';
+import '../../core/widgets/bgms_card.dart';
+import '../squad/squad_screen.dart';
 import '../../core/widgets/bgms_brand_header.dart';
-import '../../core/widgets/bgms_sparkline_bar.dart';
 import '../../core/widgets/player_search_bar.dart';
+import '../../core/widgets/player_suggestion_list.dart';
 import '../../navigation/shell_scaffold.dart';
 import 'ai_coaching_card.dart';
-import 'all_matches_screen.dart';
 import 'battle_screen.dart';
-import 'ban_watch_screen.dart';
-import 'encounter_screen.dart';
-import 'player_match_history_screen.dart';
+import 'player_match_history_models.dart';
+import 'player_match_history_repository.dart';
 import 'player_stats_models.dart';
 import 'player_stats_repository.dart';
 import 'widgets/match_card.dart';
 import 'widgets/radar_chart_widget.dart';
 import 'weapon_mastery_screen.dart';
+import '../../core/widgets/share_button.dart';
 
 class StatsDetailScreen extends StatefulWidget {
   const StatsDetailScreen({
@@ -33,12 +35,20 @@ class StatsDetailScreen extends StatefulWidget {
     required this.platform,
     this.repository,
     this.preferencesLoader,
+    this.suggestionFetcher,
+    this.historyRepository,
   });
+
+  /// 매치 탭의 DB 경기 목록 조회. 테스트에서 주입한다.
+  final PlayerMatchHistoryRepository? historyRepository;
 
   final String? nickname;
   final String platform;
   final PlayerStatsRepository? repository;
   final Future<SharedPreferences> Function()? preferencesLoader;
+
+  /// 닉네임 자동완성 조회. 없으면 후보를 띄우지 않는다.
+  final PlayerSuggestionFetcher? suggestionFetcher;
 
   @override
   State<StatsDetailScreen> createState() => _StatsDetailScreenState();
@@ -62,6 +72,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
   Timer? _refreshCooldownTimer;
   String? _preferredQueue;
   String? _preferredMode;
+  _StatsSection _preferredSection = _StatsSection.matches;
   PlayerStatsBundle? _lastBundle;
   int _requestGeneration = 0;
   bool _isRequestInFlight = false;
@@ -102,6 +113,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
       _selectedSeason = null; // 닉네임이나 플랫폼이 바뀌면 시즌 필터 초기화
       _preferredQueue = null;
       _preferredMode = null;
+      _preferredSection = _StatsSection.matches;
       _lastBundle = null;
       _refreshCooldownTimer?.cancel();
       _refreshAvailableAt = null;
@@ -424,11 +436,17 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
                           builder: (_) => BattleScreen(
                             initialNickname: nickname,
                             initialPlatform: _normalizedPlatform,
+                            suggestionFetcher: widget.suggestionFetcher,
                           ),
                         ),
                       ),
                       icon: const Icon(Icons.compare_arrows),
                       tooltip: '전적 비교',
+                    ),
+                    ShareButton(
+                      title: '$nickname 배그 전적 - BGMS',
+                      path:
+                          '/stats/$_normalizedPlatform/${Uri.encodeComponent(nickname)}',
                     ),
                   ],
                 ),
@@ -450,6 +468,7 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
               if (_searchError == null) return;
               setState(() => _searchError = null);
             },
+            suggestionFetcher: widget.suggestionFetcher,
           )
         else
           FutureBuilder<PlayerStatsBundle>(
@@ -506,6 +525,9 @@ class _StatsDetailScreenState extends State<StatsDetailScreen> {
                 refreshRemainingSeconds: _refreshRemainingSeconds,
                 preferredQueue: _preferredQueue,
                 preferredMode: _preferredMode,
+                section: _preferredSection,
+                onSectionChanged: (section) => _preferredSection = section,
+                historyRepository: widget.historyRepository,
                 onModeChanged: (queue, mode) {
                   _preferredQueue = queue;
                   _preferredMode = mode;
@@ -535,7 +557,10 @@ class _StatsSearchHub extends StatelessWidget {
     required this.onSearch,
     required this.onTextChanged,
     this.errorText,
+    this.suggestionFetcher,
   });
+
+  final PlayerSuggestionFetcher? suggestionFetcher;
 
   final TextEditingController controller;
   final String platform;
@@ -553,14 +578,22 @@ class _StatsSearchHub extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 홈과 같은 검색 바를 재사용해 검색 UI가 중복되지 않게 한다.
-        PlayerSearchBar(
+        PlayerSuggestionField(
           controller: controller,
-          platform: platform,
-          searching: searching,
-          errorText: errorText,
-          onPlatformChanged: onPlatformChanged,
-          onSearch: onSearch,
-          onTextChanged: onTextChanged,
+          fetcher: suggestionFetcher,
+          onSelected: (suggestion) => onSearch(
+            nickname: suggestion.nickname,
+            platform: suggestion.platform,
+          ),
+          child: PlayerSearchBar(
+            controller: controller,
+            platform: platform,
+            searching: searching,
+            errorText: errorText,
+            onPlatformChanged: onPlatformChanged,
+            onSearch: onSearch,
+            onTextChanged: onTextChanged,
+          ),
         ),
         const SizedBox(height: 12),
         _PlayerShortcutPanel(
@@ -645,6 +678,8 @@ class _PlayerShortcutPanel extends StatelessWidget {
   }
 }
 
+enum _StatsSection { summary, matches, ai }
+
 class _StatsContent extends StatefulWidget {
   const _StatsContent({
     super.key,
@@ -655,8 +690,12 @@ class _StatsContent extends StatefulWidget {
     this.preferredQueue,
     this.preferredMode,
     required this.onModeChanged,
+    required this.section,
+    required this.onSectionChanged,
+    this.historyRepository,
   });
 
+  final PlayerMatchHistoryRepository? historyRepository;
   final PlayerStatsBundle bundle;
   final String? selectedSeason;
   final ValueChanged<String?> onSeasonChanged;
@@ -664,6 +703,10 @@ class _StatsContent extends StatefulWidget {
   final String? preferredQueue;
   final String? preferredMode;
   final void Function(String queue, String mode) onModeChanged;
+
+  /// 새로고침으로 다시 그려져도 보던 구역(요약·매치·AI)을 유지한다.
+  final _StatsSection section;
+  final ValueChanged<_StatsSection> onSectionChanged;
 
   @override
   State<_StatsContent> createState() => _StatsContentState();
@@ -677,6 +720,7 @@ class _StatsContentState extends State<_StatsContent> {
 
   late String _selectedQueue;
   late String _selectedMode;
+  late _StatsSection _section = widget.section;
 
   @override
   void initState() {
@@ -705,117 +749,147 @@ class _StatsContentState extends State<_StatsContent> {
           onSeasonChanged: widget.onSeasonChanged,
           refreshRemainingSeconds: widget.refreshRemainingSeconds,
         ),
-        if (widget.bundle.refreshError != null)
-          Text(
-            '최신 갱신 실패 · 이전 기록을 유지합니다. ${widget.bundle.refreshError}',
-            style: const TextStyle(color: BgmsColors.textSecondary),
-          )
-        else
-          Text(switch (profile.syncStatus) {
-            PlayerSyncStatus.saved =>
-              '시즌 지표 새 저장 완료 · 경기 수집 상태는 DB 이력에서 확인하세요.',
-            PlayerSyncStatus.cached => 'DB에 저장된 시즌 기록을 표시합니다.',
-            PlayerSyncStatus.partial =>
-              profile.updatedAt == null
-                  ? '일부 전적 갱신 실패 · 저장된 기록 기준 시각을 확인할 수 없습니다.'
-                  : '일부 전적 갱신 실패 · 이전 기록 기준 시간을 유지합니다.',
-            PlayerSyncStatus.saveFailed =>
-              profile.updatedAt == null
-                  ? 'DB 저장 실패 · 새 저장이 완료되지 않았습니다. 저장된 기록 기준 시각을 확인할 수 없습니다.'
-                  : 'DB 저장 실패 · 새 저장이 완료되지 않았습니다. 이전 기록 기준 시간을 유지합니다.',
-            PlayerSyncStatus.unknown => '시즌 기록의 DB 저장 상태를 확인할 수 없습니다.',
-          }, style: const TextStyle(color: BgmsColors.textSecondary)),
-        if (widget.bundle.collectionMessage != null)
-          Text(
-            widget.bundle.collectionMessage!,
-            style: const TextStyle(color: BgmsColors.textSecondary),
+        for (final notice in _statusNotices(profile))
+          Padding(
+            padding: const EdgeInsets.only(top: BgmsSpacing.sm),
+            child: Text(
+              notice,
+              style: const TextStyle(color: BgmsColors.textSecondary),
+            ),
           ),
-        Text(switch (profile.historyDiscoveryStatus) {
-          HistoryDiscoveryStatus.queued =>
-            '경기 수집 목록 등록 완료 · DB 전체 경기 이력에서 수집 진행을 확인하세요.',
-          HistoryDiscoveryStatus.failed =>
-            '경기 수집 목록 등록 실패 · DB 전체 경기 이력에서 기존 저장 기록을 확인하세요.',
-          HistoryDiscoveryStatus.unknown => '경기 수집 목록 등록 상태를 확인할 수 없습니다.',
-        }, style: const TextStyle(color: BgmsColors.textSecondary)),
-        const SizedBox(height: 12),
-
-        // 큐 선택 세그먼트 탭
-        _buildQueueSegmentedControl(),
-        const SizedBox(height: 8),
-
-        // 모드 선택 슬라이딩 칩
-        _buildModeChips(),
-        const SizedBox(height: 16),
-
-        // 2. 스탯 렌더링 또는 Empty State
-        if (hasStats) ...[
-          if (_selectedQueue == 'ranked') ...[
-            _TierInfoPanel(stats: currentStats),
-            const SizedBox(height: 12),
-          ],
-          SectionBand(
-            title: '성향 분석',
-            icon: Icons.radar_outlined,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: BgmsColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: BgmsColors.border),
+        const SizedBox(height: BgmsSpacing.lg),
+        DefaultTabController(
+          length: _StatsSection.values.length,
+          initialIndex: _section.index,
+          child: TabBar(
+            onTap: (index) {
+              setState(() => _section = _StatsSection.values[index]);
+              widget.onSectionChanged(_section);
+            },
+            tabs: const [
+              Tab(text: '요약'),
+              Tab(text: '매치'),
+              Tab(text: 'AI 분석'),
+            ],
+          ),
+        ),
+        const SizedBox(height: BgmsSpacing.lg),
+        if (_section == _StatsSection.matches)
+          _MatchSummaryPanel(
+            bundle: widget.bundle,
+            historyRepository: widget.historyRepository,
+          )
+        else if (_section == _StatsSection.ai) ...[
+          GroupedList(
+            title: '팀 분석',
+            children: [
+              GroupedRow(
+                icon: Icons.groups_outlined,
+                title: '스쿼드 분석',
+                subtitle: '같이 한 팀원별 협업 등급과 AI 코칭',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => SquadScreen(
+                      nickname: profile.nickname,
+                      platform: profile.platform,
+                    ),
+                  ),
+                ),
               ),
-              child: SizedBox(
-                height: 220,
-                child: RadarChartWidget(
-                  combat: _calculateCombatScore(currentStats),
-                  tactical: _calculateTacticalScore(currentStats),
-                  survival: _calculateSurvivalScore(currentStats),
-                  teamwork: _calculateTeamworkScore(currentStats),
-                  grit: currentStats.top10Rate,
+            ],
+          ),
+          const SizedBox(height: BgmsSpacing.xl),
+          AiCoachingCard(bundle: widget.bundle),
+        ] else ...[
+          // 큐 선택 세그먼트 탭
+          _buildQueueSegmentedControl(),
+          const SizedBox(height: 8),
+
+          // 모드 선택 슬라이딩 칩
+          _buildModeChips(),
+          const SizedBox(height: 16),
+
+          // 2. 스탯 렌더링 또는 Empty State
+          if (hasStats) ...[
+            if (_selectedQueue == 'ranked') ...[
+              _TierInfoPanel(stats: currentStats),
+              const SizedBox(height: 12),
+            ],
+            SectionBand(
+              title: '성향 분석',
+              icon: Icons.radar_outlined,
+              child: BgmsCard(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: SizedBox(
+                  height: 220,
+                  child: RadarChartWidget(
+                    combat: _calculateCombatScore(currentStats),
+                    tactical: _calculateTacticalScore(currentStats),
+                    survival: _calculateSurvivalScore(currentStats),
+                    teamwork: _calculateTeamworkScore(currentStats),
+                    grit: currentStats.top10Rate,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-          // 6개 주요 메트릭 그리드
-          _MetricsGrid(
-            stats: currentStats,
-            recentMatches: widget.bundle.matches
-                .where(
-                  (m) =>
-                      MatchModeFilters.normalize(m.gameMode) == _selectedMode,
-                )
-                .take(20)
-                .toList(),
-            isRanked: _selectedQueue == 'ranked',
-          ),
-        ] else if (profile.statsAvailability[_selectedQueue]?.status ==
-            StatsAvailabilityStatus.unavailable) ...[
-          const _StatePanel(
-            icon: Icons.cloud_off_outlined,
-            title: '시즌 지표 조회 불가',
-            body: '이 큐의 전적을 지금 확인할 수 없습니다. 플레이 기록이 없다는 뜻은 아닙니다.',
-          ),
-        ] else ...[
-          _EmptyStatsPanel(
-            queueLabel: _selectedQueue == 'ranked' ? '경쟁전' : '일반전',
-            modeLabel: _selectedMode == 'squad'
-                ? '스쿼드'
-                : _selectedMode == 'duo'
-                ? '듀오'
-                : '솔로',
-          ),
+            // 6개 주요 메트릭 그리드
+            _MetricsGrid(
+              stats: currentStats,
+              recentMatches: widget.bundle.matches
+                  .where(
+                    (m) =>
+                        MatchModeFilters.normalize(m.gameMode) == _selectedMode,
+                  )
+                  .take(20)
+                  .toList(),
+              isRanked: _selectedQueue == 'ranked',
+            ),
+          ] else if (profile.statsAvailability[_selectedQueue]?.status ==
+              StatsAvailabilityStatus.unavailable) ...[
+            const _StatePanel(
+              icon: Icons.cloud_off_outlined,
+              title: '시즌 지표 조회 불가',
+              body: '이 큐의 전적을 지금 확인할 수 없습니다. 플레이 기록이 없다는 뜻은 아닙니다.',
+            ),
+          ] else ...[
+            _EmptyStatsPanel(
+              queueLabel: _selectedQueue == 'ranked' ? '경쟁전' : '일반전',
+              modeLabel: _selectedMode == 'squad'
+                  ? '스쿼드'
+                  : _selectedMode == 'duo'
+                  ? '듀오'
+                  : '솔로',
+            ),
+          ],
         ],
-        const SizedBox(height: 12),
-
-        // 3. 매치 요약 및 리스트
-        _MatchSummaryPanel(bundle: widget.bundle),
-        const SizedBox(height: 12),
-
-        // 4. AI 코칭 리포트 카드
-        AiCoachingCard(bundle: widget.bundle),
       ],
     );
+  }
+
+  /// 정상 상태는 숨기고, 사용자가 알아야 할 갱신·수집 실패만 문장으로 돌려준다.
+  List<String> _statusNotices(PlayerStatsProfile profile) {
+    final bundle = widget.bundle;
+    return [
+      if (bundle.refreshError != null)
+        '최신 갱신 실패 · 이전 기록을 유지합니다. ${bundle.refreshError}'
+      else
+        ?switch (profile.syncStatus) {
+          PlayerSyncStatus.partial =>
+            profile.updatedAt == null
+                ? '일부 전적 갱신 실패 · 저장된 기록 기준 시각을 확인할 수 없습니다.'
+                : '일부 전적 갱신 실패 · 이전 기록 기준 시간을 유지합니다.',
+          PlayerSyncStatus.saveFailed =>
+            profile.updatedAt == null
+                ? 'DB 저장 실패 · 새 저장이 완료되지 않았습니다. 저장된 기록 기준 시각을 확인할 수 없습니다.'
+                : 'DB 저장 실패 · 새 저장이 완료되지 않았습니다. 이전 기록 기준 시간을 유지합니다.',
+          _ => null,
+        },
+      ?bundle.collectionMessage,
+      if (profile.historyDiscoveryStatus == HistoryDiscoveryStatus.failed)
+        '경기 수집 목록 등록 실패 · 경기 이력에서 기존 저장 기록을 확인하세요.',
+    ];
   }
 
   Widget _buildQueueSegmentedControl() {
@@ -982,56 +1056,48 @@ class _TierInfoPanel extends StatelessWidget {
     final Color tierColor = _getTierColor(tierName);
     final IconData tierIcon = _getTierIcon(tierName);
 
-    return Card(
-      color: BgmsColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: BgmsColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(tierIcon, color: tierColor, size: 36),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tierName,
-                        style: const TextStyle(
-                          color: BgmsColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
+    return BgmsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(tierIcon, color: tierColor, size: 36),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tierName,
+                      style: const TextStyle(
+                        color: BgmsColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '현재 RP: $rp  (최고 RP: $bestRp)',
-                        style: const TextStyle(
-                          color: BgmsColors.textMuted,
-                          fontSize: 12,
-                        ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '현재 RP: $rp  (최고 RP: $bestRp)',
+                      style: const TextStyle(
+                        color: BgmsColors.textMuted,
+                        fontSize: 12,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: progress,
-              backgroundColor: BgmsColors.border,
-              color: tierColor,
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(
+            value: progress,
+            backgroundColor: BgmsColors.border,
+            color: tierColor,
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ],
       ),
     );
   }
@@ -1213,191 +1279,205 @@ class _EmptyStatsPanel extends StatelessWidget {
 }
 
 class _MatchSummaryPanel extends StatelessWidget {
-  const _MatchSummaryPanel({required this.bundle});
+  const _MatchSummaryPanel({required this.bundle, this.historyRepository});
 
   final PlayerStatsBundle bundle;
-
-  /// 전적 화면에 미리 보여줄 매치 수. 나머지는 전체 보기에서 확인한다.
-  static const _previewCount = 5;
+  final PlayerMatchHistoryRepository? historyRepository;
 
   @override
   Widget build(BuildContext context) {
-    final matches = bundle.matches;
+    final profile = bundle.profile;
 
-    // 전적 화면에는 앞쪽 몇 건만 미리 보여준다.
-    // 전체 목록과 모드 필터는 '전체 보기'로 열리는 별도 화면에서 제공한다.
-    // 상단 큐/모드 선택은 시즌 지표용이라 이 리스트에는 걸지 않는다.
-    final preview = matches.take(_previewCount).toList();
-    final hasMore = matches.length > _previewCount;
+    void open(Widget screen) => Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => screen));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 새로고침으로 bundle이 바뀌면 DB 목록도 처음부터 다시 읽는다.
+        _DbMatchList(
+          key: ObjectKey(bundle),
+          bundle: bundle,
+          repository: historyRepository,
+        ),
+        const SizedBox(height: BgmsSpacing.xl),
+        GroupedList(
+          title: '더 보기',
+          children: [
+            GroupedRow(
+              icon: Icons.workspace_premium_outlined,
+              title: '무기 숙련도',
+              onTap: () => open(
+                WeaponMasteryScreen(
+                  nickname: profile.nickname,
+                  platform: profile.platform,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 매치 탭 목록. 웹처럼 BGMS DB에 저장된 경기를 20경기씩 보여준다.
+///
+/// DB 목록을 못 읽으면 PUBG 최근 매치 요약(bundle.matches)으로 대신한다.
+class _DbMatchList extends StatefulWidget {
+  const _DbMatchList({super.key, required this.bundle, this.repository});
+
+  final PlayerStatsBundle bundle;
+  final PlayerMatchHistoryRepository? repository;
+
+  @override
+  State<_DbMatchList> createState() => _DbMatchListState();
+}
+
+class _DbMatchListState extends State<_DbMatchList> {
+  late final _repository = widget.repository ?? PlayerMatchHistoryRepository();
+  final List<MatchSummary> _matches = [];
+  PlayerMatchHistoryPage? _lastPage;
+  bool _loading = true;
+  String? _error;
+  String _filter = 'all';
+
+  // 웹 components/stat/matches/MatchFeed.tsx FILTERS와 같은 서버 필터.
+  static const _filters = {
+    'all': '전체',
+    'normal': '일반전',
+    'ranked': '경쟁전',
+    'casual': '캐주얼',
+    'tdm': 'TDM',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _selectFilter(String filter) {
+    if (filter == _filter || _loading) return;
+    _filter = filter;
+    _matches.clear();
+    _lastPage = null;
+    _load();
+  }
+
+  Future<void> _load() async {
+    final profile = widget.bundle.profile;
+    final page = (_lastPage?.page ?? 0) + 1;
+    final filter = _filter;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await _repository.fetchPage(
+        nickname: profile.nickname,
+        platform: profile.platform,
+        page: page,
+        filter: filter,
+      );
+      if (!mounted || filter != _filter) return;
+      setState(() {
+        _lastPage = result;
+        _matches.addAll(result.matches);
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = ApiException.from(error).message;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = widget.bundle.profile;
+    final muted = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(color: BgmsColors.textSecondary);
+    // 첫 페이지를 못 읽었으면 최근 매치 요약으로 대신 보여준다.
+    final useFallback = _lastPage == null && !_loading && _filter == 'all';
+    final matches = useFallback ? widget.bundle.matches : _matches;
+    final total = _lastPage?.totalCount;
 
     return SectionBand(
-      title: '최근 매치 · 모든 모드',
-      icon: Icons.receipt_long_outlined,
+      title: useFallback ? '최근 매치' : '전체 매치',
       action: Text(
-        '${matches.length}경기',
+        total == null ? '${matches.length}경기' : '총 $total경기',
         style: Theme.of(
           context,
-        ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
+        ).textTheme.labelMedium?.copyWith(color: BgmsColors.textSecondary),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (bundle.summaryError != null) ...[
-            Text(
-              '최근 매치 요약을 불러오지 못했습니다. ${bundle.summaryError}',
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
-            ),
-            const SizedBox(height: 10),
-          ] else if (bundle.summaryFallback) ...[
-            Text(
-              '일부 매치의 서버 기록을 찾지 못했습니다. 자동 분석이 진행 중인 상태는 아닙니다.',
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: BgmsColors.textMuted),
-            ),
-            const SizedBox(height: 10),
-          ],
-          const Text(
-            '최근 경기 목록은 모든 큐·모드의 최신 최대 20경기입니다. 상단 선택은 시즌 지표에 적용됩니다. DB 전체 경기 이력은 별도 조회합니다.',
-          ),
-          if (matches.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-              decoration: BoxDecoration(
-                color: BgmsColors.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: BgmsColors.border),
+          if (!useFallback)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final entry in _filters.entries)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(entry.value),
+                          selected: entry.key == _filter,
+                          showCheckmark: false,
+                          onSelected: (_) => _selectFilter(entry.key),
+                        ),
+                      ),
+                  ],
+                ),
               ),
+            ),
+          if (useFallback && _error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
               child: Text(
-                '표시할 최근 경기가 없습니다. 과거에 저장된 기록은 DB 전체 경기 이력에서 확인하세요.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: BgmsColors.textSecondary,
+                '저장된 경기 목록을 불러오지 못해 최근 매치만 보여줍니다. $_error',
+                style: muted,
+              ),
+            ),
+          if (useFallback && widget.bundle.summaryError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                '최근 매치 요약을 불러오지 못했습니다. ${widget.bundle.summaryError}',
+                style: muted,
+              ),
+            ),
+          if (_loading && _matches.isEmpty)
+            const LoadingCard(lines: 4, label: '저장된 경기를 불러오고 있습니다')
+          else if (matches.isEmpty)
+            Text('저장된 경기가 없습니다. 오른쪽 위 새로고침으로 최신 경기를 가져오세요.', style: muted)
+          else
+            for (final match in matches)
+              MatchCard(match: match, profile: profile),
+          if (!useFallback && _matches.isNotEmpty) ...[
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text('다음 경기를 불러오지 못했습니다. $_error', style: muted),
+              ),
+            if (_lastPage?.hasNextPage == true || _error != null)
+              OutlinedButton(
+                onPressed: _loading ? null : _load,
+                child: Text(
+                  _loading
+                      ? '불러오는 중...'
+                      : '20경기 더 보기 (${_matches.length}/$total)',
                 ),
               ),
-            )
-          else ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: BgmsColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: BgmsColors.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        '최근 순위 흐름',
-                        style: TextStyle(
-                          color: BgmsColors.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        '치킨 ${matches.where((m) => m.rank == 1).length}회',
-                        style: const TextStyle(
-                          color: BgmsColors.accent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  BgmsSparklineBar(
-                    ranks: matches.take(20).map((m) => m.rank).toList(),
-                  ),
-                ],
-              ),
-            ),
-            ...preview.map(
-              (match) => MatchCard(match: match, profile: bundle.profile),
-            ),
-            const SizedBox(height: 4),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (context) => AllMatchesScreen(
-                      matches: matches,
-                      profile: bundle.profile,
-                      summaryFallback:
-                          bundle.summaryFallback && bundle.summaryError == null,
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.list_alt, size: 18),
-              label: Text(
-                hasMore ? '최근 ${matches.length}경기 보기' : '최근 경기 · 모드별 필터',
-              ),
-            ),
           ],
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (context) => PlayerMatchHistoryScreen(
-                    profile: bundle.profile,
-                    initialCollectAvailableAt: bundle.collectionAvailableAt,
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.history, size: 18),
-            label: const Text('DB 전체 경기 이력'),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (context) => WeaponMasteryScreen(
-                    nickname: bundle.profile.nickname,
-                    platform: bundle.profile.platform,
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.workspace_premium_outlined, size: 18),
-            label: const Text('무기 숙련도'),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (context) => EncounterScreen(
-                    nickname: bundle.profile.nickname,
-                    platform: bundle.profile.platform,
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.people_outline, size: 18),
-            label: const Text('만난 상대 · 관심 등록'),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (context) => const BanWatchScreen(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.visibility_outlined, size: 18),
-            label: const Text('관심 추적 목록'),
-          ),
         ],
       ),
     );
@@ -1649,128 +1729,109 @@ class _ProfileHeader extends StatelessWidget {
     // 만약 API에서 주는 현재 활성 시즌이 있고 selectedSeason이 설정 안 되었을 때 대응
     final String currentSeasonId = selectedSeason ?? profile.seasonId ?? '';
 
-    return Card(
-      color: BgmsColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: BgmsColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.black,
-                  child: const Icon(Icons.person),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        profile.nickname,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: BgmsColors.accent,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        profile.platform.toUpperCase(),
-                        style: const TextStyle(
-                          color: BgmsColors.textMuted,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(color: BgmsColors.border, height: 1),
-            const SizedBox(height: 12),
-
-            // 시즌 필터 드롭다운 UI
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Row(
+    return BgmsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.calendar_month_outlined,
-                      size: 18,
-                      color: BgmsColors.textSecondary,
-                    ),
-                    SizedBox(width: 6),
                     Text(
-                      '조회 시즌',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: BgmsColors.textSecondary,
+                      profile.nickname,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      profile.platform.toUpperCase(),
+                      style: const TextStyle(
+                        color: BgmsColors.textMuted,
+                        fontSize: 13,
                       ),
                     ),
                   ],
                 ),
-                if (seasons.isEmpty)
-                  Text(
-                    currentSeasonId.isEmpty
-                        ? '기본 시즌'
-                        : seasonLabel(currentSeasonId),
-                    style: const TextStyle(
-                      color: BgmsColors.accent,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                else
-                  DropdownButton<String>(
-                    value: seasons.contains(currentSeasonId)
-                        ? currentSeasonId
-                        : seasons.first,
-                    dropdownColor: BgmsColors.surface,
-                    underline: const SizedBox(),
-                    icon: const Icon(
-                      Icons.arrow_drop_down,
-                      color: BgmsColors.accent,
-                    ),
-                    style: const TextStyle(
-                      color: BgmsColors.accent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                    items: seasons.map((season) {
-                      return DropdownMenuItem<String>(
-                        value: season,
-                        child: Text(seasonLabel(season)),
-                      );
-                    }).toList(),
-                    onChanged: onSeasonChanged,
-                  ),
-              ],
-            ),
-            if (updatedAt != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                '시즌 기록 기준: ${updatedAt.toLocal()}'.split('.').first,
-                style: const TextStyle(
-                  color: BgmsColors.textMuted,
-                  fontSize: 11,
-                ),
               ),
             ],
-            _AvailabilityNotice(
-              availability: profile.statsAvailability,
-              retryAfterSeconds: refreshRemainingSeconds,
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: BgmsColors.border, height: 1),
+          const SizedBox(height: 12),
+
+          // 시즌 필터 드롭다운 UI
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(
+                    Icons.calendar_month_outlined,
+                    size: 18,
+                    color: BgmsColors.textSecondary,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    '조회 시즌',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: BgmsColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              if (seasons.isEmpty)
+                Text(
+                  currentSeasonId.isEmpty
+                      ? '기본 시즌'
+                      : seasonLabel(currentSeasonId),
+                  style: const TextStyle(
+                    color: BgmsColors.accent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              else
+                DropdownButton<String>(
+                  value: seasons.contains(currentSeasonId)
+                      ? currentSeasonId
+                      : seasons.first,
+                  dropdownColor: BgmsColors.surface,
+                  underline: const SizedBox(),
+                  icon: const Icon(
+                    Icons.arrow_drop_down,
+                    color: BgmsColors.accent,
+                  ),
+                  style: const TextStyle(
+                    color: BgmsColors.accent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  items: seasons.map((season) {
+                    return DropdownMenuItem<String>(
+                      value: season,
+                      child: Text(seasonLabel(season)),
+                    );
+                  }).toList(),
+                  onChanged: onSeasonChanged,
+                ),
+            ],
+          ),
+          if (updatedAt != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              '시즌 기록 기준: ${updatedAt.toLocal()}'.split('.').first,
+              style: const TextStyle(color: BgmsColors.textMuted, fontSize: 11),
             ),
           ],
-        ),
+          _AvailabilityNotice(
+            availability: profile.statsAvailability,
+            retryAfterSeconds: refreshRemainingSeconds,
+          ),
+        ],
       ),
     );
   }

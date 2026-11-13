@@ -116,11 +116,6 @@ class MapMarkerLayer {
   final MapMarkerSource source;
   final String message;
 
-  String get displaySourceLabel => switch (source) {
-    MapMarkerSource.api => '마커 연동',
-    MapMarkerSource.fallback => '마커 준비 중',
-  };
-
   String get displayMessage {
     if (source == MapMarkerSource.api) {
       return '선택한 맵의 전술 마커를 표시하고 있습니다.';

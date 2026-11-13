@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/bgms_theme.dart';
+import '../../../core/widgets/cached_image.dart';
 import '../../../core/widgets/bgms_card.dart';
+import '../../../core/widgets/phase_strip.dart';
 import '../../maps/map_models.dart';
 import '../player_stats_models.dart';
 import 'tier_style.dart';
@@ -52,166 +55,227 @@ class MatchCard extends StatelessWidget {
     return mode.contains('fpp') ? '$base 1인칭' : base;
   }
 
+  /// 화면 낭독기가 카드 한 장을 한 문장으로 읽게 한다.
+  String get _semanticLabel {
+    final rank = match.rank;
+    return [
+      rank == null ? '순위 정보 없음' : (rank == 1 ? '치킨' : '$rank위'),
+      bgmsMapDisplayName(match.mapName),
+      _modeLabel,
+      '${match.kills ?? '정보 없음'}킬',
+      '딜량 ${match.damage?.toStringAsFixed(0) ?? '정보 없음'}',
+      _formatElapsedTime(match.createdAt),
+    ].join(', ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isChicken = match.rank == 1;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final stackStats =
-              constraints.maxWidth < 352 ||
-              MediaQuery.textScalerOf(context).scale(14) > 18;
-          final stats = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _MatchStat(label: '킬', value: match.kills?.toString() ?? '-'),
-              const SizedBox(width: 14),
-              _MatchStat(
-                label: '딜량',
-                value: match.damage?.toStringAsFixed(0) ?? '-',
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: BgmsColors.textMuted,
-              ),
-            ],
-          );
-          return BgmsCard(
-            statusColor: _statusColor,
-            isGlow: isChicken,
-            borderRadius: 14,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            backgroundColor: isChicken
-                ? BgmsColors.accent.withValues(alpha: 0.05)
-                : BgmsColors.surface,
-            onTap: () {
-              context.push(
-                '/stats/match/${match.matchId}',
-                extra: {
-                  'nickname': profile.nickname,
-                  'platform': profile.platform,
-                  'summary': match,
-                },
-              );
-            },
-            child: Row(
+    return Semantics(
+      button: true,
+      label: _semanticLabel,
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final stackStats =
+                constraints.maxWidth < 352 ||
+                MediaQuery.textScalerOf(context).scale(14) > 18;
+            final stats = Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _RankBlock(
-                  rank: match.rank,
-                  color: _rankColor,
-                  isChicken: isChicken,
-                ),
+                _MatchStat(label: '킬', value: match.kills?.toString() ?? '-'),
                 const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                _MatchStat(
+                  label: '딜량',
+                  value: match.damage?.toStringAsFixed(0) ?? '-',
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: BgmsColors.textMuted,
+                ),
+              ],
+            );
+            return BgmsCard(
+              statusColor: _statusColor,
+              isGlow: isChicken,
+              padding: EdgeInsets.zero,
+              backgroundColor: BgmsColors.surface,
+              onTap: () {
+                context.push(
+                  '/stats/match/${match.matchId}',
+                  extra: {
+                    'nickname': profile.nickname,
+                    'platform': profile.platform,
+                    'summary': match,
+                  },
+                );
+              },
+              child: _MapBackdrop(
+                mapName: match.mapName,
+                child: Row(
+                  children: [
+                    _RankBlock(
+                      rank: match.rank,
+                      color: _rankColor,
+                      isChicken: isChicken,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: Text(
-                              bgmsMapDisplayName(match.mapName),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                          ),
-                          if (isChicken) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: BgmsColors.accent.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  Icon(
-                                    Icons.emoji_events,
-                                    size: 12,
-                                    color: BgmsColors.accent,
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  bgmsMapDisplayName(match.mapName),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.2,
                                   ),
-                                  SizedBox(width: 3),
-                                  Text(
-                                    'WIN',
-                                    style: TextStyle(
-                                      color: BgmsColors.accent,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              _modeLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: BgmsColors.textMuted,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                          ),
-                          if (match.tier != null) ...[
-                            const _DotSeparator(),
-                            Flexible(
-                              child: Text(
-                                match.tierName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: getStatsTierColor(match.tierName),
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0,
                                 ),
                               ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _modeLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: BgmsColors.textMuted,
+                                    letterSpacing: 0,
+                                  ),
+                                ),
+                              ),
+                              if (match.tier != null) ...[
+                                const _DotSeparator(),
+                                Flexible(
+                                  child: Text(
+                                    match.tierName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: getStatsTierColor(match.tierName),
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              const _DotSeparator(),
+                              Flexible(
+                                child: Text(
+                                  _formatElapsedTime(match.createdAt),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: BgmsColors.textMuted,
+                                    letterSpacing: 0,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          PhaseStrip(
+                            deathPhase: match.deathPhase,
+                            rank: match.rank,
+                          ),
+                          if (stackStats) ...[
+                            const SizedBox(height: 8),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: stats,
                             ),
                           ],
-                          const _DotSeparator(),
-                          Flexible(
-                            child: Text(
-                              _formatElapsedTime(match.createdAt),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: BgmsColors.textMuted,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
-                      if (stackStats) ...[const SizedBox(height: 8), stats],
-                    ],
+                    ),
+                    if (!stackStats) ...[const SizedBox(width: 12), stats],
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// 카드 오른쪽에 그 경기 맵 전체 모습을 옅게 깐다. 지도 탭과 같은 서버 타일(줌 0)이다.
+class _MapBackdrop extends StatelessWidget {
+  const _MapBackdrop({required this.mapName, required this.child});
+
+  final String mapName;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = normalizeBgmsMapId(mapName);
+    final map = bgmsMapCatalog
+        .where((map) => map.id.toLowerCase() == normalized)
+        .firstOrNull;
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: child,
+    );
+    if (map == null) return content;
+    return Stack(
+      children: [
+        Positioned(
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 160,
+          child: ExcludeSemantics(
+            child: Opacity(
+              opacity: 0.45,
+              child: Image(
+                image: cachedImageProvider(
+                  AppConfig.local.mapTileUrl(
+                    mapId: map.tilePath,
+                    zoom: 0,
+                    column: 0,
+                    row: 0,
                   ),
                 ),
-                if (!stackStats) ...[const SizedBox(width: 12), stats],
-              ],
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
             ),
-          );
-        },
-      ),
+          ),
+        ),
+        // 왼쪽 글자가 지도 위에서도 읽히도록 카드 색에서 투명으로 번지게 덮는다.
+        const Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  BgmsColors.surface,
+                  BgmsColors.surface,
+                  Color(0x99161917),
+                ],
+                stops: [0, 0.55, 1],
+              ),
+            ),
+          ),
+        ),
+        content,
+      ],
     );
   }
 }
@@ -234,24 +298,22 @@ class _RankBlock extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            rank == null ? '-' : '#$rank',
-            maxLines: 1,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              rank == null ? '-' : '#$rank',
+              maxLines: 1,
+              style: BgmsText.number(24, color: color),
             ),
           ),
-          Text(
-            isChicken ? '치킨' : '순위',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: isChicken ? BgmsColors.accent : BgmsColors.textMuted,
-              fontSize: 10,
-              fontWeight: isChicken ? FontWeight.w700 : FontWeight.w500,
-              letterSpacing: 0,
+          if (isChicken)
+            Text(
+              '치킨',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: BgmsColors.accent,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -269,21 +331,12 @@ class _MatchStat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(
-          value,
-          maxLines: 1,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.3,
-          ),
-        ),
+        Text(value, maxLines: 1, style: BgmsText.number(20)),
         Text(
           label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: BgmsColors.textMuted,
-            fontSize: 10,
-            letterSpacing: 0,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: BgmsColors.textSecondary),
         ),
       ],
     );

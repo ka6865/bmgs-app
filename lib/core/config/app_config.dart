@@ -50,6 +50,14 @@ class AppConfig {
     return '$normalizedBaseUrl/assets/rank/$clean-1.webp';
   }
 
+  /// 웹 도감과 같은 무기 이미지 프록시 경로. 예: `/api/images/weapons/ar_m416.webp`
+  /// 서버가 `/api/images/...`처럼 상대 경로로 준 이미지 주소를 절대 주소로 바꾼다.
+  String resolveUrl(String url) =>
+      url.startsWith('/') ? '$normalizedBaseUrl$url' : url;
+
+  String weaponImageUrl(String weaponId) =>
+      '$normalizedBaseUrl/api/images/weapons/${Uri.encodeComponent(weaponId)}.webp';
+
   /// 지도 타일 URL. 웹 Leaflet 타일 피라미드와 동일한 규칙이다.
   ///
   /// 한 변의 타일 수는 2^zoom이고 y좌표는 음수다. 화면 최상단 행이 가장 작은

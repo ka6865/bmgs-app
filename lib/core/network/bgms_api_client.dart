@@ -209,95 +209,40 @@ class BgmsApiClient {
     body: {'nickname': nickname, 'platform': platform},
   );
 
-  Future<Map<String, dynamic>> fetchEncounters({
+  /// 함께 플레이한 팀 묶음 목록(groupKey 없음) 또는 한 묶음의 분석(groupKey 지정).
+  Future<Map<String, dynamic>> fetchSquadAnalysis({
     required String nickname,
     required String platform,
-    required String accessToken,
-    int page = 1,
+    String? groupKey,
   }) => _getJson(
-    Uri.parse('$_baseUrl/api/pubg/encounters').replace(
+    Uri.parse('$_baseUrl/api/pubg/squad-analyze').replace(
       queryParameters: {
         'nickname': nickname,
         'platform': platform,
-        'page': '$page',
+        'groupKey': ?groupKey,
       },
     ),
-    accessToken: accessToken,
+    receiveTimeout: aiReceiveTimeout,
   );
 
-  Future<Map<String, dynamic>> collectEncounters({
+  /// 스쿼드 AI 코칭. 로그인 토큰이 필요하며 서버가 수치를 다시 계산한다.
+  Future<Map<String, dynamic>> fetchSquadAi({
     required String nickname,
     required String platform,
-    required String matchId,
+    required String groupKey,
+    required String coachingStyle,
     required String accessToken,
   }) => _postJson(
-    Uri.parse('$_baseUrl/api/pubg/encounters'),
+    Uri.parse('$_baseUrl/api/pubg/ai-squad'),
     body: {
-      'action': 'collect',
       'nickname': nickname,
       'platform': platform,
-      'matchId': matchId,
+      'groupKey': groupKey,
+      'coachingStyle': coachingStyle,
     },
     accessToken: accessToken,
+    receiveTimeout: aiReceiveTimeout,
   );
-
-  Future<Map<String, dynamic>> fetchEncounterProfile({
-    required String nickname,
-    required String platform,
-    required String matchId,
-    required String targetAccountId,
-    required String accessToken,
-    bool refresh = false,
-  }) => _postJson(
-    Uri.parse('$_baseUrl/api/pubg/encounters'),
-    body: {
-      'action': 'profiles',
-      'nickname': nickname,
-      'platform': platform,
-      'matchId': matchId,
-      'targetAccountId': targetAccountId,
-      'refresh': refresh,
-    },
-    accessToken: accessToken,
-  );
-
-  Future<Map<String, dynamic>> createBanWatch({
-    required Map<String, dynamic> payload,
-    required String accessToken,
-  }) => _postJson(
-    Uri.parse('$_baseUrl/api/pubg/ban-watch'),
-    body: payload,
-    accessToken: accessToken,
-  );
-
-  Future<Map<String, dynamic>> fetchBanWatches({required String accessToken}) =>
-      _getJson(
-        Uri.parse('$_baseUrl/api/pubg/ban-watch'),
-        accessToken: accessToken,
-      );
-
-  Future<Map<String, dynamic>> removeBanWatch({
-    required String watchId,
-    required String accessToken,
-  }) async {
-    try {
-      if (accessToken.isEmpty) {
-        throw const ApiException(
-          kind: ApiErrorKind.unauthorized,
-          message: '로그인이 필요합니다.',
-        );
-      }
-      final response = await _dio.deleteUri<dynamic>(
-        Uri.parse(
-          '$_baseUrl/api/pubg/ban-watch',
-        ).replace(queryParameters: {'id': watchId}),
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-      );
-      return _asJsonMap(response.data);
-    } catch (error) {
-      throw ApiException.from(error);
-    }
-  }
 
   Future<Map<String, dynamic>> fetchWeaponMastery({
     required String nickname,
@@ -494,6 +439,42 @@ class BgmsApiClient {
           'nickname': nickname,
           'platform': platform,
           'summaryContractVersion': 2,
+        },
+        options: Options(
+          responseType: ResponseType.plain,
+          headers: headers,
+          receiveTimeout: aiReceiveTimeout,
+        ),
+      );
+      return response.data ?? '';
+    } catch (error) {
+      throw ApiException.from(error);
+    }
+  }
+
+  /// 단일 경기 AI 코칭. 서버가 경기 ID로 저장된 분석을 읽고 NDJSON으로 답한다.
+  Future<String> fetchMatchAi({
+    required String matchId,
+    required String nickname,
+    required String platform,
+    required String coachingStyle,
+    String? accessToken,
+  }) async {
+    final headers = await _authHeaders(explicitToken: accessToken);
+    if (headers == null) {
+      throw const ApiException(
+        kind: ApiErrorKind.unauthorized,
+        message: 'AI 분석은 로그인 후 이용할 수 있습니다.',
+      );
+    }
+    try {
+      final response = await _dio.postUri<String>(
+        Uri.parse('$_baseUrl/api/pubg/ai-analyze'),
+        data: {
+          'matchData': {'matchId': matchId},
+          'nickname': nickname,
+          'platform': platform,
+          'coachingStyle': coachingStyle,
         },
         options: Options(
           responseType: ResponseType.plain,
@@ -791,6 +772,7 @@ class BgmsApiClient {
     Object? body,
     String? accessToken,
     Map<String, String> headers = const {},
+    Duration? receiveTimeout,
   }) async {
     try {
       if (accessToken != null && accessToken.isEmpty) {
@@ -803,6 +785,7 @@ class BgmsApiClient {
         uri,
         data: body,
         options: Options(
+          receiveTimeout: receiveTimeout,
           headers: {
             ...headers,
             if (accessToken != null) 'Authorization': 'Bearer $accessToken',

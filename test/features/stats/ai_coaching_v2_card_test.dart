@@ -71,6 +71,7 @@ void main() {
     expect(find.text('화력은 어떤가?'), findsOneWidget);
     expect(find.text('추천 액션'), findsOneWidget);
     expect(find.text('위치 점검 - 다음 경기에서 엄폐를 확인하세요'), findsOneWidget);
-    expect(find.textContaining('평균 화력: 240'), findsOneWidget);
+    expect(find.text('평균 화력'), findsOneWidget);
+    expect(find.text('240'), findsOneWidget);
   });
 }

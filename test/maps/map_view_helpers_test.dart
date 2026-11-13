@@ -41,21 +41,23 @@ void main() {
   });
 
   test('getCategoryLabel maps english layer to korean label', () {
-    expect(getCategoryLabel('Garage'), '차량');
-    expect(getCategoryLabel('SecretRoom'), '비밀방');
-    expect(getCategoryLabel('Esports'), '이스포츠');
+    expect(getCategoryLabel('Garage'), '차고지');
+    expect(getCategoryLabel('SecretRoom'), '비밀의 방');
+    expect(getCategoryLabel('Esports'), '고정 차량');
     expect(getCategoryLabel('HotDrop'), '핫드랍');
     expect(getCategoryLabel('Glider'), '글라이더');
     expect(getCategoryLabel('Boat'), '보트');
-    expect(getCategoryLabel('EsportsBoat'), '대회 보트');
+    expect(getCategoryLabel('EsportsBoat'), '고정 보트');
     expect(getCategoryLabel('GoldenMirado'), '황금 미라도');
-    expect(getCategoryLabel('EsportsMirado'), '대회 미라도');
-    expect(getCategoryLabel('EsportsPickup'), '대회 픽업');
+    expect(getCategoryLabel('EsportsMirado'), 'e스포츠 미라도');
+    expect(getCategoryLabel('EsportsPickup'), 'e스포츠 픽업');
     expect(getCategoryLabel('Porter'), '포터');
     expect(getCategoryLabel('PoliceCar'), '경찰차');
     expect(getCategoryLabel('Snowmobile'), '스노우모빌');
     expect(getCategoryLabel('BearCave'), '곰 동굴');
     expect(getCategoryLabel('GasPump'), '주유소');
+    expect(getCategoryLabel('EsportsGlider'), '고정 글라이더');
+    expect(getCategoryLabel('SecurityCard'), '보안 키카드');
     expect(getCategoryLabel('Unknown'), '기타');
   });
 }

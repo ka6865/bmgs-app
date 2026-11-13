@@ -500,3 +500,71 @@ class LabeledValue extends StatelessWidget {
     );
   }
 }
+
+/// 설정형 목록을 한 패널로 묶는 그룹 목록. 행 사이는 헤어라인으로 나눈다.
+class GroupedList extends StatelessWidget {
+  const GroupedList({super.key, required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: BgmsSpacing.sm),
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: BgmsColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Material(
+          color: BgmsColors.surface,
+          shape: BgmsShape.panel(),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                if (i > 0) const Divider(indent: 56),
+                children[i],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// [GroupedList] 안의 한 행. 아이콘, 제목, 한 줄 설명, 이동 표시.
+class GroupedRow extends StatelessWidget {
+  const GroupedRow({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      minTileHeight: 56,
+      leading: Icon(icon, color: BgmsColors.accent),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: subtitle == null ? null : Text(subtitle!),
+      trailing: const Icon(Icons.chevron_right, color: BgmsColors.textMuted),
+      onTap: onTap,
+    );
+  }
+}

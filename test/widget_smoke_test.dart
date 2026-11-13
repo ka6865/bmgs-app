@@ -14,6 +14,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// 홈의 주간 랭킹 섹션에서 전체 랭킹 화면으로 들어간다.
+Future<void> _openRankings(WidgetTester tester) async {
+  final section = find.text('이번 주 딜량 랭킹');
+  await tester.scrollUntilVisible(
+    section,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.descendant(
+      of: find.ancestor(of: section, matching: find.byType(Column)).first,
+      matching: find.widgetWithText(TextButton, '전체'),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('home renders compact dashboard in empty state', (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -21,10 +39,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('PUBG 플레이어 검색'), findsOneWidget);
-    expect(find.text('랭킹'), findsWidgets);
+    expect(find.text('도감'), findsWidgets);
     expect(find.text('지도'), findsWidgets);
-    expect(find.text('게시판'), findsWidgets);
-    expect(find.text('이어서 보기'), findsNothing);
+    expect(find.text('커뮤니티'), findsWidgets);
+    expect(find.byKey(const Key('home_continue_player')), findsNothing);
     expect(find.text('즐겨찾는 플레이어'), findsOneWidget);
     expect(find.text('즐겨찾기를 추가하면 빠르게 전적을 확인할 수 있습니다.'), findsOneWidget);
   });
@@ -48,7 +66,7 @@ void main() {
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    expect(find.text('이어서 보기'), findsOneWidget);
+    expect(find.byKey(const Key('home_continue_player')), findsOneWidget);
     expect(find.textContaining('latestPlayer'), findsOneWidget);
     expect(find.text('즐겨찾는 플레이어'), findsOneWidget);
     expect(find.textContaining('favorite0'), findsOneWidget);
@@ -116,7 +134,7 @@ void main() {
       await tester.tap(find.byKey(const Key('player_search_submit')));
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.map).last);
+      await tester.tap(find.byIcon(Icons.map_outlined).last);
       await tester.pumpAndSettle();
       expect(router.routeInformationProvider.value.uri.path, '/maps');
 
@@ -165,9 +183,8 @@ void main() {
         await store.isFavorite('favoriteCandidate', platform: 'kakao'),
         isTrue,
       );
-      // 히어로 카드는 '닉네임 · 플랫폼' 한 줄, 즐겨찾기 타일은 닉네임과 플랫폼을 두 줄로 나눠 표시한다.
-      expect(find.text('favoriteCandidate · kakao'), findsOneWidget);
-      expect(find.text('favoriteCandidate'), findsOneWidget);
+      // 플레이어 패널과 즐겨찾기 타일이 각각 닉네임을 표시한다.
+      expect(find.text('favoriteCandidate'), findsNWidgets(2));
       expect(find.byTooltip('즐겨찾기 해제'), findsOneWidget);
 
       await tester.tap(find.byTooltip('즐겨찾기 해제'));
@@ -177,8 +194,7 @@ void main() {
         await store.isFavorite('favoriteCandidate', platform: 'kakao'),
         isFalse,
       );
-      expect(find.text('favoriteCandidate · kakao'), findsOneWidget);
-      expect(find.text('favoriteCandidate'), findsNothing);
+      expect(find.text('favoriteCandidate'), findsOneWidget);
       expect(find.text('즐겨찾기를 추가하면 빠르게 전적을 확인할 수 있습니다.'), findsOneWidget);
     },
   );
@@ -200,7 +216,7 @@ void main() {
       await tester.tap(find.widgetWithText(NavigationDestination, '홈'));
       await tester.pumpAndSettle();
 
-      expect(find.text('searchedFromStats · steam'), findsOneWidget);
+      expect(find.text('searchedFromStats'), findsOneWidget);
     },
   );
 
@@ -214,17 +230,17 @@ void main() {
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.person));
+    await tester.tap(find.byTooltip('내 정보'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('전체 삭제'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('즐겨찾기 해제'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(NavigationDestination, '홈'));
+    await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(find.text('managedPlayer · steam'), findsNothing);
+    expect(find.text('managedPlayer'), findsNothing);
     expect(find.text('즐겨찾기를 추가하면 빠르게 전적을 확인할 수 있습니다.'), findsOneWidget);
   });
 
@@ -263,15 +279,27 @@ void main() {
     expect(find.byTooltip('입력 지우기'), findsNothing);
   });
 
-  testWidgets('bottom tab opens rankings', (tester) async {
+  testWidgets('home ranking section opens full rankings', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('랭킹').last);
-    await tester.pumpAndSettle();
+    await _openRankings(tester);
 
     expect(find.text('딜량'), findsOneWidget);
+  });
+
+  testWidgets('bottom tab opens codex hub', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(NavigationDestination, '도감'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('무기 도감'), findsOneWidget);
+    expect(find.text('핫드랍 지도'), findsOneWidget);
+    expect(find.text('상자깡 시뮬'), findsOneWidget);
   });
 
   testWidgets('bottom tab opens maps', (tester) async {
@@ -290,11 +318,10 @@ void main() {
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('게시판').last);
+    await tester.tap(find.widgetWithText(NavigationDestination, '커뮤니티'));
     await tester.pumpAndSettle();
 
-    // 하단 탭에 '게시판'이 있으므로 화면 제목은 중복되지 않는 이름을 쓴다.
-    expect(find.text('커뮤니티'), findsOneWidget);
+    expect(find.text('커뮤니티'), findsWidgets);
     expect(find.byTooltip('글쓰기'), findsOneWidget);
   });
 
@@ -383,8 +410,7 @@ void main() {
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.leaderboard));
-    await tester.pumpAndSettle();
+    await _openRankings(tester);
 
     expect(find.text('랭킹'), findsWidgets);
     expect(find.text('딜량'), findsOneWidget);
@@ -396,7 +422,7 @@ void main() {
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.map));
+    await tester.tap(find.byIcon(Icons.map_outlined));
     await tester.pumpAndSettle();
 
     expect(find.text('지도'), findsWidgets);
@@ -411,10 +437,9 @@ void main() {
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.person));
+    await tester.tap(find.byTooltip('내 정보'));
     await tester.pumpAndSettle();
 
-    // 하단 탭 라벨이 '마이'이므로 화면 제목은 '내 정보'로 구분한다.
     expect(find.text('내 정보'), findsOneWidget);
     expect(find.text('로그인 준비 상태'), findsOneWidget);
     expect(find.text('최근 검색이 없습니다.'), findsOneWidget);
@@ -430,7 +455,7 @@ void main() {
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.person));
+    await tester.tap(find.byTooltip('내 정보'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('myTabPlayer'));
@@ -451,7 +476,7 @@ void main() {
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.person));
+    await tester.tap(find.byTooltip('내 정보'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('전체 삭제'));
@@ -475,7 +500,7 @@ void main() {
     await tester.pumpWidget(const BgmsApp(enableSuggestions: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.person));
+    await tester.tap(find.byTooltip('내 정보'));
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(find.text('약관 및 정보'), 200);
@@ -503,8 +528,6 @@ void main() {
 
     await tester.tap(find.text('마커 필터'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilterChip, '차량'));
-    await tester.pumpAndSettle();
 
     final markerFinder = find.byIcon(Icons.local_taxi);
     await tester.ensureVisible(markerFinder);
@@ -519,9 +542,9 @@ void main() {
 
     // 바텀시트 콘텐츠 확인
     expect(find.text('강남 차고지'), findsWidgets);
-    expect(find.text('차량'), findsWidgets);
+    expect(find.text('차고지'), findsWidgets);
     expect(find.textContaining('위치 좌표: (X: 50.0%, Y: 50.0%)'), findsOneWidget);
-    expect(find.textContaining('강남 차고지은(는) 차량 분류 지점입니다.'), findsOneWidget);
+    expect(find.textContaining('강남 차고지은(는) 차고지 분류 지점입니다.'), findsOneWidget);
 
     // 닫기 버튼 탭 후 바텀시트가 사라지는지 검증
     await tester.tap(find.byIcon(Icons.close));
@@ -544,8 +567,6 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('마커 필터'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilterChip, '차량'));
       await tester.pumpAndSettle();
 
       // 1. 전체화면 버튼 확인 및 탭
@@ -600,8 +621,6 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('마커 필터'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilterChip, '차량'));
     await tester.pumpAndSettle();
 
     // 1. InteractiveViewer 찾기

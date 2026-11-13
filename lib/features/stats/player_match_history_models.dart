@@ -24,7 +24,12 @@ class PlayerMatchHistoryPage {
     final matches = rawMatches is List
         ? rawMatches
               .whereType<Map>()
-              .map((raw) => _summaryFromRecord(Map<String, dynamic>.from(raw)))
+              .map(
+                (raw) => _summaryFromRecord(
+                  Map<String, dynamic>.from(raw),
+                  json['performanceSummaries'],
+                ),
+              )
               .toList(growable: false)
         : const <MatchSummary>[];
     final page = _positiveInt(json['page']) ?? 1;
@@ -39,7 +44,15 @@ class PlayerMatchHistoryPage {
     );
   }
 
-  static MatchSummary _summaryFromRecord(Map<String, dynamic> record) {
+  static MatchSummary _summaryFromRecord(
+    Map<String, dynamic> record,
+    Object? performanceSummaries,
+  ) {
+    // 분석이 끝난 경기는 서버가 performanceSummaries에 사망 페이즈를 함께 준다.
+    final performance = performanceSummaries is Map
+        ? performanceSummaries[record['match_id']]
+        : null;
+    final deathPhase = performance is Map ? performance['deathPhase'] : null;
     if (record['match_type']?.toString().trim().toLowerCase() ==
         'unavailable') {
       return MatchSummary.fallback(
@@ -62,6 +75,9 @@ class PlayerMatchHistoryPage {
       createdAt: DateTime.tryParse(record['played_at']?.toString() ?? ''),
       matchType: record['match_type']?.toString(),
       timeSurvived: _nonNegativeDouble(record['survival_time']) ?? 0,
+      deathPhase: deathPhase is num && deathPhase >= 0
+          ? deathPhase.toInt()
+          : null,
     );
   }
 }
